@@ -1,0 +1,20 @@
+# macOS 系统文件
+.DS_Store
+
+# 微信开发者工具私有配置（含个人环境、调试开关等）
+project.private.config.json
+
+# 小程序 project.config.json 中的真实 appid（建议保留文件但使用 touristappid）
+# 如已使用真实 appid，请勿提交
+
+# npm 依赖（如后续引入）
+node_modules/
+miniprogram_npm/
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+
+# 编辑器/IDE
+.vscode/
+.idea/
