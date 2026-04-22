@@ -1,0 +1,125 @@
+<view class="page">
+  <view class="ambient-bg"></view>
+
+  <view class="page-header-bar">
+    <view class="header-left">
+      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+    </view>
+    <text class="header-title">匹配</text>
+    <view class="header-action">
+      <view class="notification-dot"></view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="content" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Profile Card -->
+      <view class="profile-card anim-scale-in">
+        <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+        <view class="profile-info">
+          <text class="profile-name">{{matchName}}</text>
+          <text class="profile-bio">{{matchBio}}</text>
+          <view class="tag-list">
+            <view class="tag" wx:for="{{tags}}" wx:key="index">{{item}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Compatibility -->
+      <view class="compatibility-section anim-fade-in-up" style="animation-delay: 0.15s">
+        <view class="compatibility-header">
+          <text class="section-label">契合度</text>
+          <text class="compatibility-score">{{compatibility}}%</text>
+        </view>
+        <view class="compatibility-bar">
+          <view class="compatibility-fill" style="width: {{compatibility}}%;"></view>
+        </view>
+        <text class="compatibility-desc">你们在生活节奏和价值观上高度同频</text>
+      </view>
+
+      <!-- Why Matched -->
+      <view class="insight-section anim-fade-in-up" style="animation-delay: 0.25s">
+        <text class="section-label">为什么匹配</text>
+        <view class="insight-card">
+          <text class="quote-mark">"</text>
+          <text class="insight-text">你们同样偏好安静的周末与深度的自我对话，这种对「留白」的共同追求，为建立无压力的灵魂连接提供了土壤。</text>
+        </view>
+      </view>
+
+      <!-- Icebreakers -->
+      <view class="icebreaker-section anim-fade-in-up" style="animation-delay: 0.35s">
+        <text class="section-label">试试这样开场</text>
+        <view class="icebreaker-list">
+          <view class="icebreaker-item" wx:for="{{icebreakers}}" wx:key="index" bindtap="copyIcebreaker" data-text="{{item}}">
+            <text class="icebreaker-text">{{item}}</text>
+            <view class="copy-btn">复制</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-spacer"></view>
+    </view>
+  </scroll-view>
+
+  <!-- Floating Button -->
+  <view class="floating-action-bar anim-fade-in-up" style="animation-delay: 0.45s">
+    <button class="btn-start-chat" bindtap="startChat">
+      <text class="btn-text">开启对话</text>
+    </button>
+  </view>
+
+  <!-- Chat Dialog Overlay -->
+  <view wx:if="{{showChat}}" class="chat-overlay anim-fade-in">
+    <view class="chat-dialog anim-slide-up">
+      <!-- Chat Header -->
+      <view class="chat-header">
+        <view class="chat-header-left" bindtap="closeChat">
+          <view class="chat-back-arrow"></view>
+        </view>
+        <view class="chat-header-center">
+          <image class="chat-header-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+          <text class="chat-header-name">{{matchName}}</text>
+        </view>
+        <view class="chat-header-right">
+          <view class="chat-status-dot"></view>
+        </view>
+      </view>
+
+      <!-- Chat Messages -->
+      <scroll-view scroll-y class="chat-messages" scroll-into-view="msg-{{chatMessages.length - 1}}">
+        <view class="chat-welcome">
+          <text class="chat-welcome-text">你们已通过匹配相识</text>
+        </view>
+        <view
+          wx:for="{{chatMessages}}"
+          wx:key="id"
+          id="msg-{{index}}"
+          class="chat-msg {{item.sender === 'user' ? 'chat-msg-user' : 'chat-msg-match'}}"
+        >
+          <image wx:if="{{item.sender === 'match'}}" class="chat-msg-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+          <view class="chat-msg-bubble {{item.sender === 'user' ? 'chat-msg-bubble-user' : 'chat-msg-bubble-match'}}">
+            <text class="chat-msg-text">{{item.content}}</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <!-- Chat Input -->
+      <view class="chat-input-area">
+        <view class="chat-input-box">
+          <input
+            class="chat-input"
+            placeholder="说点什么..."
+            placeholder-class="chat-placeholder"
+            value="{{chatInput}}"
+            bindinput="onChatInput"
+            confirm-type="send"
+            bindconfirm="sendMessage"
+          />
+          <view class="chat-send-btn {{chatInput ? 'chat-send-active' : ''}}" bindtap="sendMessage">
+            <view class="send-arrow"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

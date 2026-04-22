@@ -1,0 +1,73 @@
+<view class="page">
+  <!-- Header -->
+  <view class="page-header-bar">
+    <view class="header-left">
+      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+    </view>
+    <text class="header-title">记忆库</text>
+    <view class="header-action">
+      <view class="notification-dot"></view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="content safe-bottom">
+    <view class="content-inner">
+      <!-- Tab Switcher -->
+      <view class="tab-switcher anim-fade-in">
+        <view class="tab-pill" bindtap="goToMemory">聊天</view>
+        <view class="tab-pill" bindtap="goToMemory">记忆</view>
+        <view class="tab-pill tab-pill-active">档案</view>
+      </view>
+
+      <!-- Personality Dimensions -->
+      <view class="archive-card anim-fade-in-up">
+        <view class="archive-header">
+          <view class="archive-icon icon-dimension"></view>
+          <text class="archive-title headline">人格维度</text>
+        </view>
+        <view class="dimension-list">
+          <view class="dimension" wx:for="{{dimensions}}" wx:key="index">
+            <view class="dimension-header">
+              <text class="dimension-name">{{item.name}}</text>
+              <text class="dimension-value value-{{item.color}}">{{item.value}}%</text>
+            </view>
+            <view class="progress-track">
+              <view class="progress-bar bar-{{item.color}}" style="width: {{item.value}}%;"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Core Traits -->
+      <view class="archive-card anim-fade-in-up" style="animation-delay: 0.12s">
+        <view class="archive-header">
+          <view class="archive-icon icon-trait"></view>
+          <text class="archive-title headline">核心特质</text>
+        </view>
+        <view class="trait-list">
+          <view class="trait trait-{{item.color}}" wx:for="{{traits}}" wx:key="index">
+            <text class="trait-name">{{item.name}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Match Suggestion -->
+      <view class="archive-card match-card anim-fade-in-up" style="animation-delay: 0.24s">
+        <view class="archive-header">
+          <view class="archive-icon icon-match"></view>
+          <text class="archive-title headline">推荐匹配</text>
+        </view>
+        <view class="match-item">
+          <view class="match-avatar">
+            <text class="match-avatar-letter">P</text>
+          </view>
+          <view class="match-info">
+            <text class="match-name">实用主义者 (Pragmatist)</text>
+            <text class="match-desc body">能与你的发散思维形成完美互补。</text>
+          </view>
+          <view class="match-arrow"></view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

@@ -1,0 +1,142 @@
+<view class="page explore-page">
+  <!-- Ambient Background -->
+  <view class="ambient-glow ambient-glow-1"></view>
+  <view class="ambient-glow ambient-glow-2"></view>
+
+  <!-- Header -->
+  <view class="page-header-bar explore-header">
+    <view class="header-left">
+      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+    </view>
+    <text class="header-title">广场</text>
+    <view class="header-action">
+      <view class="notification-dot"></view>
+    </view>
+  </view>
+
+  <!-- Feed -->
+  <scroll-view scroll-y class="feed safe-bottom" enable-back-to-top>
+    <view class="feed-inner">
+      <!-- Magazine Header -->
+      <view class="section-header anim-fade-in-up">
+        <view class="section-title-wrap">
+          <text class="section-title">此刻</text>
+          <text class="section-subtitle">来自社区的真实回响</text>
+        </view>
+        <view class="section-divider"></view>
+      </view>
+
+      <!-- Staggered Feed -->
+      <view class="feed-grid">
+        <view
+          class="post-card {{index === 0 ? 'post-featured' : ''}} {{index !== 0 && index % 2 === 0 ? 'post-left' : ''}} {{index !== 0 && index % 2 !== 0 ? 'post-right' : ''}} anim-fade-in-up"
+          style="animation-delay: {{0.15 + index * 0.1}}s"
+          wx:for="{{posts}}"
+          wx:key="id"
+        >
+          <!-- Post Header -->
+          <view class="post-header">
+            <view class="post-author">
+              <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+              <view class="post-meta">
+                <text class="post-name">{{item.author}}</text>
+                <text class="post-time">{{item.time}}</text>
+              </view>
+            </view>
+            <view class="post-more" bindtap="showShareMenu" data-id="{{item.id}}">
+              <view class="more-dot"></view>
+              <view class="more-dot"></view>
+              <view class="more-dot"></view>
+            </view>
+          </view>
+
+          <!-- Post Content -->
+          <view class="post-body">
+            <text class="post-text">{{item.content}}</text>
+          </view>
+
+          <!-- Post Actions -->
+          <view class="post-actions">
+            <view class="action-group {{item.liked ? 'action-liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">
+              <view class="action-icon icon-heart {{item.liked ? 'heart-active' : ''}} {{item.heartBeating ? 'heart-beating' : ''}}"></view>
+              <text class="action-count">{{item.likes}}</text>
+            </view>
+            <view class="action-group" bindtap="toggleComments" data-id="{{item.id}}">
+              <view class="action-icon icon-comment"></view>
+              <text class="action-count">{{item.comments.length}}</text>
+            </view>
+          </view>
+
+          <!-- Comments Section -->
+          <view class="comments-section {{item.showComments ? 'is-expanded' : ''}}">
+            <view class="comments-divider"></view>
+            <view class="comments-list">
+              <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
+                <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill"/>
+                <view class="comment-content">
+                  <text class="comment-author">{{c.author}}</text>
+                  <text class="comment-text">{{c.content}}</text>
+                </view>
+              </view>
+            </view>
+            <view class="comment-input-row">
+              <input class="comment-input" placeholder="写下你的评论..." placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" bindconfirm="addComment"/>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- Floating Action Button -->
+  <view class="fab-post anim-fade-in-up" style="animation-delay: 0.5s" bindtap="openPostPanel">
+    <view class="fab-icon"></view>
+  </view>
+
+  <!-- Post Panel Overlay -->
+  <view wx:if="{{showPostPanel}}" class="post-overlay anim-fade-in" bindtap="closePostPanel">
+    <view class="post-modal" catchtap="preventClose">
+      <view class="post-modal-header">
+        <text class="post-modal-title">发布动态</text>
+        <view class="post-modal-close" bindtap="closePostPanel">
+          <view class="close-icon"></view>
+        </view>
+      </view>
+      <textarea
+        class="post-modal-textarea"
+        placeholder="分享你此刻的想法..."
+        placeholder-class="post-placeholder"
+        value="{{postContent}}"
+        bindinput="onPostInput"
+        maxlength="500"
+        auto-height
+        focus="{{showPostPanel}}"
+      />
+
+      <!-- Image Upload -->
+      <view class="image-upload-area">
+        <scroll-view scroll-x class="image-scroll" show-scrollbar="false">
+          <view class="image-list">
+            <view class="image-item" wx:for="{{postImages}}" wx:key="index">
+              <image class="image-preview" src="{{item}}" mode="aspectFill" bindtap="previewImage" data-src="{{item}}"/>
+              <view class="image-delete" bindtap="deleteImage" data-index="{{index}}">
+                <view class="delete-icon"></view>
+              </view>
+            </view>
+            <view wx:if="{{postImages.length < 9}}" class="image-add" bindtap="chooseImage">
+              <view class="add-icon"></view>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <view class="post-modal-footer">
+        <text class="post-char-count">{{postContent.length}}/500</text>
+        <view class="post-submit-btn {{canSubmit ? 'post-submit-active' : ''}} {{isSubmitting ? 'post-submit-loading' : ''}}" bindtap="submitPost">
+          <text wx:if="{{!isSubmitting}}">发布</text>
+          <text wx:if="{{isSubmitting}}">发布中...</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

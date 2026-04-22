@@ -1,0 +1,96 @@
+<view class="page moments-page">
+  <!-- Header -->
+  <view class="page-header-bar moments-header">
+    <view class="header-left" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="header-title">我的动态</text>
+    <view class="header-action"></view>
+  </view>
+
+  <scroll-view scroll-y class="feed safe-bottom" enable-back-to-top>
+    <view class="feed-inner">
+      <!-- Empty State -->
+      <view wx:if="{{posts.length === 0}}" class="empty-state anim-fade-in-up">
+        <view class="empty-icon"></view>
+        <text class="empty-title">还没有发布过动态</text>
+        <text class="empty-desc">去广场分享你此刻的想法吧</text>
+      </view>
+
+      <!-- Post List -->
+      <view wx:if="{{posts.length > 0}}" class="feed-grid">
+        <view
+          class="post-card anim-fade-in-up"
+          style="animation-delay: {{index * 0.08}}s"
+          wx:for="{{posts}}"
+          wx:key="id"
+        >
+          <!-- Post Header -->
+          <view class="post-header">
+            <view class="post-author">
+              <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+              <view class="post-meta">
+                <text class="post-name">{{item.author}}</text>
+                <text class="post-time">{{item.time}}</text>
+              </view>
+            </view>
+            <view class="post-more" bindtap="deletePost" data-id="{{item.id}}">
+              <view class="more-dot"></view>
+              <view class="more-dot"></view>
+              <view class="more-dot"></view>
+            </view>
+          </view>
+
+          <!-- Post Content -->
+          <view class="post-body">
+            <text class="post-text">{{item.content}}</text>
+          </view>
+
+          <!-- Post Images -->
+          <view wx:if="{{item.images && item.images.length > 0}}" class="post-images">
+            <image
+              wx:for="{{item.images}}"
+              wx:for-item="img"
+              wx:key="index"
+              class="post-image {{item.images.length === 1 ? 'post-image-single' : ''}}"
+              src="{{img}}"
+              mode="aspectFill"
+              bindtap="previewImage"
+              data-src="{{img}}"
+              data-urls="{{item.images}}"
+            />
+          </view>
+
+          <!-- Post Actions -->
+          <view class="post-actions">
+            <view class="action-group {{item.liked ? 'action-liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">
+              <view class="action-icon icon-heart {{item.liked ? 'heart-active' : ''}} {{item.heartBeating ? 'heart-beating' : ''}}"></view>
+              <text class="action-count">{{item.likes}}</text>
+            </view>
+            <view class="action-group" bindtap="toggleComments" data-id="{{item.id}}">
+              <view class="action-icon icon-comment"></view>
+              <text class="action-count">{{item.comments.length}}</text>
+            </view>
+          </view>
+
+          <!-- Comments Section -->
+          <view class="comments-section {{item.showComments ? 'is-expanded' : ''}}">
+            <view class="comments-divider"></view>
+            <view class="comments-list">
+              <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
+                <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill"/>
+                <view class="comment-content">
+                  <text class="comment-author">{{c.author}}</text>
+                  <text class="comment-text">{{c.content}}</text>
+                </view>
+              </view>
+            </view>
+            <view class="comment-input-row">
+              <input class="comment-input" placeholder="写下你的评论..." placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" bindconfirm="addComment"/>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

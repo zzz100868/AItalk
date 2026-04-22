@@ -1,0 +1,185 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+
+/* ── Sub Header ── */
+.sub-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx;
+  padding-top: calc(20rpx + max(48rpx, env(safe-area-inset-top)));
+  background: rgba(250, 249, 247, 0.88);
+  backdrop-filter: saturate(180%) blur(24rpx);
+  -webkit-backdrop-filter: saturate(180%) blur(24rpx);
+  border-bottom: 1rpx solid var(--border-subtle);
+}
+
+.back-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999rpx;
+  transition: background var(--duration-fast) ease;
+}
+
+.back-btn:active {
+  background: var(--border-subtle);
+}
+
+.back-arrow {
+  width: 12rpx;
+  height: 12rpx;
+  border-top: 2rpx solid var(--text-primary);
+  border-left: 2rpx solid var(--text-primary);
+  transform: rotate(-45deg);
+}
+
+.sub-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.spacer {
+  width: 64rpx;
+}
+
+/* ── Content ── */
+.content {
+  height: calc(100vh - 110rpx - max(48rpx, env(safe-area-inset-top)));
+}
+
+.content-inner {
+  padding: 24rpx 32rpx 80rpx;
+}
+
+.page-header {
+  margin-bottom: 32rpx;
+  padding-left: 4rpx;
+}
+
+.page-title {
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.page-subtitle {
+  color: var(--text-tertiary);
+}
+
+/* ── Following List ── */
+.following-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.following-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--border-subtle);
+}
+
+.following-item:last-child {
+  border-bottom: none;
+}
+
+.following-info {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.following-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 9999rpx;
+  object-fit: cover;
+  border: 1rpx solid var(--border-subtle);
+}
+
+.official-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 9999rpx;
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid var(--border-subtle);
+}
+
+.official-letter {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.following-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.following-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.following-handle {
+  font-size: 24rpx;
+  color: var(--text-muted);
+}
+
+/* ── Follow Button ── */
+.follow-btn {
+  background: transparent;
+  border: 1rpx solid var(--border-medium);
+  color: var(--text-tertiary);
+  padding: 12rpx 28rpx;
+  border-radius: 9999rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  transition: all var(--duration-fast) var(--ease-spring);
+}
+
+.follow-btn:active {
+  opacity: 0.7;
+  transform: scale(0.92);
+  background: var(--border-subtle);
+}
+
+/* ── List End ── */
+.list-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  margin-top: 48rpx;
+}
+
+.list-end-line {
+  flex: 1;
+  height: 1rpx;
+  background: var(--border-subtle);
+  max-width: 60rpx;
+}
+
+.list-end-dot {
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 9999rpx;
+  background: var(--text-muted);
+}

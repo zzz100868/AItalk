@@ -1,0 +1,162 @@
+<view class="page">
+  <!-- Ambient Background Layer -->
+  <view class="ambient-glow ambient-glow-1"></view>
+  <view class="ambient-glow ambient-glow-2"></view>
+  <view class="ambient-gradient"></view>
+
+  <!-- Header -->
+  <view class="page-header-bar">
+    <view class="header-left">
+      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+    </view>
+    <text class="header-title">记忆库</text>
+    <view class="header-action">
+      <view class="notification-dot"></view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="content" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Tab Switcher -->
+      <view class="tab-switcher anim-fade-in">
+        <view class="tab-slider" style="transform: translateX({{tabSliderX}}%);"></view>
+        <view class="tab-pill {{activeTab === 'chat' ? 'tab-pill-active' : ''}}" bindtap="switchTab" data-tab="chat">
+          <text>对话</text>
+        </view>
+        <view class="tab-pill {{activeTab === 'memory' ? 'tab-pill-active' : ''}}" bindtap="switchTab" data-tab="memory">
+          <text>记忆</text>
+        </view>
+        <view class="tab-pill {{activeTab === 'archive' ? 'tab-pill-active' : ''}}" bindtap="switchTab" data-tab="archive">
+          <text>档案</text>
+        </view>
+      </view>
+
+      <!-- Chat View -->
+      <view wx:if="{{activeTab === 'chat'}}" class="chat-view">
+        <!-- Chat Status Bar -->
+        <view class="chat-status-bar anim-fade-in-up">
+          <view class="status-item">
+            <text class="status-num">{{chatDays}}</text>
+            <text class="status-label">连续对话</text>
+          </view>
+          <view class="status-divider"></view>
+          <view class="status-item">
+            <text class="status-num">{{chatMood}}</text>
+            <text class="status-label">今日心情</text>
+          </view>
+          <view class="status-divider"></view>
+          <view class="status-item">
+            <text class="status-num">{{chatTopics}}</text>
+            <text class="status-label">话题数</text>
+          </view>
+        </view>
+
+        <!-- Messages -->
+        <view class="messages">
+          <view
+            wx:for="{{messages}}"
+            wx:key="id"
+            class="msg-row {{item.sender === 'user' ? 'msg-user' : 'msg-ai'}}"
+            style="animation-delay: {{index * 0.08}}s"
+          >
+            <image wx:if="{{item.sender === 'ai'}}" class="ai-avatar-small" src="{{aiAvatar}}" mode="aspectFill"/>
+            <view class="msg-bubble {{item.sender === 'user' ? 'msg-bubble-user' : 'msg-bubble-ai'}}">
+              <text class="msg-text">{{item.content}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Memory View -->
+      <view wx:if="{{activeTab === 'memory'}}" class="memory-view">
+        <!-- Categories -->
+        <scroll-view scroll-x class="category-bar anim-fade-in" show-scrollbar="false">
+          <view class="category-list">
+            <view
+              wx:for="{{categories}}"
+              wx:key="id"
+              class="category-chip {{activeCategory === item.id ? 'category-chip-active' : ''}}"
+              bindtap="switchCategory"
+              data-id="{{item.id}}"
+            >
+              <text>{{item.name}}</text>
+            </view>
+          </view>
+        </scroll-view>
+
+        <!-- Insight Cards -->
+        <view class="insight-list">
+          <view
+            class="insight-card anim-fade-in-up"
+            style="animation-delay: {{index * 0.1}}s"
+            wx:for="{{filteredInsights}}"
+            wx:key="id"
+          >
+            <view class="insight-header">
+              <text class="insight-date">{{item.date}}</text>
+              <view class="insight-tag tag-{{item.tagColor}}">{{item.tag}}</view>
+            </view>
+            <text class="insight-title">{{item.title}}</text>
+            <text class="insight-content">{{item.content}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Archive View -->
+      <view wx:if="{{activeTab === 'archive'}}" class="archive-view">
+        <!-- About Me -->
+        <view class="archive-section anim-fade-in-up">
+          <view class="section-title">关于我</view>
+          <view class="about-card">
+            <text class="about-text">{{aboutMe}}</text>
+          </view>
+        </view>
+
+        <!-- Personality -->
+        <view class="archive-section anim-fade-in-up" style="animation-delay: 0.1s">
+          <view class="section-title">性格画像</view>
+          <view class="personality-card">
+            <view class="personality-item" wx:for="{{personalities}}" wx:key="index">
+              <text class="personality-name">{{item.name}}</text>
+              <text class="personality-desc">{{item.desc}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- Traits -->
+        <view class="archive-section anim-fade-in-up" style="animation-delay: 0.2s">
+          <view class="section-title">我的标签</view>
+          <view class="traits-wrap">
+            <view class="trait-item trait-{{item.color}}" wx:for="{{traits}}" wx:key="index">
+              <text>{{item.name}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- Match Suggestion -->
+        <view class="archive-section anim-fade-in-up" style="animation-delay: 0.3s">
+          <view class="section-title">推荐匹配</view>
+          <view class="match-card-simple">
+            <view class="match-avatar-simple">
+              <text>P</text>
+            </view>
+            <view class="match-info">
+              <text class="match-name">实用主义者</text>
+              <text class="match-desc">能与你形成很好的互补，带来稳定的陪伴感。</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- Chat Input -->
+  <view wx:if="{{activeTab === 'chat'}}" class="chat-input-area">
+    <view class="chat-input-box {{inputFocused ? 'chat-input-box-focused' : ''}}">
+      <input class="chat-input" placeholder="说点什么..." placeholder-class="input-placeholder" focus="{{inputFocused}}" bindfocus="onInputFocus" bindblur="onInputBlur"/>
+      <view class="send-btn">
+        <view class="send-arrow"></view>
+      </view>
+    </view>
+  </view>
+</view>

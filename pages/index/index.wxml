@@ -1,0 +1,119 @@
+<view class="page-container">
+  <!-- Ambient background -->
+  <view class="ambient-bg">
+    <view class="ambient-orb orb-1"></view>
+    <view class="ambient-orb orb-2"></view>
+    <view class="ambient-noise"></view>
+  </view>
+
+  <!-- Header -->
+  <view class="page-header-bar">
+    <view class="header-left">
+      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+    </view>
+    <text class="header-title">{{isCalling ? '通话中' : '聊天'}}</text>
+    <view class="header-action">
+      <view class="notification-dot"></view>
+    </view>
+  </view>
+
+  <!-- Main Content -->
+  <view class="main-content">
+    <view class="call-center">
+
+      <!-- ========== 通话结束状态 ========== -->
+      <block wx:if="{{!isCalling}}">
+        <!-- AI Avatar -->
+        <view class="avatar-zone anim-scale-in">
+          <view class="avatar-frame-static">
+            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+            <view class="avatar-overlay"></view>
+          </view>
+          <view class="avatar-offline-ring"></view>
+        </view>
+
+        <!-- Call Ended Info -->
+        <view class="call-info anim-fade-in-up" style="animation-delay: 0.2s">
+          <text class="ai-name display-md">{{aiName}}</text>
+          <text class="call-ended-caption caption">通话已结束</text>
+          <view class="call-meta">
+            <text class="call-duration">{{callDuration}}</text>
+            <text class="call-separator">·</text>
+            <text class="call-date">{{callDate}}</text>
+          </view>
+        </view>
+
+        <!-- Action Button -->
+        <view class="action-area anim-fade-in-up" style="animation-delay: 0.3s">
+          <view class="btn-primary" bindtap="startCall">
+            <view class="btn-icon icon-phone"></view>
+            <text>再次拨打</text>
+          </view>
+        </view>
+      </block>
+
+      <!-- ========== 通话中状态 ========== -->
+      <block wx:if="{{isCalling}}">
+        <!-- AI Avatar with glow -->
+        <view class="avatar-zone anim-scale-in">
+          <view class="avatar-ring-outer"></view>
+          <view class="avatar-ring-mid"></view>
+          <view class="avatar-float">
+            <view class="avatar-frame">
+              <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+              <view class="avatar-overlay"></view>
+            </view>
+          </view>
+          <view class="voice-wave-container">
+            <view class="voice-bar" wx:for="{{7}}" wx:key="index" style="animation-delay: {{index * 0.1}}s"></view>
+          </view>
+        </view>
+
+        <!-- Call Info -->
+        <view class="call-info anim-fade-in-up" style="animation-delay: 0.15s">
+          <text class="ai-name display-md">{{aiName}}</text>
+          <view class="call-status-row">
+            <view class="status-dot status-dot-live"></view>
+            <text class="call-status caption">实时语音 · {{callDuration}}</text>
+          </view>
+        </view>
+
+        <!-- Call Controls -->
+        <view class="controls">
+          <view class="control-item anim-fade-in-up" style="animation-delay: 0.25s" bindtap="toggleMute">
+            <view class="control-btn {{isMuted ? 'control-btn-active' : ''}}">
+              <view class="icon-mic {{isMuted ? 'icon-mic-off' : ''}}">
+                <view class="mic-body"></view>
+                <view class="mic-base"></view>
+                <view wx:if="{{isMuted}}" class="mic-slash"></view>
+              </view>
+            </view>
+            <text class="control-label">{{isMuted ? '已静音' : '静音'}}</text>
+          </view>
+
+          <view class="control-item control-main anim-fade-in-up" style="animation-delay: 0.35s" bindtap="endCall">
+            <view class="control-btn control-btn-end">
+              <view class="icon-phone-down">
+                <view class="phone-receiver"></view>
+                <view class="phone-arrow"></view>
+              </view>
+            </view>
+            <text class="control-label control-label-end">挂断</text>
+          </view>
+
+          <view class="control-item anim-fade-in-up" style="animation-delay: 0.45s" bindtap="toggleSpeaker">
+            <view class="control-btn {{isSpeakerOn ? 'control-btn-active' : ''}}">
+              <view class="icon-speaker">
+                <view class="speaker-body"></view>
+                <view class="speaker-wave"></view>
+                <view wx:if="{{isSpeakerOn}}" class="speaker-wave-2"></view>
+              </view>
+            </view>
+            <text class="control-label">{{isSpeakerOn ? '免提' : '听筒'}}</text>
+          </view>
+        </view>
+      </block>
+
+    </view>
+  </view>
+</view>

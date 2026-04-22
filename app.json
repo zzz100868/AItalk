@@ -1,0 +1,61 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/explore/explore",
+    "pages/match/match",
+    "pages/memory/memory",
+    "pages/archive/archive",
+    "pages/profile/profile",
+    "pages/followers/followers",
+    "pages/following/following",
+    "pages/moments/moments"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#faf9f7",
+    "navigationBarTitleText": "赛博聊机",
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "custom",
+    "backgroundColor": "#faf9f7"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#d1d5db",
+    "selectedColor": "#f4a3ad",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "聊天",
+        "iconPath": "images/tab_chat.png",
+        "selectedIconPath": "images/tab_chat_active.png"
+      },
+      {
+        "pagePath": "pages/explore/explore",
+        "text": "广场",
+        "iconPath": "images/tab_explore.png",
+        "selectedIconPath": "images/tab_explore_active.png"
+      },
+      {
+        "pagePath": "pages/match/match",
+        "text": "匹配",
+        "iconPath": "images/tab_match.png",
+        "selectedIconPath": "images/tab_match_active.png"
+      },
+      {
+        "pagePath": "pages/memory/memory",
+        "text": "记忆库",
+        "iconPath": "images/tab_memory.png",
+        "selectedIconPath": "images/tab_memory_active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "images/tab_profile.png",
+        "selectedIconPath": "images/tab_profile_active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

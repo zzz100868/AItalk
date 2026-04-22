@@ -1,0 +1,94 @@
+<view class="page">
+  <!-- 顶部氛围光晕背景 -->
+  <view class="hero-glow"></view>
+
+  <!-- Header -->
+  <view class="page-header-bar">
+    <view class="header-left"></view>
+    <text class="header-title">我的</text>
+    <view class="header-action">
+      <view class="notification-dot"></view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Profile Hero -->
+      <view class="profile-hero anim-fade-in-up">
+        <view class="avatar-wrapper">
+          <view class="avatar-frame anim-scale-in">
+            <image class="profile-avatar" src="{{userInfo.avatar}}" mode="aspectFill"/>
+            <view class="avatar-ring"></view>
+            <view class="avatar-ring-outer"></view>
+          </view>
+        </view>
+        <view class="profile-info">
+          <text class="profile-name">{{userInfo.nickName}}</text>
+          <view class="profile-id-row">
+            <text class="profile-id">ID {{userInfo.id}}</text>
+            <view class="id-copy" bindtap="copyId"></view>
+          </view>
+          <text class="profile-bio">{{userInfo.bio}}</text>
+        </view>
+      </view>
+
+      <!-- Stats -->
+      <view class="stats-card anim-fade-in-up" style="animation-delay: 0.1s">
+        <view class="stat-item" bindtap="goToFollowing">
+          <text class="stat-num">{{stats.following}}</text>
+          <text class="stat-label">关注</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item" bindtap="goToFollowers">
+          <text class="stat-num">{{stats.followers}}</text>
+          <text class="stat-label">粉丝</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-num">{{stats.likes}}</text>
+          <text class="stat-label">获赞</text>
+        </view>
+      </view>
+
+      <!-- Menu Section: 个人中心 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.18s">
+        <view class="section-header">
+          <text class="section-label">个人中心</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="goToMoments">
+            <view class="menu-item-content">
+              <text class="menu-title">我的动态</text>
+              <text class="menu-desc">查看你发布的内容</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+
+        </view>
+      </view>
+
+      <!-- Menu Section: 系统 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.26s">
+        <view class="section-header">
+          <text class="section-label">系统</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="goToSettings">
+            <view class="menu-item-content">
+              <text class="menu-title">设置</text>
+              <text class="menu-desc">账号、隐私与通知</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Version Footer -->
+      <view class="version-footer anim-fade-in-up" style="animation-delay: 0.34s">
+        <text class="version-text">Stitch AI v1.0</text>
+      </view>
+    </view>
+  </scroll-view>
+</view>

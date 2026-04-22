@@ -1,0 +1,202 @@
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab-bar-bg {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(180%) blur(32rpx);
+  -webkit-backdrop-filter: saturate(180%) blur(32rpx);
+  border-top: 1rpx solid rgba(28, 25, 23, 0.06);
+}
+
+.tab-bar-inner {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 16rpx 20rpx 20rpx;
+}
+
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 20rpx;
+  position: relative;
+  gap: 6rpx;
+  border-radius: 16rpx;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+
+.tab-item:active {
+  transform: scale(0.92);
+  background: rgba(28, 25, 23, 0.04);
+}
+
+.tab-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40rpx;
+  height: 40rpx;
+}
+
+/* ── CSS Icons ── */
+.tab-icon {
+  position: relative;
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Chat icon: speech bubble */
+.icon-chat::before {
+  content: '';
+  position: absolute;
+  width: 28rpx;
+  height: 22rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 10rpx 10rpx 10rpx 2rpx;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Explore icon: compass / globe */
+.icon-explore::before {
+  content: '';
+  position: absolute;
+  width: 24rpx;
+  height: 24rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 9999rpx;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.icon-explore::after {
+  content: '';
+  position: absolute;
+  width: 2rpx;
+  height: 28rpx;
+  background: currentColor;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* Match icon: heart / spark */
+.icon-match::before {
+  content: '';
+  position: absolute;
+  width: 22rpx;
+  height: 22rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 4rpx;
+  transform: translate(-50%, -50%) rotate(45deg);
+  top: 50%;
+  left: 50%;
+}
+
+/* Memory icon: layers / stack */
+.icon-memory::before {
+  content: '';
+  position: absolute;
+  width: 24rpx;
+  height: 16rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 2rpx;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -30%);
+}
+.icon-memory::after {
+  content: '';
+  position: absolute;
+  width: 24rpx;
+  height: 16rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 2rpx;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -80%);
+}
+
+/* Profile icon: person */
+.icon-profile::before {
+  content: '';
+  position: absolute;
+  width: 18rpx;
+  height: 18rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 9999rpx;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.icon-profile::after {
+  content: '';
+  position: absolute;
+  width: 26rpx;
+  height: 12rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 12rpx 12rpx 0 0;
+  border-bottom: none;
+  top: 70%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tab-label {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: #78716c;
+  letter-spacing: 0.04em;
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-icon {
+  color: #78716c;
+}
+
+.tab-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 9999rpx;
+  background: var(--accent);
+  opacity: 0;
+  filter: blur(20rpx);
+  transform: translate(-50%, -50%);
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+
+/* Active State */
+.tab-item.active .tab-label {
+  color: #1c1917;
+  font-weight: 600;
+}
+
+.tab-item.active .tab-icon {
+  color: #1c1917;
+  animation: tabBounce 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2rpx 8rpx rgba(196, 113, 90, 0.35));
+}
+
+.tab-item.active .tab-glow {
+  opacity: 0.18;
+}
+
+@keyframes tabBounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
