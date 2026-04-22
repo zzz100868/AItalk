@@ -1,0 +1,153 @@
+<view class="page settings-page">
+  <!-- Header -->
+  <view class="page-header-bar settings-header">
+    <view class="header-left" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="header-title">设置</text>
+    <view class="header-action"></view>
+  </view>
+
+  <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Profile Mini -->
+      <view class="profile-mini anim-fade-in-up">
+        <image class="mini-avatar" src="{{userInfo.avatar}}" mode="aspectFill"/>
+        <view class="mini-info">
+          <text class="mini-name">{{userInfo.nickName}}</text>
+          <text class="mini-id">ID {{userInfo.id}}</text>
+        </view>
+        <view class="mini-arrow"></view>
+      </view>
+
+      <!-- Section: 账号 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.08s">
+        <view class="section-header">
+          <text class="section-label">账号</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="goToEditProfile">
+            <view class="menu-item-content">
+              <text class="menu-title">编辑资料</text>
+              <text class="menu-desc">头像、昵称与个人简介</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+          <view class="menu-item" bindtap="goToAccountSecurity">
+            <view class="menu-item-content">
+              <text class="menu-title">账号与安全</text>
+              <text class="menu-desc">手机号、密码与登录方式</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 隐私 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.16s">
+        <view class="section-header">
+          <text class="section-label">隐私</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item menu-item-switch">
+            <view class="menu-item-content">
+              <text class="menu-title">公开动态</text>
+              <text class="menu-desc">允许所有人查看我的广场动态</text>
+            </view>
+            <switch class="menu-switch" color="#c4715a" checked="{{settings.publicMoments}}" data-key="publicMoments" bindchange="toggleSetting"/>
+          </view>
+          <view class="menu-item menu-item-switch">
+            <view class="menu-item-content">
+              <text class="menu-title">允许陌生人评论</text>
+              <text class="menu-desc">未关注的人也可以评论我的动态</text>
+            </view>
+            <switch class="menu-switch" color="#c4715a" checked="{{settings.allowStrangerComment}}" data-key="allowStrangerComment" bindchange="toggleSetting"/>
+          </view>
+          <view class="menu-item" bindtap="goToBlockedList">
+            <view class="menu-item-content">
+              <text class="menu-title">黑名单</text>
+              <text class="menu-desc">管理已屏蔽的用户</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 通知 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.24s">
+        <view class="section-header">
+          <text class="section-label">通知</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item menu-item-switch">
+            <view class="menu-item-content">
+              <text class="menu-title">新消息提醒</text>
+              <text class="menu-desc">接收聊天与评论的推送通知</text>
+            </view>
+            <switch class="menu-switch" color="#c4715a" checked="{{settings.pushNewMessage}}" data-key="pushNewMessage" bindchange="toggleSetting"/>
+          </view>
+          <view class="menu-item menu-item-switch">
+            <view class="menu-item-content">
+              <text class="menu-title">点赞提醒</text>
+              <text class="menu-desc">当有人点赞我的动态时通知我</text>
+            </view>
+            <switch class="menu-switch" color="#c4715a" checked="{{settings.pushLike}}" data-key="pushLike" bindchange="toggleSetting"/>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 通用 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.32s">
+        <view class="section-header">
+          <text class="section-label">通用</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="clearCache">
+            <view class="menu-item-content">
+              <text class="menu-title">清除缓存</text>
+              <text class="menu-desc">释放本地存储空间</text>
+            </view>
+            <text class="menu-extra">{{cacheSize}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 关于 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.4s">
+        <view class="section-header">
+          <text class="section-label">关于</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="checkUpdate">
+            <view class="menu-item-content">
+              <text class="menu-title">检查更新</text>
+            </view>
+            <text class="menu-extra">v{{version}}</text>
+          </view>
+          <view class="menu-item" bindtap="goToUserAgreement">
+            <view class="menu-item-content">
+              <text class="menu-title">用户协议</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+          <view class="menu-item" bindtap="goToPrivacyPolicy">
+            <view class="menu-item-content">
+              <text class="menu-title">隐私政策</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Footer -->
+      <view class="version-footer anim-fade-in-up" style="animation-delay: 0.48s">
+        <text class="version-text">Stitch AI v{{version}}</text>
+      </view>
+    </view>
+  </scroll-view>
+</view>

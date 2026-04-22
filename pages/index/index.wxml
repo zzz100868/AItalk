@@ -8,7 +8,7 @@
 
   <!-- Header -->
   <view class="page-header-bar">
-    <view class="header-left">
+    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
       <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
     </view>
     <text class="header-title">{{isCalling ? '通话中' : '聊天'}}</text>

@@ -66,5 +66,11 @@ Page({
         wx.showToast({ title: '已复制', icon: 'none' })
       }
     })
+  },
+
+  goToUserHome(e) {
+    const author = e.currentTarget.dataset.author
+    if (!author) return
+    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
   }
 })

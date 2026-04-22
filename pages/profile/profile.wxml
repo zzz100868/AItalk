@@ -15,7 +15,7 @@
     <view class="content-inner">
       <!-- Profile Hero -->
       <view class="profile-hero anim-fade-in-up">
-        <view class="avatar-wrapper">
+        <view class="avatar-wrapper" bindtap="goToMyHome">
           <view class="avatar-frame anim-scale-in">
             <image class="profile-avatar" src="{{userInfo.avatar}}" mode="aspectFill"/>
             <view class="avatar-ring"></view>

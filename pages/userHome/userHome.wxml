@@ -1,0 +1,145 @@
+<view class="page user-home-page">
+  <!-- Header -->
+  <view class="page-header-bar user-home-header">
+    <view class="header-left" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="header-title">{{userInfo.name}}</text>
+    <view class="header-action"></view>
+  </view>
+
+  <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Profile Hero -->
+      <view class="profile-hero anim-fade-in-up">
+        <view class="avatar-wrapper">
+          <view class="avatar-frame anim-scale-in">
+            <image class="profile-avatar" src="{{userInfo.avatar}}" mode="aspectFill" lazy-load/>
+            <view class="avatar-ring"></view>
+            <view class="avatar-ring-outer"></view>
+          </view>
+        </view>
+        <view class="profile-info">
+          <text class="profile-name">{{userInfo.name}}</text>
+          <text class="profile-handle">{{userInfo.handle}}</text>
+          <text class="profile-bio">{{userInfo.bio}}</text>
+        </view>
+      </view>
+
+      <!-- Stats -->
+      <view class="stats-card anim-fade-in-up" style="animation-delay: 0.1s">
+        <view class="stat-item">
+          <text class="stat-num">{{stats.following}}</text>
+          <text class="stat-label">关注</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-num">{{stats.followers}}</text>
+          <text class="stat-label">粉丝</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-num">{{stats.likes}}</text>
+          <text class="stat-label">获赞</text>
+        </view>
+      </view>
+
+      <!-- Action Buttons -->
+      <view class="action-bar anim-fade-in-up" style="animation-delay: 0.15s" wx:if="{{!isMe}}">
+        <view class="action-btn {{isFollowing ? 'action-btn-active' : ''}}" bindtap="toggleFollow">
+          <text>{{isFollowing ? '已关注' : '关注'}}</text>
+        </view>
+      </view>
+      <view class="action-bar anim-fade-in-up" style="animation-delay: 0.15s" wx:if="{{isMe}}">
+        <view class="action-btn action-btn-secondary" bindtap="goToEditProfile">
+          <text>编辑资料</text>
+        </view>
+      </view>
+
+      <!-- Posts Section -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.2s">
+        <view class="section-header">
+          <text class="section-label">动态</text>
+          <view class="section-line"></view>
+        </view>
+
+        <!-- Empty State -->
+        <view wx:if="{{posts.length === 0}}" class="empty-state">
+          <view class="empty-icon"></view>
+          <text class="empty-title">还没有发布过动态</text>
+          <text class="empty-desc">去广场分享你此刻的想法吧</text>
+        </view>
+
+        <!-- Post List -->
+        <view wx:if="{{posts.length > 0}}" class="feed-grid">
+          <view
+            class="post-card anim-fade-in-up"
+            style="animation-delay: {{index * 0.08}}s"
+            wx:for="{{posts}}"
+            wx:key="id"
+          >
+            <!-- Post Header -->
+            <view class="post-header">
+              <view class="post-author">
+                <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill" lazy-load/>
+                <view class="post-meta">
+                  <text class="post-name">{{item.author}}</text>
+                  <text class="post-time">{{item.time}}</text>
+                </view>
+              </view>
+            </view>
+
+            <!-- Post Content -->
+            <view class="post-body">
+              <text class="post-text">{{item.content}}</text>
+            </view>
+
+            <!-- Post Images -->
+            <view wx:if="{{item.images && item.images.length > 0}}" class="post-images">
+              <image
+                wx:for="{{item.images}}"
+                wx:for-item="img"
+                wx:key="index"
+                class="post-image {{item.images.length === 1 ? 'post-image-single' : ''}}"
+                src="{{img}}"
+                mode="aspectFill" lazy-load
+                bindtap="previewImage"
+                data-src="{{img}}"
+                data-urls="{{item.images}}"
+              />
+            </view>
+
+            <!-- Post Actions -->
+            <view class="post-actions">
+              <view class="action-group {{item.liked ? 'action-liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">
+                <view class="action-icon icon-heart {{item.liked ? 'heart-active' : ''}} {{item.heartBeating ? 'heart-beating' : ''}}"></view>
+                <text class="action-count">{{item.likes}}</text>
+              </view>
+              <view class="action-group" bindtap="toggleComments" data-id="{{item.id}}">
+                <view class="action-icon icon-comment"></view>
+                <text class="action-count">{{item.comments.length}}</text>
+              </view>
+            </view>
+
+            <!-- Comments Section -->
+            <view class="comments-section {{item.showComments ? 'is-expanded' : ''}}">
+              <view class="comments-divider"></view>
+              <view class="comments-list">
+                <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
+                  <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill" lazy-load/>
+                  <view class="comment-content">
+                    <text class="comment-author">{{c.author}}</text>
+                    <text class="comment-text">{{c.content}}</text>
+                  </view>
+                </view>
+              </view>
+              <view class="comment-input-row">
+                <input class="comment-input" placeholder="写下你的评论..." placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" bindconfirm="addComment"/>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

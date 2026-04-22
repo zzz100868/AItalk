@@ -177,5 +177,11 @@ Page({
 
   showAttachMenu() {},
 
-  startVoice() {}
+  startVoice() {},
+
+  goToUserHome(e) {
+    const author = e.currentTarget.dataset.author
+    if (!author) return
+    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+  }
 })

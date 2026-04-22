@@ -8,7 +8,10 @@
     "pages/profile/profile",
     "pages/followers/followers",
     "pages/following/following",
-    "pages/moments/moments"
+    "pages/moments/moments",
+    "pages/settings/settings",
+    "pages/editProfile/editProfile",
+    "pages/userHome/userHome"
   ],
   "window": {
     "backgroundTextStyle": "light",

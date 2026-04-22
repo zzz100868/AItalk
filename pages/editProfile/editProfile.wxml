@@ -1,0 +1,76 @@
+<view class="page edit-profile-page">
+  <!-- Header -->
+  <view class="page-header-bar edit-header">
+    <view class="header-left" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="header-title">编辑资料</text>
+    <view class="header-action">
+      <view class="save-btn {{canSave ? 'save-btn-active' : ''}}" bindtap="saveProfile">
+        <text>保存</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Avatar Section -->
+      <view class="avatar-section anim-fade-in-up">
+        <view class="avatar-wrapper" bindtap="chooseAvatar">
+          <image class="edit-avatar" src="{{avatar}}" mode="aspectFill"/>
+          <view class="avatar-mask">
+            <view class="camera-icon"></view>
+          </view>
+        </view>
+        <text class="avatar-hint">点击更换头像</text>
+      </view>
+
+      <!-- Form Card -->
+      <view class="form-card anim-fade-in-up" style="animation-delay: 0.1s">
+        <!-- Nickname -->
+        <view class="form-item">
+          <text class="form-label">昵称</text>
+          <input
+            class="form-input"
+            value="{{nickName}}"
+            placeholder="请输入昵称"
+            placeholder-class="form-placeholder"
+            maxlength="20"
+            bindinput="onInputNickName"
+          />
+        </view>
+
+        <!-- Divider -->
+        <view class="form-divider"></view>
+
+        <!-- ID -->
+        <view class="form-item">
+          <text class="form-label">ID</text>
+          <text class="form-value">{{id}}</text>
+        </view>
+
+        <!-- Divider -->
+        <view class="form-divider"></view>
+
+        <!-- Bio -->
+        <view class="form-item form-item-stack">
+          <text class="form-label">个人简介</text>
+          <textarea
+            class="form-textarea"
+            value="{{bio}}"
+            placeholder="介绍一下自己..."
+            placeholder-class="form-placeholder"
+            maxlength="100"
+            auto-height
+            bindinput="onInputBio"
+          />
+        </view>
+      </view>
+
+      <!-- Hint -->
+      <view class="form-hint anim-fade-in-up" style="animation-delay: 0.2s">
+        <text>资料仅用于站内展示，我们不会向第三方分享你的个人信息。</text>
+      </view>
+    </view>
+  </scroll-view>
+</view>

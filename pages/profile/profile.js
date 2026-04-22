@@ -13,16 +13,34 @@ Page({
     }
   },
 
+  loadStats() {
+    const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
+    this.setData({
+      'stats.following': (followData.following || []).length,
+      'stats.followers': followData.followerCounts['林夕'] || '3.2k'
+    })
+  },
+
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 4 })
     }
+    this.loadUserInfo()
+    this.loadStats()
   },
 
   onLoad() {
+    this.loadUserInfo()
+  },
+
+  loadUserInfo() {
     const app = getApp()
+    const cache = app.globalData._cache
+    const saved = cache?.profile || wx.getStorageSync('userProfile') || {}
     this.setData({
-      'userInfo.avatar': app.globalData.userInfo.avatarUrl || this.data.userInfo.avatar
+      'userInfo.avatar': saved.avatar || app.globalData.userInfo.avatarUrl || this.data.userInfo.avatar,
+      'userInfo.nickName': saved.nickName || app.globalData.userInfo.nickName || this.data.userInfo.nickName,
+      'userInfo.bio': saved.bio || this.data.userInfo.bio
     })
   },
 
@@ -43,7 +61,7 @@ Page({
   },
 
   goToSettings() {
-    wx.showToast({ title: '设置', icon: 'none' })
+    wx.navigateTo({ url: '/pages/settings/settings' })
   },
 
   copyId() {
@@ -53,5 +71,9 @@ Page({
         wx.showToast({ title: '已复制 ID', icon: 'none' })
       }
     })
+  },
+
+  goToMyHome() {
+    wx.navigateTo({ url: '/pages/userHome/userHome?author=林夕' })
   }
 })

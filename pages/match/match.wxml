@@ -2,7 +2,7 @@
   <view class="ambient-bg"></view>
 
   <view class="page-header-bar">
-    <view class="header-left">
+    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
       <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
     </view>
     <text class="header-title">匹配</text>
@@ -15,7 +15,7 @@
     <view class="content-inner">
       <!-- Profile Card -->
       <view class="profile-card anim-scale-in">
-        <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+        <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
         <view class="profile-info">
           <text class="profile-name">{{matchName}}</text>
           <text class="profile-bio">{{matchBio}}</text>
@@ -77,7 +77,7 @@
           <view class="chat-back-arrow"></view>
         </view>
         <view class="chat-header-center">
-          <image class="chat-header-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+          <image class="chat-header-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
           <text class="chat-header-name">{{matchName}}</text>
         </view>
         <view class="chat-header-right">
@@ -96,7 +96,7 @@
           id="msg-{{index}}"
           class="chat-msg {{item.sender === 'user' ? 'chat-msg-user' : 'chat-msg-match'}}"
         >
-          <image wx:if="{{item.sender === 'match'}}" class="chat-msg-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+          <image wx:if="{{item.sender === 'match'}}" class="chat-msg-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
           <view class="chat-msg-bubble {{item.sender === 'user' ? 'chat-msg-bubble-user' : 'chat-msg-bubble-match'}}">
             <text class="chat-msg-text">{{item.content}}</text>
           </view>

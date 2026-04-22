@@ -6,7 +6,7 @@
 
   <!-- Header -->
   <view class="page-header-bar">
-    <view class="header-left">
+    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
       <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
     </view>
     <text class="header-title">记忆库</text>
@@ -59,7 +59,7 @@
             class="msg-row {{item.sender === 'user' ? 'msg-user' : 'msg-ai'}}"
             style="animation-delay: {{index * 0.08}}s"
           >
-            <image wx:if="{{item.sender === 'ai'}}" class="ai-avatar-small" src="{{aiAvatar}}" mode="aspectFill"/>
+            <image wx:if="{{item.sender === 'ai'}}" class="ai-avatar-small" src="{{aiAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="Stitch AI"/>
             <view class="msg-bubble {{item.sender === 'user' ? 'msg-bubble-user' : 'msg-bubble-ai'}}">
               <text class="msg-text">{{item.content}}</text>
             </view>

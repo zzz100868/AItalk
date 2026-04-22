@@ -4,11 +4,22 @@ Page({
       this.getTabBar().setData({ selected: 1 })
     }
     this.loadMyPosts()
+    this.loadUserAvatar()
+  },
+
+  loadUserAvatar() {
+    const saved = wx.getStorageSync('userProfile')
+    if (saved?.avatar) {
+      this.setData({ userAvatar: saved.avatar })
+    }
   },
 
   loadMyPosts() {
     const myPosts = wx.getStorageSync('myPosts') || []
     if (myPosts.length === 0) return
+    const lastId = myPosts[myPosts.length - 1].id
+    if (lastId === this._lastMyPostsId) return
+    this._lastMyPostsId = lastId
     const existingIds = new Set(this.data.posts.map(p => p.id))
     const newPosts = myPosts.filter(p => !existingIds.has(p.id))
     if (newPosts.length > 0) {
@@ -100,42 +111,43 @@ Page({
 
   toggleLike(e) {
     const id = e.currentTarget.dataset.id
-    let triggeredHeartBeat = false
-    const posts = this.data.posts.map(p => {
-      if (p.id === id) {
-        const newLiked = !p.liked
-        triggeredHeartBeat = newLiked
-        return {
-          ...p,
-          liked: newLiked,
-          likes: p.liked ? p.likes - 1 : p.likes + 1,
-          heartBeating: newLiked
-        }
-      }
-      return p
-    })
-    this.setData({ posts })
+    const posts = this.data.posts
+    const idx = posts.findIndex(p => p.id === id)
+    if (idx === -1) return
 
-    if (triggeredHeartBeat) {
+    const post = posts[idx]
+    const newLiked = !post.liked
+    post.liked = newLiked
+    post.likes = newLiked ? post.likes + 1 : post.likes - 1
+
+    const update = {
+      [`posts[${idx}].liked`]: newLiked,
+      [`posts[${idx}].likes`]: post.likes
+    }
+    if (newLiked) {
+      post.heartBeating = true
+      update[`posts[${idx}].heartBeating`] = true
+    }
+    this.setData(update)
+    wx.setStorage({ key: 'myPosts', data: posts })
+
+    if (newLiked) {
       setTimeout(() => {
-        const clearedPosts = this.data.posts.map(p => {
-          if (p.id === id) return { ...p, heartBeating: false }
-          return p
-        })
-        this.setData({ posts: clearedPosts })
+        post.heartBeating = false
+        this.setData({ [`posts[${idx}].heartBeating`]: false })
       }, 500)
     }
   },
 
   toggleComments(e) {
     const id = e.currentTarget.dataset.id
-    const posts = this.data.posts.map(p => {
-      if (p.id === id) {
-        return { ...p, showComments: !p.showComments }
-      }
-      return p
-    })
-    this.setData({ posts })
+    const posts = this.data.posts
+    const idx = posts.findIndex(p => p.id === id)
+    if (idx === -1) return
+    const newShow = !posts[idx].showComments
+    posts[idx].showComments = newShow
+    this.setData({ [`posts[${idx}].showComments`]: newShow })
+    wx.setStorage({ key: 'myPosts', data: posts })
   },
 
   addComment(e) {
@@ -143,26 +155,36 @@ Page({
     const content = e.detail.value
     if (!content || !content.trim()) return
 
-    const posts = this.data.posts.map(p => {
-      if (p.id === postId) {
-        const newComment = {
-          id: Date.now(),
-          author: '林夕',
-          avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
-          content: content.trim()
-        }
-        return { ...p, comments: [...p.comments, newComment], commentInput: '' }
-      }
-      return p
+    const posts = this.data.posts
+    const idx = posts.findIndex(p => p.id === postId)
+    if (idx === -1) return
+
+    const newComment = {
+      id: Date.now(),
+      author: '林夕',
+      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
+      content: content.trim()
+    }
+    posts[idx].comments.push(newComment)
+    posts[idx].commentInput = ''
+
+    this.setData({
+      [`posts[${idx}].comments`]: posts[idx].comments,
+      [`posts[${idx}].commentInput`]: ''
     })
-    this.setData({ posts })
+    wx.setStorage({ key: 'myPosts', data: posts })
   },
 
   showShareMenu(e) {
     const id = e.currentTarget.dataset.id
     const post = this.data.posts.find(p => p.id === id)
+    const isMine = post.author === '林夕'
+    const itemList = isMine
+      ? ['分享给好友', '复制链接', '收藏', '删除']
+      : ['分享给好友', '复制链接', '收藏']
     wx.showActionSheet({
-      itemList: ['分享给好友', '复制链接', '收藏'],
+      itemList,
+      itemColor: isMine ? '#c45a5a' : '',
       success: (res) => {
         if (res.tapIndex === 0) {
           wx.showToast({ title: '已准备分享', icon: 'none' })
@@ -173,6 +195,20 @@ Page({
           })
         } else if (res.tapIndex === 2) {
           wx.showToast({ title: '已收藏', icon: 'none' })
+        } else if (res.tapIndex === 3 && isMine) {
+          wx.showModal({
+            title: '确认删除',
+            content: '确定要删除这条动态吗？',
+            confirmColor: '#c45a5a',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                const posts = this.data.posts.filter(p => p.id !== id)
+                this.setData({ posts })
+                wx.setStorage({ key: 'myPosts', data: posts })
+                wx.showToast({ title: '已删除', icon: 'none' })
+              }
+            }
+          })
         }
       }
     })
@@ -180,6 +216,12 @@ Page({
 
   goToProfile() {
     wx.switchTab({ url: '/pages/profile/profile' })
+  },
+
+  goToUserHome(e) {
+    const author = e.currentTarget.dataset.author
+    if (!author) return
+    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
   },
 
   openPostPanel() {
@@ -244,10 +286,13 @@ Page({
 
     this.setData({ isSubmitting: true })
 
+    const saved = wx.getStorageSync('userProfile')
+    const author = saved?.nickName || '林夕'
+    const avatar = saved?.avatar || 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5'
     const newPost = {
       id: Date.now(),
-      author: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
+      author,
+      avatar,
       time: '刚刚',
       content: content,
       images: images,
@@ -259,7 +304,8 @@ Page({
 
     const myPosts = wx.getStorageSync('myPosts') || []
     myPosts.unshift(newPost)
-    wx.setStorageSync('myPosts', myPosts)
+    wx.setStorage({ key: 'myPosts', data: myPosts })
+    this._lastMyPostsId = newPost.id
 
     this.setData({
       posts: [newPost, ...this.data.posts],

@@ -5,8 +5,8 @@
 
   <!-- Header -->
   <view class="page-header-bar explore-header">
-    <view class="header-left">
-      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
+      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill" lazy-load/>
     </view>
     <text class="header-title">广场</text>
     <view class="header-action">
@@ -36,8 +36,8 @@
         >
           <!-- Post Header -->
           <view class="post-header">
-            <view class="post-author">
-              <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+            <view class="post-author" bindtap="goToUserHome" data-author="{{item.author}}">
+              <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill" lazy-load/>
               <view class="post-meta">
                 <text class="post-name">{{item.author}}</text>
                 <text class="post-time">{{item.time}}</text>
@@ -72,7 +72,7 @@
             <view class="comments-divider"></view>
             <view class="comments-list">
               <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
-                <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill"/>
+                <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill" lazy-load bindtap="goToUserHome" data-author="{{c.author}}"/>
                 <view class="comment-content">
                   <text class="comment-author">{{c.author}}</text>
                   <text class="comment-text">{{c.content}}</text>
@@ -118,7 +118,7 @@
         <scroll-view scroll-x class="image-scroll" show-scrollbar="false">
           <view class="image-list">
             <view class="image-item" wx:for="{{postImages}}" wx:key="index">
-              <image class="image-preview" src="{{item}}" mode="aspectFill" bindtap="previewImage" data-src="{{item}}"/>
+              <image class="image-preview" src="{{item}}" mode="aspectFill" lazy-load bindtap="previewImage" data-src="{{item}}"/>
               <view class="image-delete" bindtap="deleteImage" data-index="{{index}}">
                 <view class="delete-icon"></view>
               </view>

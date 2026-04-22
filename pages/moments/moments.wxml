@@ -27,8 +27,8 @@
         >
           <!-- Post Header -->
           <view class="post-header">
-            <view class="post-author">
-              <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+            <view class="post-author" bindtap="goToUserHome" data-author="{{item.author}}">
+              <image class="post-avatar" src="{{item.avatar}}" mode="aspectFill" lazy-load/>
               <view class="post-meta">
                 <text class="post-name">{{item.author}}</text>
                 <text class="post-time">{{item.time}}</text>
@@ -54,7 +54,7 @@
               wx:key="index"
               class="post-image {{item.images.length === 1 ? 'post-image-single' : ''}}"
               src="{{img}}"
-              mode="aspectFill"
+              mode="aspectFill" lazy-load
               bindtap="previewImage"
               data-src="{{img}}"
               data-urls="{{item.images}}"
@@ -78,7 +78,7 @@
             <view class="comments-divider"></view>
             <view class="comments-list">
               <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
-                <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill"/>
+                <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill" lazy-load bindtap="goToUserHome" data-author="{{c.author}}"/>
                 <view class="comment-content">
                   <text class="comment-author">{{c.author}}</text>
                   <text class="comment-text">{{c.content}}</text>

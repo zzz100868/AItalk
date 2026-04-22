@@ -59,5 +59,11 @@ Page({
   toggleSpeaker() {
     this.setData({ isSpeakerOn: !this.data.isSpeakerOn })
     wx.showToast({ title: this.data.isSpeakerOn ? '免提已开' : '免提已关', icon: 'none' })
+  },
+
+  goToUserHome(e) {
+    const author = e.currentTarget.dataset.author
+    if (!author) return
+    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
   }
 })

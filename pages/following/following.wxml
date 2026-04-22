@@ -22,7 +22,7 @@
           wx:for="{{following}}"
           wx:key="id"
         >
-          <view class="following-info">
+          <view class="following-info" bindtap="goToUserHome" data-name="{{item.name}}">
             <view wx:if="{{item.isOfficial}}" class="following-avatar official-avatar">
               <text class="official-letter">{{item.name[0]}}</text>
             </view>

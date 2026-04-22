@@ -22,7 +22,7 @@
           wx:for="{{followers}}"
           wx:key="id"
         >
-          <view class="follower-info">
+          <view class="follower-info" bindtap="goToUserHome" data-name="{{item.name}}">
             <image class="follower-avatar" src="{{item.avatar}}" mode="aspectFill"/>
             <view class="follower-meta">
               <text class="follower-name">{{item.name}}</text>
