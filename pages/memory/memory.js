@@ -3,6 +3,7 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
     }
+    this.loadInsights()
   },
 
   data: {
@@ -133,11 +134,27 @@ Page({
       { name: '细节控', color: 'mint' },
       { name: '慢热型', color: 'bloom' },
       { name: '理想主义者', color: 'sky' }
-    ]
+    ],
+    showEditModal: false,
+    editId: null,
+    editTitle: '',
+    editContent: ''
   },
 
   onLoad() {
-    this.filterInsights()
+    this.loadInsights()
+  },
+
+  loadInsights() {
+    const stored = wx.getStorageSync('memoryInsights')
+    if (stored && stored.length > 0) {
+      this.setData({ insights: stored }, () => {
+        this.filterInsights()
+      })
+    } else {
+      wx.setStorage({ key: 'memoryInsights', data: this.data.insights })
+      this.filterInsights()
+    }
   },
 
   switchTab(e) {
@@ -178,6 +195,80 @@ Page({
   showAttachMenu() {},
 
   startVoice() {},
+
+  onInsightLongPress(e) {
+    const id = e.currentTarget.dataset.id
+    wx.showActionSheet({
+      itemList: ['编辑', '删除'],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          this.openEditModal(id)
+        } else if (res.tapIndex === 1) {
+          this.deleteInsight(id)
+        }
+      }
+    })
+  },
+
+  deleteInsight(id) {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除这条记忆吗？',
+      confirmColor: '#c4715a',
+      success: (res) => {
+        if (res.confirm) {
+          const insights = this.data.insights.filter(i => i.id !== id)
+          this.setData({ insights }, () => {
+            this.filterInsights()
+          })
+          wx.setStorage({ key: 'memoryInsights', data: insights })
+          wx.showToast({ title: '已删除', icon: 'none' })
+        }
+      }
+    })
+  },
+
+  openEditModal(id) {
+    const item = this.data.insights.find(i => i.id === id)
+    if (!item) return
+    this.setData({
+      showEditModal: true,
+      editId: id,
+      editTitle: item.title,
+      editContent: item.content
+    })
+  },
+
+  cancelEdit() {
+    this.setData({ showEditModal: false, editId: null })
+  },
+
+  preventBubble() {},
+
+  onEditTitleInput(e) {
+    this.setData({ editTitle: e.detail.value })
+  },
+
+  onEditContentInput(e) {
+    this.setData({ editContent: e.detail.value })
+  },
+
+  saveEdit() {
+    const { editId, editTitle, editContent, insights } = this.data
+    if (!editTitle.trim() || !editContent.trim()) {
+      wx.showToast({ title: '标题和内容不能为空', icon: 'none' })
+      return
+    }
+    const idx = insights.findIndex(i => i.id === editId)
+    if (idx === -1) return
+    insights[idx].title = editTitle.trim()
+    insights[idx].content = editContent.trim()
+    this.setData({ insights, showEditModal: false, editId: null }, () => {
+      this.filterInsights()
+    })
+    wx.setStorage({ key: 'memoryInsights', data: insights })
+    wx.showToast({ title: '已保存', icon: 'none' })
+  },
 
   goToUserHome(e) {
     const author = e.currentTarget.dataset.author

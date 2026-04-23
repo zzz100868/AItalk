@@ -91,6 +91,8 @@
             style="animation-delay: {{index * 0.1}}s"
             wx:for="{{filteredInsights}}"
             wx:key="id"
+            bindlongpress="onInsightLongPress"
+            data-id="{{item.id}}"
           >
             <view class="insight-header">
               <text class="insight-date">{{item.date}}</text>
@@ -98,6 +100,7 @@
             </view>
             <text class="insight-title">{{item.title}}</text>
             <text class="insight-content">{{item.content}}</text>
+            <view class="insight-hint">长按可编辑或删除</view>
           </view>
         </view>
       </view>
@@ -156,6 +159,21 @@
       <input class="chat-input" placeholder="说点什么..." placeholder-class="input-placeholder" focus="{{inputFocused}}" bindfocus="onInputFocus" bindblur="onInputBlur"/>
       <view class="send-btn">
         <view class="send-arrow"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Edit Modal -->
+  <view wx:if="{{showEditModal}}" class="modal-overlay" bindtap="cancelEdit">
+    <view class="modal-dialog" catchtap="preventBubble">
+      <view class="modal-header">编辑记忆</view>
+      <view class="modal-body">
+        <input class="modal-input" placeholder="标题" value="{{editTitle}}" bindinput="onEditTitleInput"/>
+        <textarea class="modal-textarea" placeholder="内容" value="{{editContent}}" bindinput="onEditContentInput" maxlength="-1"/>
+      </view>
+      <view class="modal-footer">
+        <view class="modal-btn cancel" bindtap="cancelEdit">取消</view>
+        <view class="modal-btn confirm" bindtap="saveEdit">保存</view>
       </view>
     </view>
   </view>

@@ -577,3 +577,111 @@
   from { opacity: 0; transform: translateX(-20rpx); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* ═══════════════════════════════════════
+   Insight Hint
+   ═══════════════════════════════════════ */
+
+.insight-hint {
+  font-size: 20rpx;
+  color: var(--text-muted);
+  margin-top: 8rpx;
+  opacity: 0.6;
+}
+
+/* ═══════════════════════════════════════
+   Edit Modal
+   ═══════════════════════════════════════ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+}
+
+.modal-dialog {
+  background: var(--bg-elevated);
+  border-radius: 28rpx;
+  padding: 40rpx 32rpx 32rpx;
+  width: 100%;
+  max-width: 600rpx;
+  border: 1rpx solid var(--border-subtle);
+  box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.modal-header {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.modal-input {
+  background: var(--bg-base);
+  border: 1rpx solid var(--border-subtle);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: var(--text-primary);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.modal-textarea {
+  background: var(--bg-base);
+  border: 1rpx solid var(--border-subtle);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: var(--text-primary);
+  height: 240rpx;
+  line-height: 1.6;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 16rpx;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 16rpx 36rpx;
+  border-radius: 9999rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.modal-btn.cancel {
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+}
+
+.modal-btn.confirm {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.modal-btn:active {
+  opacity: 0.85;
+  transform: scale(0.97);
+}

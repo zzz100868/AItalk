@@ -20,7 +20,9 @@ Page({
     chatMessages: [
       { id: 1, sender: 'match', content: '嗨，很高兴认识你。我是 Kael。' }
     ],
-    chatInput: ''
+    chatInput: '',
+    inputKey: 0,
+    lastMsgId: 1
   },
 
   startChat() {
@@ -41,7 +43,12 @@ Page({
 
     const newMsg = { id: Date.now(), sender: 'user', content }
     const messages = [...this.data.chatMessages, newMsg]
-    this.setData({ chatMessages: messages, chatInput: '' })
+    this.setData({
+      chatMessages: messages,
+      chatInput: '',
+      inputKey: this.data.inputKey + 1,
+      lastMsgId: newMsg.id
+    })
 
     setTimeout(() => {
       const replies = [
@@ -52,8 +59,10 @@ Page({
         '说得太好了，我也一直在思考这个问题。'
       ]
       const reply = replies[Math.floor(Math.random() * replies.length)]
+      const replyMsg = { id: Date.now() + 1, sender: 'match', content: reply }
       this.setData({
-        chatMessages: [...this.data.chatMessages, { id: Date.now() + 1, sender: 'match', content: reply }]
+        chatMessages: [...this.data.chatMessages, replyMsg],
+        lastMsgId: replyMsg.id
       })
     }, 1200)
   },

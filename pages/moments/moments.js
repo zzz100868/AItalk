@@ -19,7 +19,10 @@ Page({
   },
 
   loadPosts() {
-    const posts = wx.getStorageSync('myPosts') || []
+    const saved = wx.getStorageSync('userProfile')
+    const myName = saved?.nickName || '林夕'
+    let posts = wx.getStorageSync('myPosts') || []
+    posts = posts.filter(p => p.author === myName)
     this.setData({ posts })
     this._lastPostsLen = posts.length
   },

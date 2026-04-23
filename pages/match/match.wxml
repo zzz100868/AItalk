@@ -86,14 +86,14 @@
       </view>
 
       <!-- Chat Messages -->
-      <scroll-view scroll-y class="chat-messages" scroll-into-view="msg-{{chatMessages.length - 1}}">
+      <scroll-view scroll-y class="chat-messages" scroll-into-view="msg-{{lastMsgId}}">
         <view class="chat-welcome">
           <text class="chat-welcome-text">你们已通过匹配相识</text>
         </view>
         <view
           wx:for="{{chatMessages}}"
           wx:key="id"
-          id="msg-{{index}}"
+          id="msg-{{item.id}}"
           class="chat-msg {{item.sender === 'user' ? 'chat-msg-user' : 'chat-msg-match'}}"
         >
           <image wx:if="{{item.sender === 'match'}}" class="chat-msg-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
@@ -107,6 +107,7 @@
       <view class="chat-input-area">
         <view class="chat-input-box">
           <input
+            key="{{inputKey}}"
             class="chat-input"
             placeholder="说点什么..."
             placeholder-class="chat-placeholder"
@@ -114,6 +115,7 @@
             bindinput="onChatInput"
             confirm-type="send"
             bindconfirm="sendMessage"
+            always-embed="{{true}}"
           />
           <view class="chat-send-btn {{chatInput ? 'chat-send-active' : ''}}" bindtap="sendMessage">
             <view class="send-arrow"></view>

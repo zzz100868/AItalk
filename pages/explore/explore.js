@@ -129,7 +129,6 @@ Page({
       update[`posts[${idx}].heartBeating`] = true
     }
     this.setData(update)
-    wx.setStorage({ key: 'myPosts', data: posts })
 
     if (newLiked) {
       setTimeout(() => {
@@ -147,7 +146,6 @@ Page({
     const newShow = !posts[idx].showComments
     posts[idx].showComments = newShow
     this.setData({ [`posts[${idx}].showComments`]: newShow })
-    wx.setStorage({ key: 'myPosts', data: posts })
   },
 
   addComment(e) {
@@ -172,7 +170,7 @@ Page({
       [`posts[${idx}].comments`]: posts[idx].comments,
       [`posts[${idx}].commentInput`]: ''
     })
-    wx.setStorage({ key: 'myPosts', data: posts })
+    // 不保存评论到 myPosts，myPosts 只存自己发布的动态
   },
 
   showShareMenu(e) {
@@ -204,7 +202,9 @@ Page({
               if (modalRes.confirm) {
                 const posts = this.data.posts.filter(p => p.id !== id)
                 this.setData({ posts })
-                wx.setStorage({ key: 'myPosts', data: posts })
+                const myPosts = wx.getStorageSync('myPosts') || []
+                const updatedMyPosts = myPosts.filter(p => p.id !== id)
+                wx.setStorage({ key: 'myPosts', data: updatedMyPosts })
                 wx.showToast({ title: '已删除', icon: 'none' })
               }
             }
