@@ -57,7 +57,7 @@
 }
 
 .content-inner {
-  padding: 24rpx 32rpx 180rpx;
+  padding: 24rpx 32rpx 140rpx;
 }
 
 /* ═══════════════════════════════════════
@@ -112,6 +112,7 @@
   display: flex;
   flex-direction: column;
   gap: 32rpx;
+  min-height: 60vh;
 }
 
 /* Chat Status Bar */
@@ -154,7 +155,9 @@
   display: flex;
   flex-direction: column;
   gap: 24rpx;
-  padding-bottom: 120rpx;
+  flex: 1;
+  justify-content: flex-end;
+  padding-bottom: 24rpx;
 }
 
 .msg-row {
@@ -212,12 +215,7 @@
 
 /* Chat Input */
 .chat-input-area {
-  position: fixed;
-  bottom: calc(130rpx + env(safe-area-inset-bottom));
-  left: 0;
-  right: 0;
-  padding: 0 24rpx;
-  z-index: 40;
+  padding: 24rpx 0 32rpx;
 }
 
 .chat-input-box {

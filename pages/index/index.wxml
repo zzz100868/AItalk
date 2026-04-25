@@ -6,114 +6,149 @@
     <view class="ambient-noise"></view>
   </view>
 
-  <!-- Header -->
-  <view class="page-header-bar">
-    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
-      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
-    </view>
-    <text class="header-title">{{isCalling ? '通话中' : '聊天'}}</text>
-    <view class="header-action">
-      <view class="notification-dot"></view>
+  <!-- ========== Landing View ========== -->
+  <view class="view-layer landing-view {{viewMode === 'landing' ? 'view-active' : 'view-inactive'}} {{isTransitioning ? 'transitioning' : ''}}">
+    <view class="landing-content">
+      <!-- AI Avatar -->
+      <view class="brand-mark">
+        <view class="avatar-zone">
+          <view class="avatar-ring-outer"></view>
+          <view class="avatar-ring-mid"></view>
+          <view class="avatar-frame">
+            <image class="ai-avatar" src="https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoya&size=400&backgroundColor=e8dff5" mode="aspectFill"/>
+          </view>
+        </view>
+      </view>
+
+      <!-- Title -->
+      <view class="title-section">
+        <view class="brand-title" aria-label="AiTalk">
+          <text class="title-part title-ai">Ai</text>
+          <text class="title-part title-talk">Talk</text>
+        </view>
+        <text class="brand-subtitle">每一次对话，都是一次相遇</text>
+      </view>
+
+      <!-- CTA Button -->
+      <view class="action-area">
+        <view class="btn-start" bindtap="enterApp">
+          <text>点击此处开始</text>
+          <view class="btn-arrow"></view>
+        </view>
+      </view>
+
+      <!-- Footer -->
+      <view class="landing-footer">
+        <text class="footer-text">v1.0.0</text>
+      </view>
     </view>
   </view>
 
-  <!-- Main Content -->
-  <view class="main-content">
-    <view class="call-center">
+  <!-- ========== Call View ========== -->
+  <view class="view-layer call-view {{viewMode === 'call' ? 'view-active' : 'view-inactive'}}">
+    <!-- Header -->
+    <view class="page-header-bar">
+      <view class="header-left" bindtap="goToUserHome" data-author="林夕">
+        <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
+      </view>
+      <text class="header-title">{{isCalling ? '通话中' : '聊天'}}</text>
+      <view class="header-action">
+        <view class="notification-dot"></view>
+      </view>
+    </view>
 
-      <!-- ========== 通话结束状态 ========== -->
-      <block wx:if="{{!isCalling}}">
-        <!-- AI Avatar -->
-        <view class="avatar-zone anim-scale-in">
-          <view class="avatar-frame-static">
-            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
-            <view class="avatar-overlay"></view>
-          </view>
-          <view class="avatar-offline-ring"></view>
-        </view>
+    <!-- Call Content -->
+    <view class="main-content">
+      <view class="call-center">
 
-        <!-- Call Ended Info -->
-        <view class="call-info anim-fade-in-up" style="animation-delay: 0.2s">
-          <text class="ai-name display-md">{{aiName}}</text>
-          <text class="call-ended-caption caption">通话已结束</text>
-          <view class="call-meta">
-            <text class="call-duration">{{callDuration}}</text>
-            <text class="call-separator">·</text>
-            <text class="call-date">{{callDate}}</text>
-          </view>
-        </view>
-
-        <!-- Action Button -->
-        <view class="action-area anim-fade-in-up" style="animation-delay: 0.3s">
-          <view class="btn-primary" bindtap="startCall">
-            <view class="btn-icon icon-phone"></view>
-            <text>再次拨打</text>
-          </view>
-        </view>
-      </block>
-
-      <!-- ========== 通话中状态 ========== -->
-      <block wx:if="{{isCalling}}">
-        <!-- AI Avatar with glow -->
-        <view class="avatar-zone anim-scale-in">
-          <view class="avatar-ring-outer"></view>
-          <view class="avatar-ring-mid"></view>
-          <view class="avatar-float">
-            <view class="avatar-frame">
+        <!-- 通话结束状态 -->
+        <block wx:if="{{!isCalling}}">
+          <view class="avatar-zone call-avatar-enter">
+            <view class="avatar-frame-static">
               <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
               <view class="avatar-overlay"></view>
             </view>
+            <view class="avatar-offline-ring"></view>
           </view>
-          <view class="voice-wave-container">
-            <view class="voice-bar" wx:for="{{7}}" wx:key="index" style="animation-delay: {{index * 0.1}}s"></view>
-          </view>
-        </view>
 
-        <!-- Call Info -->
-        <view class="call-info anim-fade-in-up" style="animation-delay: 0.15s">
-          <text class="ai-name display-md">{{aiName}}</text>
-          <view class="call-status-row">
-            <view class="status-dot status-dot-live"></view>
-            <text class="call-status caption">实时语音 · {{callDuration}}</text>
+          <view class="call-info">
+            <text class="ai-name display-md">{{aiName}}</text>
+            <text class="call-ended-caption caption">通话已结束</text>
+            <view class="call-meta">
+              <text class="call-duration">{{callDuration}}</text>
+              <text class="call-separator">·</text>
+              <text class="call-date">{{callDate}}</text>
+            </view>
           </view>
-        </view>
 
-        <!-- Call Controls -->
-        <view class="controls">
-          <view class="control-item anim-fade-in-up" style="animation-delay: 0.25s" bindtap="toggleMute">
-            <view class="control-btn {{isMuted ? 'control-btn-active' : ''}}">
-              <view class="icon-mic {{isMuted ? 'icon-mic-off' : ''}}">
-                <view class="mic-body"></view>
-                <view class="mic-base"></view>
-                <view wx:if="{{isMuted}}" class="mic-slash"></view>
+          <view class="action-area">
+            <view class="btn-primary" bindtap="startCall">
+              <view class="btn-icon icon-phone"></view>
+              <text>拨打</text>
+            </view>
+          </view>
+        </block>
+
+        <!-- 通话中状态 -->
+        <block wx:if="{{isCalling}}">
+          <view class="avatar-zone call-avatar-enter">
+            <view class="avatar-ring-outer"></view>
+            <view class="avatar-ring-mid"></view>
+            <view class="avatar-float">
+              <view class="avatar-frame">
+                <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+                <view class="avatar-overlay"></view>
               </view>
             </view>
-            <text class="control-label">{{isMuted ? '已静音' : '静音'}}</text>
-          </view>
-
-          <view class="control-item control-main anim-fade-in-up" style="animation-delay: 0.35s" bindtap="endCall">
-            <view class="control-btn control-btn-end">
-              <view class="icon-phone-down">
-                <view class="phone-receiver"></view>
-                <view class="phone-arrow"></view>
-              </view>
+            <view class="voice-wave-container">
+              <view class="voice-bar" wx:for="{{7}}" wx:key="index" style="animation-delay: {{index * 0.1}}s"></view>
             </view>
-            <text class="control-label control-label-end">挂断</text>
           </view>
 
-          <view class="control-item anim-fade-in-up" style="animation-delay: 0.45s" bindtap="toggleSpeaker">
-            <view class="control-btn {{isSpeakerOn ? 'control-btn-active' : ''}}">
-              <view class="icon-speaker">
-                <view class="speaker-body"></view>
-                <view class="speaker-wave"></view>
-                <view wx:if="{{isSpeakerOn}}" class="speaker-wave-2"></view>
-              </view>
+          <view class="call-info">
+            <text class="ai-name display-md">{{aiName}}</text>
+            <view class="call-status-row">
+              <view class="status-dot status-dot-live"></view>
+              <text class="call-status caption">实时语音 · {{callDuration}}</text>
             </view>
-            <text class="control-label">{{isSpeakerOn ? '免提' : '听筒'}}</text>
           </view>
-        </view>
-      </block>
 
+          <view class="controls">
+            <view class="control-item" bindtap="toggleMute">
+              <view class="control-btn {{isMuted ? 'control-btn-active' : ''}}">
+                <view class="icon-mic {{isMuted ? 'icon-mic-off' : ''}}">
+                  <view class="mic-body"></view>
+                  <view class="mic-base"></view>
+                  <view wx:if="{{isMuted}}" class="mic-slash"></view>
+                </view>
+              </view>
+              <text class="control-label">{{isMuted ? '已静音' : '静音'}}</text>
+            </view>
+
+            <view class="control-item control-main" bindtap="endCall">
+              <view class="control-btn control-btn-end">
+                <view class="icon-phone-down">
+                  <view class="phone-receiver"></view>
+                  <view class="phone-arrow"></view>
+                </view>
+              </view>
+              <text class="control-label control-label-end">挂断</text>
+            </view>
+
+            <view class="control-item" bindtap="toggleSpeaker">
+              <view class="control-btn {{isSpeakerOn ? 'control-btn-active' : ''}}">
+                <view class="icon-speaker">
+                  <view class="speaker-body"></view>
+                  <view class="speaker-wave"></view>
+                  <view wx:if="{{isSpeakerOn}}" class="speaker-wave-2"></view>
+                </view>
+              </view>
+              <text class="control-label">{{isSpeakerOn ? '免提' : '听筒'}}</text>
+            </view>
+          </view>
+        </block>
+
+      </view>
     </view>
   </view>
 </view>

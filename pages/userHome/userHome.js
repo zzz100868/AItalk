@@ -3,49 +3,57 @@ const MOCK_USERS = {
     name: '陈默',
     handle: '@chenmo',
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=400&backgroundColor=b6e3f4',
-    bio: '晨间冥想爱好者，相信安静的力量。在喧嚣中寻找内心的秩序。'
+    bio: '晨间冥想爱好者，相信安静的力量。在喧嚣中寻找内心的秩序。',
+    acceptPrivateMessage: true
   },
   '林小雨': {
     name: '林小雨',
     handle: '@xiaoyu',
     avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=400&backgroundColor=ffd5dc',
-    bio: '喜欢下雨天、旧书店和手写日记。偶尔写诗，经常发呆。'
+    bio: '喜欢下雨天、旧书店和手写日记。偶尔写诗，经常发呆。',
+    acceptPrivateMessage: true
   },
   '阿北': {
     name: '阿北',
     handle: '@abeii',
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Abei&size=400&backgroundColor=d1d4f9',
-    bio: '重读旧书的人。相信文字的力量，也相信沉默的价值。'
+    bio: '重读旧书的人。相信文字的力量，也相信沉默的价值。',
+    acceptPrivateMessage: true
   },
   '周晚': {
     name: '周晚',
     handle: '@zhouwan',
     avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Zhouwan&size=400&backgroundColor=e8dff5',
-    bio: '数字断舍离践行者。正在学习如何更少地拥有，更多地存在。'
+    bio: '数字断舍离践行者。正在学习如何更少地拥有，更多地存在。',
+    acceptPrivateMessage: true
   },
   '方塘': {
     name: '方塘',
     handle: '@fangtang',
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Fangtang&size=400&backgroundColor=c0aede',
-    bio: '深夜手冲咖啡师。用仪式感对抗生活的无序。'
+    bio: '深夜手冲咖啡师。用仪式感对抗生活的无序。',
+    acceptPrivateMessage: true
   },
   '赛博聊机官方': {
     name: '赛博聊机官方',
     handle: '@stitch_ai',
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=StitchAI&size=400&backgroundColor=e8dff5',
-    bio: '连接安静灵魂的数字空间。'
+    bio: '连接安静灵魂的数字空间。',
+    acceptPrivateMessage: true
   },
   'Kael': {
     name: 'Kael',
     handle: '@kael',
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Kael&size=400&backgroundColor=e8dff5',
-    bio: '偏好安静的周末与深度的自我对话。'
+    bio: '偏好安静的周末与深度的自我对话。',
+    acceptPrivateMessage: true
   },
   'Stitch AI': {
     name: 'Stitch AI',
     handle: '@stitch_ai',
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=StitchAI&size=400&backgroundColor=e8dff5',
-    bio: '你的数字记忆伴侣，记录每一次对话中的闪光点。'
+    bio: '你的数字记忆伴侣，记录每一次对话中的闪光点。',
+    acceptPrivateMessage: true
   }
 }
 
@@ -133,7 +141,11 @@ Page({
     stats: {},
     posts: [],
     isFollowing: false,
-    _author: ''
+    isBlocked: false,
+    _author: '',
+    replyingComment: null,
+    focusInputPostId: null,
+    canPrivateMessage: false
   },
 
   onLoad(options) {
@@ -151,11 +163,15 @@ Page({
     const isMe = author === '林夕'
     const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
 
+    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
+    const isBlocked = (blockData.blockedUsers || []).includes(author)
+
     if (isMe) {
       const saved = wx.getStorageSync('userProfile') || {}
       const myPosts = wx.getStorageSync('myPosts') || []
       this.setData({
         isMe: true,
+        isBlocked: false,
         userInfo: {
           name: saved.nickName || '林夕',
           handle: '@linxi',
@@ -174,6 +190,7 @@ Page({
         this.setData({
           isMe: false,
           isFollowing,
+          canPrivateMessage: false,
           userInfo: {
             name: author,
             handle: '',
@@ -195,14 +212,16 @@ Page({
 
       this.setData({
         isMe: false,
-        isFollowing,
+        isFollowing: isBlocked ? false : isFollowing,
+        isBlocked,
+        canPrivateMessage: mockUser.acceptPrivateMessage !== false,
         userInfo: mockUser,
         stats: {
           following: DEFAULT_STATS[author]?.following || 0,
           followers: followerCount,
           likes: DEFAULT_STATS[author]?.likes || 0
         },
-        posts
+        posts: isBlocked ? [] : posts
       })
     }
   },
@@ -215,6 +234,9 @@ Page({
     const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
     const isFollowing = (followData.following || []).includes(author)
 
+    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
+    const isBlocked = (blockData.blockedUsers || []).includes(author)
+
     if (this.data.isMe) {
       const myPosts = wx.getStorageSync('myPosts') || []
       this.setData({
@@ -223,9 +245,75 @@ Page({
       })
     } else {
       const followerCount = followData.followerCounts[author] ?? this.data.stats.followers
+      let posts = this.data.posts
+      if (isBlocked) {
+        posts = []
+      } else if (this.data.isBlocked && !isBlocked) {
+        // 刚解除拉黑，恢复帖子
+        const cacheKey = `postCache_${author}`
+        const cachedPosts = wx.getStorageSync(cacheKey)
+        posts = cachedPosts && cachedPosts.length > 0
+          ? cachedPosts
+          : MOCK_POSTS.filter(p => p.author === author)
+      }
       this.setData({
-        isFollowing,
-        'stats.followers': followerCount
+        isFollowing: isBlocked ? false : isFollowing,
+        isBlocked,
+        posts,
+        'stats.followers': followerCount,
+        canPrivateMessage: this.data.userInfo.acceptPrivateMessage !== false
+      })
+    }
+  },
+
+  toggleBlock() {
+    const author = this.data._author
+    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
+    const blockedUsers = blockData.blockedUsers || []
+    const wasBlocked = blockedUsers.includes(author)
+
+    if (wasBlocked) {
+      // 解除拉黑
+      blockData.blockedUsers = blockedUsers.filter(name => name !== author)
+      wx.setStorageSync('blockData', blockData)
+      this.setData({ isBlocked: false })
+
+      // 恢复帖子显示
+      const cacheKey = `postCache_${author}`
+      const cachedPosts = wx.getStorageSync(cacheKey)
+      const posts = cachedPosts && cachedPosts.length > 0
+        ? cachedPosts
+        : MOCK_POSTS.filter(p => p.author === author)
+      this.setData({ posts })
+
+      wx.showToast({ title: '已解除拉黑', icon: 'none' })
+    } else {
+      // 拉黑
+      wx.showModal({
+        title: '确认拉黑',
+        content: `拉黑后，你将不再看到 ${author} 的动态，也不会在匹配中遇到对方。确定要继续吗？`,
+        confirmColor: '#c45a5a',
+        success: (res) => {
+          if (res.confirm) {
+            blockData.blockedUsers.push(author)
+            wx.setStorageSync('blockData', blockData)
+
+            // 拉黑时自动取消关注
+            const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
+            if ((followData.following || []).includes(author)) {
+              followData.following = followData.following.filter(name => name !== author)
+              followData.followerCounts[author] = (followData.followerCounts[author] || 1) - 1
+              wx.setStorageSync('followData', followData)
+            }
+
+            this.setData({
+              isBlocked: true,
+              isFollowing: false,
+              posts: []
+            })
+            wx.showToast({ title: '已拉黑', icon: 'none' })
+          }
+        }
       })
     }
   },
@@ -258,7 +346,7 @@ Page({
   toggleLike(e) {
     const id = e.currentTarget.dataset.id
     const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === id)
+    const idx = posts.findIndex(p => p.id == id)
     if (idx === -1) return
 
     const post = posts[idx]
@@ -288,36 +376,176 @@ Page({
   toggleComments(e) {
     const id = e.currentTarget.dataset.id
     const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === id)
+    const idx = posts.findIndex(p => p.id == id)
     if (idx === -1) return
     const newShow = !posts[idx].showComments
     posts[idx].showComments = newShow
-    this.setData({ [`posts[${idx}].showComments`]: newShow })
+    this.setData({
+      [`posts[${idx}].showComments`]: newShow,
+      focusInputPostId: newShow ? id : null,
+      replyingComment: null
+    })
     this._savePosts(posts)
+  },
+
+  doStartReply(postId, commentId, author) {
+    this.setData({
+      replyingComment: { postId, commentId, author },
+      focusInputPostId: postId
+    })
+  },
+
+  cancelReply() {
+    this.setData({ replyingComment: null })
+  },
+
+  onCommentTap(e) {
+    const { postId, commentId, author, content } = e.currentTarget.dataset
+    if (author === '林夕') {
+      wx.showActionSheet({
+        itemList: ['删除'],
+        itemColor: '#c45a5a',
+        success: (res) => {
+          if (res.tapIndex === 0) this.deleteComment(postId, commentId)
+        }
+      })
+    } else {
+      wx.showActionSheet({
+        itemList: ['回复', '举报'],
+        itemColor: '#c45a5a',
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.doStartReply(postId, commentId, author)
+          } else if (res.tapIndex === 1) {
+            wx.showToast({ title: '举报已提交', icon: 'none' })
+          }
+        }
+      })
+    }
+  },
+
+  onReplyTap(e) {
+    const { postId, commentId, replyId, author, content } = e.currentTarget.dataset
+    if (author === '林夕') {
+      wx.showActionSheet({
+        itemList: ['复制', '删除'],
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            wx.setClipboardData({
+              data: content,
+              success: () => wx.showToast({ title: '已复制', icon: 'none' })
+            })
+          } else if (res.tapIndex === 1) {
+            this.deleteReply(postId, commentId, replyId)
+          }
+        }
+      })
+    } else {
+      wx.showActionSheet({
+        itemList: ['回复', '举报'],
+        itemColor: '#c45a5a',
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.doStartReply(postId, commentId, author)
+          } else if (res.tapIndex === 1) {
+            wx.showToast({ title: '举报已提交', icon: 'none' })
+          }
+        }
+      })
+    }
+  },
+
+  deleteComment(postId, commentId) {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除这条评论吗？',
+      confirmColor: '#c45a5a',
+      success: (res) => {
+        if (res.confirm) {
+          const posts = this.data.posts
+          const idx = posts.findIndex(p => p.id == postId)
+          if (idx === -1) return
+          posts[idx].comments = posts[idx].comments.filter(c => c.id != commentId)
+          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
+          this._savePosts(posts)
+        }
+      }
+    })
+  },
+
+  deleteReply(postId, commentId, replyId) {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除这条回复吗？',
+      confirmColor: '#c45a5a',
+      success: (res) => {
+        if (res.confirm) {
+          const posts = this.data.posts
+          const idx = posts.findIndex(p => p.id == postId)
+          if (idx === -1) return
+          const commentIdx = posts[idx].comments.findIndex(c => c.id == commentId)
+          if (commentIdx === -1) return
+          const replies = posts[idx].comments[commentIdx].replies || []
+          posts[idx].comments[commentIdx].replies = replies.filter(r => r.id != replyId)
+          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
+          this._savePosts(posts)
+        }
+      }
+    })
+  },
+
+  onInputBlur() {
+    this.setData({ focusInputPostId: null })
+  },
+
+  onCommentInput(e) {
+    const postId = e.currentTarget.dataset.id
+    const idx = this.data.posts.findIndex(p => p.id == postId)
+    if (idx === -1) return
+    this.setData({ [`posts[${idx}].commentInput`]: e.detail.value })
   },
 
   addComment(e) {
     const postId = e.currentTarget.dataset.id
-    const content = e.detail.value
-    if (!content || !content.trim()) return
-
-    const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === postId)
+    const idx = this.data.posts.findIndex(p => p.id == postId)
     if (idx === -1) return
 
-    const newComment = {
+    const content = e.detail.value || this.data.posts[idx].commentInput || ''
+    if (!content.trim()) return
+
+    const posts = this.data.posts
+    const replying = this.data.replyingComment
+    const newReply = {
       id: Date.now(),
       author: '林夕',
       avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
       content: content.trim()
     }
-    posts[idx].comments.push(newComment)
-    posts[idx].commentInput = ''
 
-    this.setData({
-      [`posts[${idx}].comments`]: posts[idx].comments,
-      [`posts[${idx}].commentInput`]: ''
-    })
+    if (replying && replying.postId == postId) {
+      const commentIdx = posts[idx].comments.findIndex(c => c.id == replying.commentId)
+      if (commentIdx !== -1) {
+        newReply.replyTo = replying.author
+        if (!posts[idx].comments[commentIdx].replies) {
+          posts[idx].comments[commentIdx].replies = []
+        }
+        posts[idx].comments[commentIdx].replies.push(newReply)
+        this.setData({
+          [`posts[${idx}].comments`]: posts[idx].comments,
+          [`posts[${idx}].commentInput`]: '',
+          replyingComment: null,
+          focusInputPostId: null
+        })
+      }
+    } else {
+      posts[idx].comments.push(newReply)
+      posts[idx].commentInput = ''
+      this.setData({
+        [`posts[${idx}].comments`]: posts[idx].comments,
+        [`posts[${idx}].commentInput`]: '',
+        focusInputPostId: null
+      })
+    }
     this._savePosts(posts)
   },
 
@@ -328,6 +556,11 @@ Page({
     } else {
       wx.setStorage({ key: `postCache_${author}`, data: posts })
     }
+  },
+
+  goToChat() {
+    const author = this.data._author
+    wx.navigateTo({ url: `/pages/chatDetail/chatDetail?user=${encodeURIComponent(author)}` })
   },
 
   goToEditProfile() {
@@ -341,6 +574,7 @@ Page({
   previewImage(e) {
     const src = e.currentTarget.dataset.src
     const urls = e.currentTarget.dataset.urls
+    getApp()._ignoreRelaunch = true
     wx.previewImage({ current: src, urls })
   }
 })

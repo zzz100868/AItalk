@@ -65,6 +65,13 @@
             </view>
             <switch class="menu-switch" color="#c4715a" checked="{{settings.allowStrangerComment}}" data-key="allowStrangerComment" bindchange="toggleSetting"/>
           </view>
+          <view class="menu-item menu-item-switch">
+            <view class="menu-item-content">
+              <text class="menu-title">接受私信</text>
+              <text class="menu-desc">允许其他人通过主页给我发送私信</text>
+            </view>
+            <switch class="menu-switch" color="#c4715a" checked="{{settings.acceptPrivateMessage}}" data-key="acceptPrivateMessage" bindchange="toggleSetting"/>
+          </view>
           <view class="menu-item" bindtap="goToBlockedList">
             <view class="menu-item-content">
               <text class="menu-title">黑名单</text>

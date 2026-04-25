@@ -1,0 +1,48 @@
+<view class="page-container {{isExiting ? 'exiting' : ''}}">
+  <!-- Exit Overlay -->
+  <view class="exit-overlay" wx:if="{{isExiting}}"></view>
+
+  <!-- Ambient background -->
+  <view class="ambient-bg">
+    <view class="ambient-orb orb-1"></view>
+    <view class="ambient-orb orb-2"></view>
+    <view class="ambient-orb orb-3"></view>
+    <view class="ambient-noise"></view>
+  </view>
+
+  <!-- Main Content -->
+  <view class="main-content">
+    <!-- AI Avatar -->
+    <view class="brand-mark anim-fade-in-up" style="animation-delay: 0.1s">
+      <view class="avatar-zone">
+        <view class="avatar-ring-outer"></view>
+        <view class="avatar-ring-mid"></view>
+        <view class="avatar-frame">
+          <image class="ai-avatar" src="https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoya&size=400&backgroundColor=e8dff5" mode="aspectFill"/>
+        </view>
+      </view>
+    </view>
+
+    <!-- Title -->
+    <view class="title-section anim-fade-in-up" style="animation-delay: 0.25s">
+      <view class="brand-title" aria-label="AiTalk">
+        <text class="title-part title-ai">Ai</text>
+        <text class="title-part title-talk">Talk</text>
+      </view>
+      <text class="brand-subtitle">每一次对话，都是一次相遇</text>
+    </view>
+
+    <!-- CTA Button -->
+    <view class="action-area anim-fade-in-up" style="animation-delay: 0.45s">
+      <view class="btn-start" bindtap="enterApp">
+        <text>点击此处开始</text>
+        <view class="btn-arrow"></view>
+      </view>
+    </view>
+
+    <!-- Footer -->
+    <view class="landing-footer anim-fade-in" style="animation-delay: 0.7s">
+      <text class="footer-text">v1.0.0</text>
+    </view>
+  </view>
+</view>

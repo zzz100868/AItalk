@@ -1,0 +1,53 @@
+<view class="page block-list-page">
+  <!-- Header -->
+  <view class="sub-header">
+    <view class="back-btn" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="sub-title">黑名单</text>
+    <view class="spacer"></view>
+  </view>
+
+  <scroll-view scroll-y class="content">
+    <view class="content-inner">
+      <view class="page-header anim-fade-in-up">
+        <text class="page-title display-lg">黑名单</text>
+        <text class="page-subtitle body">已屏蔽 {{blockedList.length}} 位用户</text>
+      </view>
+
+      <!-- Empty State -->
+      <view wx:if="{{blockedList.length === 0}}" class="empty-state anim-fade-in-up">
+        <view class="empty-icon"></view>
+        <text class="empty-title">暂无拉黑用户</text>
+        <text class="empty-desc">你可以在用户主页将某人加入黑名单</text>
+      </view>
+
+      <!-- Blocked List -->
+      <view wx:if="{{blockedList.length > 0}}" class="blocked-list">
+        <view
+          class="blocked-item anim-fade-in-up"
+          style="animation-delay: {{(index + 1) * 0.06}}s"
+          wx:for="{{blockedList}}"
+          wx:key="name"
+        >
+          <view class="blocked-info">
+            <image class="blocked-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+            <view class="blocked-meta">
+              <text class="blocked-name">{{item.name}}</text>
+              <text wx:if="{{item.bio}}" class="blocked-bio">{{item.bio}}</text>
+            </view>
+          </view>
+          <view class="unblock-btn" bindtap="unblockUser" data-name="{{item.name}}">
+            <text>解除拉黑</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{blockedList.length > 0}}" class="list-end">
+        <view class="list-end-line"></view>
+        <text class="list-end-text caption">已到底部</text>
+        <view class="list-end-line"></view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

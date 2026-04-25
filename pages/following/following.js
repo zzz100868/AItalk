@@ -12,13 +12,21 @@ Page({
     this.syncFollowStatus()
   },
 
+  getBlockedUsers() {
+    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
+    return new Set(blockData.blockedUsers || [])
+  },
+
   syncFollowStatus() {
     const followData = wx.getStorageSync('followData') || { following: [] }
     const followingSet = new Set(followData.following || [])
-    const following = this.data.following.map(f => ({
-      ...f,
-      isFollowing: followingSet.has(f.name)
-    }))
+    const blocked = this.getBlockedUsers()
+    const following = this.data.following
+      .filter(f => !blocked.has(f.name))
+      .map(f => ({
+        ...f,
+        isFollowing: followingSet.has(f.name)
+      }))
     this.setData({ following })
   },
 

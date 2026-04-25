@@ -13,64 +13,99 @@
 
   <scroll-view scroll-y class="content" enable-back-to-top>
     <view class="content-inner">
-      <!-- Profile Card -->
-      <view class="profile-card anim-scale-in">
-        <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
-        <view class="profile-info">
-          <text class="profile-name">{{matchName}}</text>
-          <text class="profile-bio">{{matchBio}}</text>
-          <view class="tag-list">
-            <view class="tag" wx:for="{{tags}}" wx:key="index">{{item}}</view>
+
+      <!-- 匹配关闭状态 -->
+      <view wx:if="{{!isMatchOpen}}" class="closed-state anim-fade-in">
+        <view class="closed-icon">
+          <view class="clock-ring"></view>
+          <view class="clock-hand-hour"></view>
+          <view class="clock-hand-minute"></view>
+        </view>
+        <text class="closed-title">匹配尚未开启</text>
+        <text class="closed-desc">每周二开放一次匹配机会</text>
+        <view class="countdown-card">
+          <text class="countdown-label">距离下次开启</text>
+          <text class="countdown-value">{{countdownText}}</text>
+        </view>
+      </view>
+
+      <!-- 未匹配：入口页 -->
+      <view wx:elif="{{!isMatched}}" class="entry-state anim-fade-in">
+        <view class="entry-content">
+          <view class="entry-icon">
+            <view class="blind-box-icon"></view>
+          </view>
+          <text class="entry-title">周二盲盒</text>
+          <text class="entry-subtitle">每周一次，打开一个未知灵魂</text>
+          <view class="entry-btn-wrapper">
+            <view class="btn-match" bindtap="doMatch">
+              <text>匹配</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <!-- Compatibility -->
-      <view class="compatibility-section anim-fade-in-up" style="animation-delay: 0.15s">
-        <view class="compatibility-header">
-          <text class="section-label">契合度</text>
-          <text class="compatibility-score">{{compatibility}}%</text>
-        </view>
-        <view class="compatibility-bar">
-          <view class="compatibility-fill" style="width: {{compatibility}}%;"></view>
-        </view>
-        <text class="compatibility-desc">你们在生活节奏和价值观上高度同频</text>
-      </view>
-
-      <!-- Why Matched -->
-      <view class="insight-section anim-fade-in-up" style="animation-delay: 0.25s">
-        <text class="section-label">为什么匹配</text>
-        <view class="insight-card">
-          <text class="quote-mark">"</text>
-          <text class="insight-text">你们同样偏好安静的周末与深度的自我对话，这种对「留白」的共同追求，为建立无压力的灵魂连接提供了土壤。</text>
-        </view>
-      </view>
-
-      <!-- Icebreakers -->
-      <view class="icebreaker-section anim-fade-in-up" style="animation-delay: 0.35s">
-        <text class="section-label">试试这样开场</text>
-        <view class="icebreaker-list">
-          <view class="icebreaker-item" wx:for="{{icebreakers}}" wx:key="index" bindtap="copyIcebreaker" data-text="{{item}}">
-            <text class="icebreaker-text">{{item}}</text>
-            <view class="copy-btn">复制</view>
+      <!-- 已匹配：结果页 -->
+      <view wx:else class="matched-result">
+        <!-- Profile Card -->
+        <view class="profile-card anim-scale-in">
+          <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
+          <view class="profile-info">
+            <text class="profile-name">{{matchName}}</text>
+            <text class="profile-bio">{{matchBio}}</text>
+            <view class="tag-list">
+              <view class="tag" wx:for="{{tags}}" wx:key="index">{{item}}</view>
+            </view>
           </view>
         </view>
-      </view>
 
-      <view class="bottom-spacer"></view>
+        <!-- Compatibility -->
+        <view class="compatibility-section anim-fade-in-up" style="animation-delay: 0.15s">
+          <view class="compatibility-header">
+            <text class="section-label">契合度</text>
+            <text class="compatibility-score">{{compatibility}}%</text>
+          </view>
+          <view class="compatibility-bar">
+            <view class="compatibility-fill" style="width: {{compatibility}}%;"></view>
+          </view>
+          <text class="compatibility-desc">你们在生活节奏和价值观上高度同频</text>
+        </view>
+
+        <!-- Why Matched -->
+        <view class="insight-section anim-fade-in-up" style="animation-delay: 0.25s">
+          <text class="section-label">为什么匹配</text>
+          <view class="insight-card">
+            <text class="quote-mark">"</text>
+            <text class="insight-text">{{matchInsight}}</text>
+          </view>
+        </view>
+
+        <!-- Icebreakers -->
+        <view class="icebreaker-section anim-fade-in-up" style="animation-delay: 0.35s">
+          <text class="section-label">试试这样开场</text>
+          <view class="icebreaker-list">
+            <view class="icebreaker-item" wx:for="{{icebreakers}}" wx:key="index" bindtap="copyIcebreaker" data-text="{{item}}">
+              <text class="icebreaker-text">{{item}}</text>
+              <view class="copy-btn">复制</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="bottom-spacer"></view>
+      </view>
     </view>
   </scroll-view>
 
   <!-- Floating Button -->
-  <view class="floating-action-bar anim-fade-in-up" style="animation-delay: 0.45s">
+  <view wx:if="{{isMatchOpen && isMatched}}" class="floating-action-bar anim-fade-in-up" style="animation-delay: 0.45s">
     <button class="btn-start-chat" bindtap="startChat">
       <text class="btn-text">开启对话</text>
     </button>
   </view>
 
   <!-- Chat Dialog Overlay -->
-  <view wx:if="{{showChat}}" class="chat-overlay anim-fade-in">
-    <view class="chat-dialog anim-slide-up">
+  <view class="chat-overlay" style="opacity: {{showChat ? 1 : 0}}; pointer-events: {{showChat ? 'auto' : 'none'}};">
+    <view class="chat-dialog" style="bottom: {{showChat ? 0 : '-85vh'}};">
       <!-- Chat Header -->
       <view class="chat-header">
         <view class="chat-header-left" bindtap="closeChat">
@@ -86,41 +121,85 @@
       </view>
 
       <!-- Chat Messages -->
-      <scroll-view scroll-y class="chat-messages" scroll-into-view="msg-{{lastMsgId}}">
-        <view class="chat-welcome">
-          <text class="chat-welcome-text">你们已通过匹配相识</text>
-        </view>
-        <view
-          wx:for="{{chatMessages}}"
-          wx:key="id"
-          id="msg-{{item.id}}"
-          class="chat-msg {{item.sender === 'user' ? 'chat-msg-user' : 'chat-msg-match'}}"
-        >
-          <image wx:if="{{item.sender === 'match'}}" class="chat-msg-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
-          <view class="chat-msg-bubble {{item.sender === 'user' ? 'chat-msg-bubble-user' : 'chat-msg-bubble-match'}}">
-            <text class="chat-msg-text">{{item.content}}</text>
+      <view class="chat-messages-wrap">
+        <scroll-view scroll-y class="chat-messages-inner" scroll-into-view="msg-{{lastMsgId}}" show-scrollbar="{{false}}">
+          <view class="chat-welcome">
+            <text class="chat-welcome-text">你们已通过匹配相识</text>
           </view>
-        </view>
-      </scroll-view>
+          <view
+            wx:for="{{chatMessages}}"
+            wx:key="id"
+            id="msg-{{item.id}}"
+            class="chat-msg {{item.sender === 'user' ? 'chat-msg-user' : 'chat-msg-match'}}"
+          >
+            <image wx:if="{{item.sender === 'match'}}" class="chat-msg-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
+            <view class="chat-msg-bubble {{item.sender === 'user' ? 'chat-msg-bubble-user' : 'chat-msg-bubble-match'}}">
+              <text class="chat-msg-text">{{item.content}}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
 
       <!-- Chat Input -->
       <view class="chat-input-area">
         <view class="chat-input-box">
           <input
-            key="{{inputKey}}"
             class="chat-input"
             placeholder="说点什么..."
             placeholder-class="chat-placeholder"
             value="{{chatInput}}"
+            focus="{{chatFocus}}"
             bindinput="onChatInput"
             confirm-type="send"
             bindconfirm="sendMessage"
-            always-embed="{{true}}"
           />
           <view class="chat-send-btn {{chatInput ? 'chat-send-active' : ''}}" bindtap="sendMessage">
             <view class="send-arrow"></view>
           </view>
         </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Match Animation Overlay -->
+  <view class="match-animation-overlay {{isMatching ? 'overlay-visible' : ''}}">
+    <view class="animation-dim"></view>
+
+    <!-- 光芒爆发 -->
+    <view class="light-burst {{matchPhase === 'glow' || matchPhase === 'reveal' ? 'light-burst-active' : ''}}">
+      <view class="light-ray-wrap" wx:for="{{12}}" wx:key="index" style="transform: rotate({{index * 30}}deg)">
+        <view class="light-ray-bar" style="animation-delay: {{index * 0.03}}s"></view>
+      </view>
+    </view>
+
+    <!-- 中心舞台 -->
+    <view class="animation-center">
+      <!-- 摇晃盲盒 -->
+      <view class="shake-box {{matchPhase === 'shake' ? 'shake-box-active' : 'shake-box-hidden'}}">
+        <view class="shake-box-inner">
+          <text class="shake-box-q">?</text>
+        </view>
+      </view>
+
+      <!-- 翻转卡片 -->
+      <view class="flip-wrap {{matchPhase !== 'shake' ? 'flip-wrap-visible' : ''}}">
+        <view class="flip-card {{matchPhase === 'reveal' ? 'flip-card-flipped' : ''}}">
+          <view class="flip-side flip-side-front">
+            <view class="shake-box-inner">
+              <text class="shake-box-q">?</text>
+            </view>
+          </view>
+          <view class="flip-side flip-side-back">
+            <image class="reveal-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+            <view class="reveal-ring"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 揭示信息 -->
+      <view class="reveal-meta {{matchPhase === 'reveal' ? 'reveal-meta-visible' : ''}}">
+        <text class="reveal-meta-name">{{matchName}}</text>
+        <text class="reveal-meta-score">契合度 {{compatibility}}%</text>
       </view>
     </view>
   </view>

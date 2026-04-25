@@ -8,6 +8,7 @@ Page({
     settings: {
       publicMoments: true,
       allowStrangerComment: true,
+      acceptPrivateMessage: true,
       pushNewMessage: true,
       pushLike: true
     },
@@ -56,11 +57,11 @@ Page({
   },
 
   goToAccountSecurity() {
-    wx.showToast({ title: '账号与安全', icon: 'none' })
+    wx.navigateTo({ url: '/pages/accountSecurity/accountSecurity' })
   },
 
   goToBlockedList() {
-    wx.showToast({ title: '黑名单', icon: 'none' })
+    wx.navigateTo({ url: '/pages/blockList/blockList' })
   },
 
   clearCache() {

@@ -15,25 +15,66 @@
   </view>
 
   <!-- Feed -->
-  <scroll-view scroll-y class="feed safe-bottom" enable-back-to-top>
+  <scroll-view scroll-y class="feed safe-bottom" enable-back-to-top scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
     <view class="feed-inner">
-      <!-- Magazine Header -->
-      <view class="section-header anim-fade-in-up">
-        <view class="section-title-wrap">
-          <text class="section-title">此刻</text>
-          <text class="section-subtitle">来自社区的真实回响</text>
+      <!-- Skeleton Screen -->
+      <view wx:if="{{isLoading}}" class="skeleton-wrap">
+        <view class="skeleton-header">
+          <view class="skeleton-line skeleton-line-short"></view>
+          <view class="skeleton-line skeleton-line-shorter"></view>
         </view>
-        <view class="section-divider"></view>
+        <view class="skeleton-card" wx:for="{{[1,2,3]}}" wx:key="*this">
+          <view class="skeleton-header-row">
+            <view class="skeleton-avatar"></view>
+            <view class="skeleton-header-text">
+              <view class="skeleton-line skeleton-line-short"></view>
+              <view class="skeleton-line skeleton-line-shorter"></view>
+            </view>
+          </view>
+          <view class="skeleton-line"></view>
+          <view class="skeleton-line skeleton-line-medium"></view>
+          <view class="skeleton-image"></view>
+          <view class="skeleton-actions">
+            <view class="skeleton-line skeleton-line-tiny"></view>
+            <view class="skeleton-line skeleton-line-tiny"></view>
+          </view>
+        </view>
       </view>
 
-      <!-- Staggered Feed -->
-      <view class="feed-grid">
-        <view
-          class="post-card {{index === 0 ? 'post-featured' : ''}} {{index !== 0 && index % 2 === 0 ? 'post-left' : ''}} {{index !== 0 && index % 2 !== 0 ? 'post-right' : ''}} anim-fade-in-up"
-          style="animation-delay: {{0.15 + index * 0.1}}s"
-          wx:for="{{posts}}"
-          wx:key="id"
-        >
+      <!-- Error State -->
+      <view wx:if="{{!isLoading && loadError}}" class="error-state anim-fade-in-up">
+        <view class="error-icon"></view>
+        <text class="error-title">网络开小差了</text>
+        <text class="error-desc">请检查网络后重试</text>
+        <view class="error-retry" bindtap="onShow">重新加载</view>
+      </view>
+
+      <!-- Content -->
+      <view wx:if="{{!isLoading && !loadError}}">
+        <!-- Magazine Header -->
+        <view class="section-header anim-fade-in-up">
+          <view class="section-title-wrap">
+            <text class="section-title">此刻</text>
+            <text class="section-subtitle">来自社区的真实回响</text>
+          </view>
+          <view class="section-header-right">
+            <view class="bell-btn" bindtap="goToNotifications">
+              <view class="bell-icon"></view>
+              <view wx:if="{{notificationUnread}}" class="bell-dot"></view>
+            </view>
+          </view>
+          <view class="section-divider"></view>
+        </view>
+
+        <!-- Staggered Feed -->
+        <view class="feed-grid">
+          <view
+            id="post-{{item.id}}"
+            class="post-card {{index === 0 ? 'post-featured' : ''}} {{index !== 0 && index % 2 === 0 ? 'post-left' : ''}} {{index !== 0 && index % 2 !== 0 ? 'post-right' : ''}} anim-fade-in-up"
+            style="animation-delay: {{0.15 + index * 0.1}}s"
+            wx:for="{{posts}}"
+            wx:key="id"
+          >
           <!-- Post Header -->
           <view class="post-header">
             <view class="post-author" bindtap="goToUserHome" data-author="{{item.author}}">
@@ -55,6 +96,22 @@
             <text class="post-text">{{item.content}}</text>
           </view>
 
+          <!-- Post Images -->
+          <view wx:if="{{item.images && item.images.length > 0}}" class="post-images">
+            <image
+              wx:for="{{item.images}}"
+              wx:for-item="img"
+              wx:key="index"
+              class="post-image {{item.images.length === 1 ? 'post-image-single' : ''}}"
+              src="{{img}}"
+              mode="aspectFill"
+              lazy-load
+              bindtap="previewPostImage"
+              data-src="{{img}}"
+              data-urls="{{item.images}}"
+            />
+          </view>
+
           <!-- Post Actions -->
           <view class="post-actions">
             <view class="action-group {{item.liked ? 'action-liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">
@@ -74,16 +131,49 @@
               <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
                 <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill" lazy-load bindtap="goToUserHome" data-author="{{c.author}}"/>
                 <view class="comment-content">
-                  <text class="comment-author">{{c.author}}</text>
-                  <text class="comment-text">{{c.content}}</text>
+                  <view class="comment-header-row">
+                    <text class="comment-author">{{c.author}}</text>
+                  </view>
+                  <text class="comment-text" bindtap="onCommentTap" data-post-id="{{item.id}}" data-comment-id="{{c.id}}" data-author="{{c.author}}" data-content="{{c.content}}">{{c.content}}</text>
+                  <!-- Replies -->
+                  <view wx:if="{{c.replies && c.replies.length > 0}}" class="replies-wrap">
+                    <view class="reply-item {{index === c.replies.length - 1 ? 'reply-item-last' : ''}}" wx:for="{{c.replies}}" wx:for-item="r" wx:key="id">
+                      <image class="reply-avatar" src="{{r.avatar}}" mode="aspectFill" lazy-load/>
+                      <view class="reply-content">
+                        <view class="reply-meta">
+                          <text class="reply-author">{{r.author}}</text>
+                          <text class="reply-target">回复 {{r.replyTo}}</text>
+                        </view>
+                        <text class="reply-text" bindtap="onReplyTap" data-post-id="{{item.id}}" data-comment-id="{{c.id}}" data-reply-id="{{r.id}}" data-author="{{r.author}}" data-content="{{r.content}}">{{r.content}}</text>
+                      </view>
+                    </view>
+                  </view>
                 </view>
               </view>
             </view>
             <view class="comment-input-row">
-              <input class="comment-input" placeholder="写下你的评论..." placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" bindconfirm="addComment"/>
+              <view wx:if="{{replyingComment && replyingComment.postId === item.id}}" class="reply-hint">
+                <text>回复 @{{replyingComment.author}}</text>
+                <view class="reply-hint-close" bindtap="cancelReply">
+                  <view class="close-x"></view>
+                </view>
+              </view>
+              <input class="comment-input" placeholder="{{replyingComment && replyingComment.postId === item.id ? '回复评论...' : '写下你的评论...'}}" placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" focus="{{focusInputPostId === item.id}}" bindblur="onInputBlur" bindconfirm="addComment"/>
             </view>
           </view>
         </view>
+      </view>
+
+      <!-- Load More -->
+      <view wx:if="{{isLoadingMore}}" class="load-more-wrap anim-fade-in-up">
+        <view class="load-more-spinner"></view>
+        <text class="load-more-text">加载中...</text>
+      </view>
+      <view wx:if="{{!hasMore && posts.length > 0 && !isLoadingMore}}" class="no-more-wrap anim-fade-in-up">
+        <view class="no-more-line"></view>
+        <text class="no-more-text">已到底部</text>
+        <view class="no-more-line"></view>
+      </view>
       </view>
     </view>
   </scroll-view>

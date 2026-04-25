@@ -3,6 +3,12 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
     }
+    const targetTab = wx.getStorageSync('memoryTargetTab')
+    if (targetTab) {
+      wx.removeStorageSync('memoryTargetTab')
+      const tabMap = { chat: 0, memory: 100, archive: 200 }
+      this.setData({ activeTab: targetTab, tabSliderX: tabMap[targetTab] || 0 })
+    }
     this.loadInsights()
   },
 
@@ -138,10 +144,15 @@ Page({
     showEditModal: false,
     editId: null,
     editTitle: '',
-    editContent: ''
+    editContent: '',
+    scrollIntoView: ''
   },
 
-  onLoad() {
+  onLoad(options) {
+    if (options.tab) {
+      const tabMap = { chat: 0, memory: 100, archive: 200 }
+      this.setData({ activeTab: options.tab, tabSliderX: tabMap[options.tab] || 0 })
+    }
     this.loadInsights()
   },
 
@@ -186,10 +197,14 @@ Page({
 
   onInputFocus() {
     this.setData({ inputFocused: true })
+    // 键盘唤起后滚动到最后一条消息，确保输入框不被遮挡
+    setTimeout(() => {
+      this.setData({ scrollIntoView: 'msg-last' })
+    }, 200)
   },
 
   onInputBlur() {
-    this.setData({ inputFocused: false })
+    this.setData({ inputFocused: false, scrollIntoView: '' })
   },
 
   showAttachMenu() {},

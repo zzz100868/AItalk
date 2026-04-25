@@ -1,0 +1,110 @@
+<view class="page notifications-page">
+  <!-- Header -->
+  <view class="sub-header">
+    <view class="back-btn" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="sub-title">通知</text>
+    <view class="header-action" bindtap="clearAll">
+      <text class="clear-text">清空</text>
+    </view>
+  </view>
+
+  <scroll-view scroll-y class="content">
+    <view class="content-inner">
+
+      <!-- Filter Tabs -->
+      <view class="filter-bar">
+        <view
+          class="filter-item {{activeFilter === 'all' ? 'filter-active' : ''}}"
+          bindtap="setFilter"
+          data-filter="all"
+        >
+          <text class="filter-label">全部</text>
+        </view>
+        <view
+          class="filter-item {{activeFilter === 'follow' ? 'filter-active' : ''}}"
+          bindtap="setFilter"
+          data-filter="follow"
+        >
+          <text class="filter-label">关注</text>
+          <view class="filter-dot filter-dot-follow"></view>
+        </view>
+        <view
+          class="filter-item {{activeFilter === 'comment' ? 'filter-active' : ''}}"
+          bindtap="setFilter"
+          data-filter="comment"
+        >
+          <text class="filter-label">评论</text>
+          <view class="filter-dot filter-dot-comment"></view>
+        </view>
+        <view
+          class="filter-item {{activeFilter === 'reply' ? 'filter-active' : ''}}"
+          bindtap="setFilter"
+          data-filter="reply"
+        >
+          <text class="filter-label">回复</text>
+          <view class="filter-dot filter-dot-reply"></view>
+        </view>
+      </view>
+
+      <!-- Skeleton Screen -->
+      <view wx:if="{{isLoading}}" class="skeleton-wrap">
+        <view class="skeleton-notification" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+          <view class="skeleton-avatar"></view>
+          <view class="skeleton-body">
+            <view class="skeleton-line skeleton-line-short"></view>
+            <view class="skeleton-line skeleton-line-shorter"></view>
+            <view class="skeleton-line skeleton-line-medium"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Error State -->
+      <view wx:if="{{!isLoading && loadError}}" class="error-state anim-fade-in-up">
+        <view class="error-icon"></view>
+        <text class="error-title">网络开小差了</text>
+        <text class="error-desc">请检查网络后重试</text>
+        <view class="error-retry" bindtap="onShow">重新加载</view>
+      </view>
+
+      <!-- Empty State -->
+      <view wx:if="{{!isLoading && !loadError && filteredNotifications.length === 0}}" class="empty-state anim-fade-in-up">
+        <view class="empty-icon bell-icon"></view>
+        <text class="empty-title">暂无通知</text>
+        <text class="empty-desc">有人关注或回复你时，会出现在这里</text>
+      </view>
+
+      <!-- Notification List -->
+      <view wx:if="{{!isLoading && !loadError && filteredNotifications.length > 0}}" class="notification-list">
+        <view
+          class="notification-item {{!item.read ? 'notification-unread' : ''}} anim-fade-in-up"
+          style="animation-delay: {{(index + 1) * 0.06}}s"
+          wx:for="{{filteredNotifications}}"
+          wx:key="id"
+        >
+          <view class="notification-main" bindtap="handleNotificationTap" data-index="{{index}}">
+            <view class="notification-avatar-wrap">
+              <image class="notification-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+              <view class="notification-type-icon type-{{item.type}}"></view>
+            </view>
+            <view class="notification-body">
+              <view class="notification-row">
+                <text class="notification-name">{{item.author}}</text>
+                <text class="notification-time">{{item.time}}</text>
+              </view>
+              <text class="notification-content">{{item.content}}</text>
+              <text wx:if="{{item.detail}}" class="notification-detail">{{item.detail}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{filteredNotifications.length > 0}}" class="list-end">
+        <view class="list-end-line"></view>
+        <text class="list-end-text caption">已到底部</text>
+        <view class="list-end-line"></view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

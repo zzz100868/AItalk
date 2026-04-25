@@ -5,11 +5,7 @@
       <view class="back-arrow"></view>
     </view>
     <text class="header-title">编辑资料</text>
-    <view class="header-action">
-      <view class="save-btn {{canSave ? 'save-btn-active' : ''}}" bindtap="saveProfile">
-        <text>保存</text>
-      </view>
-    </view>
+    <view class="header-action"></view>
   </view>
 
   <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
@@ -73,4 +69,11 @@
       </view>
     </view>
   </scroll-view>
+
+  <!-- Bottom Save Button -->
+  <view class="bottom-action-bar">
+    <view class="save-btn-bottom {{canSave ? 'save-btn-bottom-active' : ''}}" bindtap="saveProfile">
+      <text>保存</text>
+    </view>
+  </view>
 </view>

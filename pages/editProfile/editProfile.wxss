@@ -22,28 +22,6 @@
   transform: rotate(45deg);
 }
 
-.save-btn {
-  padding: 10rpx 24rpx;
-  border-radius: 9999rpx;
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  border: 1rpx solid var(--border-subtle);
-  transition: all var(--duration-fast) ease;
-}
-
-.save-btn-active {
-  color: #ffffff;
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.save-btn-active:active {
-  opacity: 0.85;
-  transform: scale(0.96);
-}
-
 /* ── Content ── */
 .content {
   padding-top: calc(110rpx + max(48rpx, env(safe-area-inset-top)));
@@ -234,4 +212,38 @@
   font-size: 24rpx;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* ── Bottom Save Button ── */
+.bottom-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  z-index: 50;
+  padding: 0 32rpx;
+}
+
+.save-btn-bottom {
+  width: 100%;
+  padding: 28rpx 0;
+  border-radius: 9999rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1rpx solid var(--border-subtle);
+  text-align: center;
+  transition: all var(--duration-fast) ease;
+}
+
+.save-btn-bottom-active {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.save-btn-bottom-active:active {
+  opacity: 0.85;
+  transform: scale(0.98);
 }

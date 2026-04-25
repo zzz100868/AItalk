@@ -1,9 +1,28 @@
 App({
   onLaunch() {
     console.log('赛博聊机小程序启动')
+    this._hasEntered = false
     this._initDefaultPosts()
     this._initFollowData()
+    this._initBlockData()
     this._prefetchData()
+  },
+
+  onShow() {
+    // 首次启动不做处理
+    if (!this._hasEntered) {
+      this._hasEntered = true
+      return
+    }
+
+    // 如果页面正在调用原生组件（如选择图片、预览图片），跳过本次重定向
+    if (this._ignoreRelaunch) {
+      this._ignoreRelaunch = false
+      return
+    }
+
+    // 每次从后台重新进入，强制回到封面页
+    wx.reLaunch({ url: '/pages/index/index' })
   },
 
   _initDefaultPosts() {
@@ -17,6 +36,7 @@ App({
         avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
         time: '3天前',
         content: '周末去了一家藏在巷子深处的独立书店，老板是个沉默寡言的中年人，店里只有轻柔的爵士乐和翻书的声音。待了一下午，读完了《悉达多》的最后两章。出来时天已经黑了，但心里特别亮。',
+        images: ['https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&q=80'],
         likes: 45,
         comments: [
           { id: 1001, author: '陈默', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=100&backgroundColor=b6e3f4', content: '那家店我也去过，氛围确实很好' }
@@ -30,6 +50,7 @@ App({
         avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
         time: '昨天',
         content: '尝试了一周的数字断舍离：每天只在固定时间段查看消息，睡前一小时不碰手机。睡眠质量明显变好了，早晨醒来头脑也更清醒。推荐给大家试试，不用一步到位，先从睡前半小时开始。',
+        images: ['https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=800&q=80'],
         likes: 128,
         comments: [
           { id: 1002, author: '周晚', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Zhouwan&size=100&backgroundColor=e8dff5', content: '我也在尝试，确实有效' },
@@ -44,6 +65,7 @@ App({
         avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
         time: '今天 10:23',
         content: '雨天。手冲一壶耶加雪菲，窗边发呆。觉得生活里最奢侈的不是物质，而是这种完全属于自己的时间。你们今天过得怎么样？',
+        images: ['https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80'],
         likes: 89,
         comments: [],
         liked: false,
@@ -70,10 +92,16 @@ App({
     })
   },
 
+  _initBlockData() {
+    if (wx.getStorageSync('blockData')) return
+    wx.setStorageSync('blockData', { blockedUsers: [] })
+  },
+
   _prefetchData() {
     const profile = wx.getStorageSync('userProfile') || {}
     const myPosts = wx.getStorageSync('myPosts') || []
     const settings = wx.getStorageSync('userSettings') || {}
+    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
 
     this.globalData.userInfo.nickName = profile.nickName || this.globalData.userInfo.nickName
     this.globalData.userInfo.avatarUrl = profile.avatar || this.globalData.userInfo.avatarUrl
@@ -83,6 +111,7 @@ App({
       profile,
       myPosts,
       settings,
+      blockData,
       myPostsHash: myPosts.length > 0 ? myPosts[myPosts.length - 1].id : 0
     }
   },

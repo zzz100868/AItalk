@@ -1,5 +1,7 @@
 Page({
   data: {
+    viewMode: 'landing',
+    isTransitioning: false,
     isCalling: false,
     callDuration: '12:38',
     callDate: '今天 14:20',
@@ -10,14 +12,22 @@ Page({
     userAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5'
   },
 
-  onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 })
+  onLoad(options) {
+    if (options.mode === 'call') {
+      this.setData({ viewMode: 'call' })
     }
   },
 
   onUnload() {
     if (this.timer) clearInterval(this.timer)
+  },
+
+  enterApp() {
+    if (this.data.isTransitioning) return
+    this.setData({ isTransitioning: true })
+    setTimeout(() => {
+      this.setData({ viewMode: 'call', isCalling: false, isTransitioning: false })
+    }, 650)
   },
 
   startCall() {
@@ -44,11 +54,14 @@ Page({
     const hours = now.getHours().toString().padStart(2, '0')
     const minutes = now.getMinutes().toString().padStart(2, '0')
     this.setData({
+      viewMode: 'landing',
       isCalling: false,
       callDate: `今天 ${hours}:${minutes}`,
       isMuted: false,
       isSpeakerOn: false
     })
+    wx.setStorageSync('memoryTargetTab', 'archive')
+    wx.switchTab({ url: '/pages/memory/memory' })
   },
 
   toggleMute() {

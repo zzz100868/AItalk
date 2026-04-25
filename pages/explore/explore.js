@@ -3,15 +3,70 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 1 })
     }
-    this.loadMyPosts()
-    this.loadUserAvatar()
+    this.loadUserInfo()
+    this.filterBlockedPosts()
+
+    // 骨架屏模拟加载
+    this.setData({ isLoading: true, loadError: false })
+    setTimeout(() => {
+      this.loadMyPosts()
+      this.setData({ isLoading: false })
+    }, 600)
+
+    const highlightPostId = getApp()._highlightPostId
+    if (highlightPostId) {
+      delete getApp()._highlightPostId
+      this.highlightPost(highlightPostId)
+    }
   },
 
-  loadUserAvatar() {
+  onPullDownRefresh() {
+    this.setData({ isRefreshing: true })
+    setTimeout(() => {
+      this.loadMyPosts()
+      this.setData({ isRefreshing: false })
+      wx.stopPullDownRefresh()
+      wx.showToast({ title: '刷新成功', icon: 'none' })
+    }, 800)
+  },
+
+  onReachBottom() {
+    if (this.data.isLoadingMore || !this.data.hasMore) return
+    this.setData({ isLoadingMore: true })
+    setTimeout(() => {
+      this.setData({ isLoadingMore: false, hasMore: false })
+    }, 600)
+  },
+
+  highlightPost(postId) {
+    const posts = this.data.posts
+    const idx = posts.findIndex(p => p.id === postId)
+    if (idx === -1) return
+    posts[idx].showComments = true
+    this.setData({
+      [`posts[${idx}].showComments`]: true,
+      scrollIntoView: `post-${postId}`
+    })
+  },
+
+  getBlockedUsers() {
+    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
+    return new Set(blockData.blockedUsers || [])
+  },
+
+  filterBlockedPosts() {
+    const blocked = this.getBlockedUsers()
+    if (blocked.size === 0) return
+    const posts = this.data.posts.filter(p => !blocked.has(p.author))
+    this.setData({ posts })
+  },
+
+  loadUserInfo() {
     const saved = wx.getStorageSync('userProfile')
-    if (saved?.avatar) {
-      this.setData({ userAvatar: saved.avatar })
-    }
+    const updates = {}
+    if (saved?.avatar) updates.userAvatar = saved.avatar
+    if (saved?.nickName) updates.myName = saved.nickName
+    this.setData(updates)
   },
 
   loadMyPosts() {
@@ -20,8 +75,9 @@ Page({
     const lastId = myPosts[myPosts.length - 1].id
     if (lastId === this._lastMyPostsId) return
     this._lastMyPostsId = lastId
+    const blocked = this.getBlockedUsers()
     const existingIds = new Set(this.data.posts.map(p => p.id))
-    const newPosts = myPosts.filter(p => !existingIds.has(p.id))
+    const newPosts = myPosts.filter(p => !existingIds.has(p.id) && !blocked.has(p.author))
     if (newPosts.length > 0) {
       this.setData({ posts: [...newPosts, ...this.data.posts] })
     }
@@ -35,11 +91,21 @@ Page({
 
   data: {
     userAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
+    myName: '林夕',
+    focusInputPostId: null,
+    scrollIntoView: '',
     showPostPanel: false,
     postContent: '',
     postImages: [],
     canSubmit: false,
     isSubmitting: false,
+    replyingComment: null,
+    notificationUnread: true,
+    isLoading: true,
+    isRefreshing: false,
+    isLoadingMore: false,
+    hasMore: true,
+    loadError: false,
     posts: [
       {
         id: 1,
@@ -47,10 +113,13 @@ Page({
         avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=200&backgroundColor=b6e3f4',
         time: '2小时前',
         content: '今早试了十五分钟的晨间冥想，那种从喧嚣中抽离出来的澄澈感，真的能让一整天都变得不一样。推荐大家也试试，不用什么 App，就坐着，感受呼吸。',
+        images: ['https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80'],
         likes: 124,
         comments: [
-          { id: 101, author: '林夕', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5', content: '同意，最近也在坚持。' },
-          { id: 102, author: '小雨', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=100&backgroundColor=ffd5dc', content: '求推荐具体方法！' }
+          { id: 101, author: '林夕', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5', content: '同意，最近也在坚持。', replies: [
+            { id: 1011, author: '陈默', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=100&backgroundColor=b6e3f4', content: '一起加油！', replyTo: '林夕' }
+          ]},
+          { id: 102, author: '小雨', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=100&backgroundColor=ffd5dc', content: '求推荐具体方法！', replies: [] }
         ],
         liked: false,
         showComments: false
@@ -61,9 +130,13 @@ Page({
         avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=200&backgroundColor=ffd5dc',
         time: '5小时前',
         content: '有时候最高效的做事方式，就是什么都不做。让大脑放空，让念头沉淀。周末打算去山里待两天，不带电脑。',
+        images: [
+          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80',
+          'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80'
+        ],
         likes: 89,
         comments: [
-          { id: 201, author: '阿北', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Abei&size=100&backgroundColor=d1d4f9', content: '羡慕了，求带' }
+          { id: 201, author: '阿北', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Abei&size=100&backgroundColor=d1d4f9', content: '羡慕了，求带', replies: [] }
         ],
         liked: false,
         showComments: false
@@ -74,6 +147,7 @@ Page({
         avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Abei&size=200&backgroundColor=d1d4f9',
         time: '昨天',
         content: '重读《挪威的森林》，发现以前没注意到的细节。渡边在直子死后独自旅行的那段，写得真克制，却字字诛心。好的悲伤从来不是嚎啕大哭。',
+        images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&q=80'],
         likes: 256,
         comments: [],
         liked: false,
@@ -85,10 +159,13 @@ Page({
         avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Zhouwan&size=200&backgroundColor=e8dff5',
         time: '昨天',
         content: '今天删掉了手机里五个不常用的社交软件。信息流太满了，满到听不见自己的声音。数字断舍离不是逃避，是为了更清醒地选择。',
+        images: ['https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80'],
         likes: 178,
         comments: [
-          { id: 401, author: '陈默', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=100&backgroundColor=b6e3f4', content: '刚做完类似的事，感觉整个世界安静了' },
-          { id: 402, author: '林夕', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5', content: '我也在考虑这样做' }
+          { id: 401, author: '陈默', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=100&backgroundColor=b6e3f4', content: '刚做完类似的事，感觉整个世界安静了', replies: [
+            { id: 4011, author: '周晚', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Zhouwan&size=100&backgroundColor=e8dff5', content: '真的，少即是多', replyTo: '陈默' }
+          ]},
+          { id: 402, author: '林夕', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5', content: '我也在考虑这样做', replies: [] }
         ],
         liked: false,
         showComments: false
@@ -99,9 +176,28 @@ Page({
         avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Fangtang&size=200&backgroundColor=c0aede',
         time: '3天前',
         content: '深夜的手冲咖啡，豆子是埃塞俄比亚的耶加雪菲。水温 92 度，闷蒸 30 秒。看着水流画圈的时候，什么都不想。这大概就是我的冥想。',
+        images: [
+          'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&q=80',
+          'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80'
+        ],
         likes: 342,
         comments: [
-          { id: 501, author: '林小雨', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=100&backgroundColor=ffd5dc', content: '同款豆子！下次交流下冲法' }
+          { id: 501, author: '林小雨', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=100&backgroundColor=ffd5dc', content: '同款豆子！下次交流下冲法', replies: [] }
+        ],
+        liked: false,
+        showComments: false
+      },
+      {
+        id: 99999,
+        author: '林夕',
+        avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
+        time: '1天前',
+        content: '最近开始尝试每天早起半小时，用来阅读和整理思绪。发现一天的状态真的会因为早上的这半小时而变得很不一样。',
+        images: ['https://images.unsplash.com/photo-1493770348161-369560ae357d?w=800&q=80'],
+        likes: 45,
+        comments: [
+          { id: 99901, author: '林小雨', avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=100&backgroundColor=ffd5dc', content: '周末一起去山里走走？', replies: [] },
+          { id: 99902, author: '阿北', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Abei&size=100&backgroundColor=d1d4f9', content: '同感，早起真的改变状态', replies: [] }
         ],
         liked: false,
         showComments: false
@@ -148,6 +244,120 @@ Page({
     this.setData({ [`posts[${idx}].showComments`]: newShow })
   },
 
+  startReply(e) {
+    const { postId, commentId, author } = e.currentTarget.dataset
+    this.doStartReply(postId, commentId, author)
+  },
+
+  doStartReply(postId, commentId, author) {
+    this.setData({
+      replyingComment: { postId, commentId, author },
+      focusInputPostId: postId
+    })
+  },
+
+  cancelReply() {
+    this.setData({ replyingComment: null })
+  },
+
+  onCommentTap(e) {
+    const { postId, commentId, author, content } = e.currentTarget.dataset
+    if (author === this.data.myName) {
+      wx.showActionSheet({
+        itemList: ['删除'],
+        itemColor: '#c45a5a',
+        success: (res) => {
+          if (res.tapIndex === 0) this.deleteComment(postId, commentId)
+        }
+      })
+    } else {
+      wx.showActionSheet({
+        itemList: ['回复', '举报'],
+        itemColor: '#c45a5a',
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.doStartReply(postId, commentId, author)
+          } else if (res.tapIndex === 1) {
+            this.showReportSheet('评论')
+          }
+        }
+      })
+    }
+  },
+
+  onReplyTap(e) {
+    const { postId, commentId, replyId, author, content } = e.currentTarget.dataset
+    if (author === this.data.myName) {
+      wx.showActionSheet({
+        itemList: ['复制', '删除'],
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            wx.setClipboardData({
+              data: content,
+              success: () => wx.showToast({ title: '已复制', icon: 'none' })
+            })
+          } else if (res.tapIndex === 1) {
+            this.deleteReply(postId, commentId, replyId)
+          }
+        }
+      })
+    } else {
+      wx.showActionSheet({
+        itemList: ['回复', '举报'],
+        itemColor: '#c45a5a',
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.doStartReply(postId, commentId, author)
+          } else if (res.tapIndex === 1) {
+            this.showReportSheet('回复')
+          }
+        }
+      })
+    }
+  },
+
+  deleteComment(postId, commentId) {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除这条评论吗？',
+      confirmColor: '#c45a5a',
+      success: (res) => {
+        if (res.confirm) {
+          const posts = this.data.posts
+          const idx = posts.findIndex(p => p.id === postId)
+          if (idx === -1) return
+          posts[idx].comments = posts[idx].comments.filter(c => c.id !== commentId)
+          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
+        }
+      }
+    })
+  },
+
+  deleteReply(postId, commentId, replyId) {
+    wx.showModal({
+      title: '确认删除',
+      content: '确定要删除这条回复吗？',
+      confirmColor: '#c45a5a',
+      success: (res) => {
+        if (res.confirm) {
+          const posts = this.data.posts
+          const idx = posts.findIndex(p => p.id === postId)
+          if (idx === -1) return
+          const commentIdx = posts[idx].comments.findIndex(c => c.id === commentId)
+          if (commentIdx === -1) return
+          const replies = posts[idx].comments[commentIdx].replies || []
+          posts[idx].comments[commentIdx].replies = replies.filter(r => r.id !== replyId)
+          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
+        }
+      }
+    })
+  },
+
+  onInputBlur() {
+    this.setData({ focusInputPostId: null })
+  },
+
+
   addComment(e) {
     const postId = e.currentTarget.dataset.id
     const content = e.detail.value
@@ -157,20 +367,45 @@ Page({
     const idx = posts.findIndex(p => p.id === postId)
     if (idx === -1) return
 
-    const newComment = {
+    const replying = this.data.replyingComment
+    const newReply = {
       id: Date.now(),
       author: '林夕',
       avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
       content: content.trim()
     }
-    posts[idx].comments.push(newComment)
-    posts[idx].commentInput = ''
 
-    this.setData({
-      [`posts[${idx}].comments`]: posts[idx].comments,
-      [`posts[${idx}].commentInput`]: ''
-    })
-    // 不保存评论到 myPosts，myPosts 只存自己发布的动态
+    if (replying && replying.postId === postId) {
+      // 回复某条评论
+      const commentIdx = posts[idx].comments.findIndex(c => c.id === replying.commentId)
+      if (commentIdx !== -1) {
+        newReply.replyTo = replying.author
+        if (!posts[idx].comments[commentIdx].replies) {
+          posts[idx].comments[commentIdx].replies = []
+        }
+        posts[idx].comments[commentIdx].replies.push(newReply)
+        this.setData({
+          [`posts[${idx}].comments`]: posts[idx].comments,
+          [`posts[${idx}].commentInput`]: '',
+          replyingComment: null,
+          focusInputPostId: null
+        })
+      }
+    } else {
+      // 直接评论帖子
+      posts[idx].comments.push(newReply)
+      posts[idx].commentInput = ''
+      this.setData({
+        [`posts[${idx}].comments`]: posts[idx].comments,
+        [`posts[${idx}].commentInput`]: '',
+        focusInputPostId: null
+      })
+    }
+  },
+
+  goToNotifications() {
+    this.setData({ notificationUnread: false })
+    wx.navigateTo({ url: '/pages/notifications/notifications' })
   },
 
   showShareMenu(e) {
@@ -179,7 +414,7 @@ Page({
     const isMine = post.author === '林夕'
     const itemList = isMine
       ? ['分享给好友', '复制链接', '收藏', '删除']
-      : ['分享给好友', '复制链接', '收藏']
+      : ['分享给好友', '复制链接', '收藏', '举报']
     wx.showActionSheet({
       itemList,
       itemColor: isMine ? '#c45a5a' : '',
@@ -209,7 +444,19 @@ Page({
               }
             }
           })
+        } else if (res.tapIndex === 3 && !isMine) {
+          this.showReportSheet('帖子')
         }
+      }
+    })
+  },
+
+  showReportSheet(targetType) {
+    wx.showActionSheet({
+      itemList: ['色情低俗', '违法违规', '人身攻击', '广告骚扰', '其他'],
+      itemColor: '#c45a5a',
+      success: () => {
+        wx.showToast({ title: '举报成功，我们会尽快处理', icon: 'none' })
       }
     })
   },
@@ -247,6 +494,7 @@ Page({
       wx.showToast({ title: '最多9张图片', icon: 'none' })
       return
     }
+    getApp()._ignoreRelaunch = true
     wx.chooseMedia({
       count: remainCount,
       mediaType: ['image'],
@@ -266,6 +514,16 @@ Page({
     wx.previewImage({
       current: src,
       urls: this.data.postImages
+    })
+  },
+
+  previewPostImage(e) {
+    const src = e.currentTarget.dataset.src
+    const urls = e.currentTarget.dataset.urls
+    getApp()._ignoreRelaunch = true
+    wx.previewImage({
+      current: src,
+      urls: urls
     })
   },
 
@@ -307,8 +565,12 @@ Page({
     wx.setStorage({ key: 'myPosts', data: myPosts })
     this._lastMyPostsId = newPost.id
 
+    // 如果自己被自己拉黑（理论上不会），需要过滤
+    const blocked = this.getBlockedUsers()
+    const updatedPosts = blocked.has(author) ? this.data.posts : [newPost, ...this.data.posts]
+
     this.setData({
-      posts: [newPost, ...this.data.posts],
+      posts: updatedPosts,
       showPostPanel: false,
       postContent: '',
       postImages: [],

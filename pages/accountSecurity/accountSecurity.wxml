@@ -1,0 +1,133 @@
+<view class="page account-security-page">
+  <!-- Header -->
+  <view class="page-header-bar security-header">
+    <view class="header-left" bindtap="goBack">
+      <view class="back-arrow"></view>
+    </view>
+    <text class="header-title">账号与安全</text>
+    <view class="header-action"></view>
+  </view>
+
+  <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
+    <view class="content-inner">
+      <!-- Profile Mini -->
+      <view class="profile-mini anim-fade-in-up">
+        <image class="mini-avatar" src="{{userInfo.avatar}}" mode="aspectFill"/>
+        <view class="mini-info">
+          <text class="mini-name">{{userInfo.nickName}}</text>
+          <text class="mini-id">ID {{userInfo.id}}</text>
+        </view>
+      </view>
+
+      <!-- Section: 账号信息 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.08s">
+        <view class="section-header">
+          <text class="section-label">账号信息</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="changePhone">
+            <view class="menu-item-content">
+              <text class="menu-title">手机号</text>
+              <text class="menu-desc">用于登录和找回密码</text>
+            </view>
+            <view class="menu-extra-wrap">
+              <text class="menu-extra">{{phone}}</text>
+              <view class="menu-arrow"></view>
+            </view>
+          </view>
+          <view class="menu-item" bindtap="changeEmail">
+            <view class="menu-item-content">
+              <text class="menu-title">邮箱</text>
+              <text class="menu-desc">接收通知和账单</text>
+            </view>
+            <view class="menu-extra-wrap">
+              <text class="menu-extra">{{email}}</text>
+              <view class="menu-arrow"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 安全设置 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.16s">
+        <view class="section-header">
+          <text class="section-label">安全设置</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="menu-item" bindtap="changePassword">
+            <view class="menu-item-content">
+              <text class="menu-title">登录密码</text>
+              <text class="menu-desc">定期修改可提升账号安全</text>
+            </view>
+            <view class="menu-extra-wrap">
+              <text class="menu-extra-status {{passwordSet ? 'status-on' : 'status-off'}}">{{passwordSet ? '已设置' : '未设置'}}</text>
+              <view class="menu-arrow"></view>
+            </view>
+          </view>
+          <view class="menu-item">
+            <view class="menu-item-content">
+              <text class="menu-title">微信绑定</text>
+              <text class="menu-desc">快捷登录与消息同步</text>
+            </view>
+            <view class="menu-extra-wrap">
+              <text class="menu-extra-status {{wechatBound ? 'status-on' : 'status-off'}}">{{wechatBound ? '已绑定' : '未绑定'}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 登录设备 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.24s">
+        <view class="section-header">
+          <text class="section-label">登录设备</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view
+            class="device-item"
+            wx:for="{{devices}}"
+            wx:key="index"
+            bindtap="manageDevices"
+          >
+            <view class="device-icon {{item.isCurrent ? 'device-current' : ''}}"></view>
+            <view class="device-info">
+              <view class="device-row">
+                <text class="device-name">{{item.name}}</text>
+                <text wx:if="{{item.isCurrent}}" class="device-badge">当前</text>
+              </view>
+              <text class="device-meta">{{item.location}} · {{item.time}}</text>
+            </view>
+            <view class="menu-arrow"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Section: 登录记录 -->
+      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.32s">
+        <view class="section-header">
+          <text class="section-label">最近登录记录</text>
+          <view class="section-line"></view>
+        </view>
+        <view class="menu-card">
+          <view class="history-item" wx:for="{{loginHistory}}" wx:key="index">
+            <view class="history-dot {{item.type === '修改密码' ? 'history-dot-warn' : ''}}"></view>
+            <view class="history-info">
+              <view class="history-row">
+                <text class="history-type">{{item.type}}</text>
+                <text class="history-device">{{item.device}}</text>
+              </view>
+              <text class="history-meta">{{item.date}} {{item.time}} · {{item.location}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Footer -->
+      <view class="security-footer anim-fade-in-up" style="animation-delay: 0.4s">
+        <text class="footer-text">如发现异常登录，请立即修改密码</text>
+      </view>
+    </view>
+  </scroll-view>
+</view>

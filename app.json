@@ -1,6 +1,9 @@
 {
   "pages": [
     "pages/index/index",
+    "pages/landing/landing",
+    "pages/chat/chat",
+    "pages/chatDetail/chatDetail",
     "pages/explore/explore",
     "pages/match/match",
     "pages/memory/memory",
@@ -11,7 +14,10 @@
     "pages/moments/moments",
     "pages/settings/settings",
     "pages/editProfile/editProfile",
-    "pages/userHome/userHome"
+    "pages/userHome/userHome",
+    "pages/blockList/blockList",
+    "pages/accountSecurity/accountSecurity",
+    "pages/notifications/notifications"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -29,7 +35,7 @@
     "borderStyle": "white",
     "list": [
       {
-        "pagePath": "pages/index/index",
+        "pagePath": "pages/chat/chat",
         "text": "聊天",
         "iconPath": "images/tab_chat.png",
         "selectedIconPath": "images/tab_chat_active.png"
