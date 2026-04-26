@@ -11,7 +11,6 @@
     "pages/settings/settings",
     "pages/editProfile/editProfile",
     "pages/userHome/userHome",
-    "pages/blockList/blockList",
     "pages/accountSecurity/accountSecurity",
     "pages/notifications/notifications"
   ],
