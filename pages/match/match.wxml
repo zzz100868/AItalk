@@ -7,14 +7,14 @@
     <view class="noise-layer"></view>
   </view>
 
-  <!-- Dark Header -->
-  <view class="dark-header">
-    <view bindtap="goToUserHome" data-author="{{myName}}">
-      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
-    </view>
-    <text class="header-title">匹配</text>
-    <view style="width: 56rpx;"></view>
-  </view>
+  <page-header
+    variant="dark"
+    title="匹配"
+    show-avatar
+    avatar="{{userAvatar}}"
+    author="{{myName}}"
+    bind:avatartap="goToUserHome"
+  />
 
   <view class="content">
     <view class="content-inner">

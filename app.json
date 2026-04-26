@@ -1,13 +1,9 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/landing/landing",
     "pages/match/match",
     "pages/memory/memory",
-    "pages/archive/archive",
     "pages/profile/profile",
-    "pages/followers/followers",
-    "pages/following/following",
     "pages/settings/settings",
     "pages/editProfile/editProfile",
     "pages/userHome/userHome",
@@ -21,6 +17,10 @@
     "navigationBarTextStyle": "black",
     "navigationStyle": "custom",
     "backgroundColor": "#faf9f7"
+  },
+  "usingComponents": {
+    "page-header": "/components/page-header/page-header",
+    "edit-modal": "/components/edit-modal/edit-modal"
   },
   "tabBar": {
     "custom": true,

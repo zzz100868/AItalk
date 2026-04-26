@@ -1,49 +1,40 @@
+const common = require('../../utils/common.js')
+const storage = common.storage
+const userStore = require('../../stores/userStore.js')
+const mockData = require('../../data/mockData.js')
+
 Page({
   data: {
     userInfo: {
-      nickName: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
-      id: 'LX_9527'
+      nickName: mockData.DEFAULT_USER.nickName,
+      avatar: mockData.DEFAULT_USER.avatar,
+      id: mockData.DEFAULT_USER.id
     },
-    settings: {},
     cacheSize: '12.5 MB',
     version: '1.0.0'
   },
 
   onLoad() {
-    const app = getApp()
-    const cache = app.globalData._cache
-    const saved = cache?.settings || wx.getStorageSync('userSettings') || {}
-    if (saved) {
-      this.setData({ settings: { ...this.data.settings, ...saved } })
-    }
     this.calcCacheSize()
   },
 
   onShow() {
-    const app = getApp()
-    const cache = app.globalData._cache
-    const saved = cache?.profile || wx.getStorageSync('userProfile') || {}
-    if (saved) {
-      this.setData({
-        'userInfo.avatar': saved.avatar || this.data.userInfo.avatar,
-        'userInfo.nickName': saved.nickName || this.data.userInfo.nickName
-      })
-    }
+    const profile = userStore.getProfile()
+    this.setData({
+      'userInfo.avatar': profile.avatar,
+      'userInfo.nickName': profile.nickName
+    })
   },
 
   calcCacheSize() {
-    // 模拟计算缓存大小
-    const size = (Math.random() * 20 + 5).toFixed(1)
-    this.setData({ cacheSize: `${size} MB` })
-  },
-
-  toggleSetting(e) {
-    const key = e.currentTarget.dataset.key
-    const value = e.detail.value
-    const settings = { ...this.data.settings, [key]: value }
-    this.setData({ settings })
-    wx.setStorageSync('userSettings', settings)
+    try {
+      const info = wx.getStorageInfoSync()
+      const kb = info.currentSize
+      const size = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB'
+      this.setData({ cacheSize: size })
+    } catch (e) {
+      this.setData({ cacheSize: '0 KB' })
+    }
   },
 
   goToEditProfile() {
@@ -57,16 +48,23 @@ Page({
   clearCache() {
     wx.showModal({
       title: '清除缓存',
-      content: `确定要清除 ${this.data.cacheSize} 的缓存吗？`,
+      content: '确定要清除图片和临时缓存吗？你的资料、记忆和照片不会被删除。',
       confirmColor: '#c4715a',
       success: (res) => {
         if (res.confirm) {
-          wx.clearStorage({
-            success: () => {
-              wx.showToast({ title: '缓存已清除', icon: 'success' })
-              this.setData({ cacheSize: '0 MB' })
-            }
-          })
+          try {
+            const info = wx.getStorageInfoSync()
+            const keysToKeep = ['userProfile', 'userSettings', 'memoryInsights', 'profilePhotos']
+            info.keys.forEach(key => {
+              if (!keysToKeep.includes(key)) {
+                storage.remove(key)
+              }
+            })
+            wx.showToast({ title: '缓存已清除', icon: 'success' })
+            this.calcCacheSize()
+          } catch (e) {
+            wx.showToast({ title: '清除失败', icon: 'none' })
+          }
         }
       }
     })

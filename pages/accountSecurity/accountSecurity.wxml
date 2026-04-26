@@ -1,12 +1,5 @@
 <view class="page account-security-page">
-  <!-- Header -->
-  <view class="page-header-bar security-header">
-    <view class="header-left" bindtap="goBack">
-      <view class="back-arrow"></view>
-    </view>
-    <text class="header-title">账号与安全</text>
-    <view class="header-action"></view>
-  </view>
+  <page-header title="账号与安全" show-back bind:back="goBack" />
 
   <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
     <view class="content-inner">

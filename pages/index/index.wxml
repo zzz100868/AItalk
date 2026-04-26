@@ -15,7 +15,7 @@
           <view class="avatar-ring-outer"></view>
           <view class="avatar-ring-mid"></view>
           <view class="avatar-frame">
-            <image class="ai-avatar" src="https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoya&size=400&backgroundColor=e8dff5" mode="aspectFill"/>
+            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
           </view>
         </view>
       </view>
@@ -46,16 +46,14 @@
 
   <!-- ========== Call View ========== -->
   <view class="view-layer call-view {{viewMode === 'call' ? 'view-active' : 'view-inactive'}}">
-    <!-- Header -->
-    <view class="page-header-bar">
-      <view class="header-left" bindtap="goToUserHome" data-author="林夕">
-        <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
-      </view>
-      <text class="header-title">{{isCalling ? '通话中' : '聊天'}}</text>
-      <view class="header-action">
-        <view class="notification-dot"></view>
-      </view>
-    </view>
+    <page-header
+      title="{{isCalling ? '通话中' : '聊天'}}"
+      show-avatar
+      avatar="{{userAvatar}}"
+      author="{{userName}}"
+      show-dot
+      bind:avatartap="goToUserHome"
+    />
 
     <!-- Call Content -->
     <view class="main-content">

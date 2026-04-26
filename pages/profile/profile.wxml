@@ -1,19 +1,13 @@
 <view class="page">
   <view class="hero-glow"></view>
 
-  <view class="dark-header">
-    <view style="width: 56rpx;"></view>
-    <text class="header-title">我的</text>
-    <view class="header-action">
-      <view class="notification-dot"></view>
-    </view>
-  </view>
+  <page-header variant="dark" title="我的" show-dot />
 
   <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
     <view class="content-inner">
       <!-- Profile Hero -->
       <view class="profile-hero anim-fade-in-up">
-        <view class="avatar-wrapper" bindtap="goToMyHome">
+        <view class="avatar-wrapper">
           <view class="avatar-frame anim-scale-in">
             <image class="profile-avatar" src="{{userInfo.avatar}}" mode="aspectFill"/>
             <view class="avatar-ring"></view>
@@ -37,6 +31,34 @@
           <view class="section-line"></view>
         </view>
         <view class="menu-card">
+          <!-- Photo Gallery -->
+          <view class="photo-section">
+            <view class="photo-header">
+              <text class="photo-title">生活照</text>
+              <text class="photo-count">{{photos.length}}/8</text>
+            </view>
+            <view class="photo-grid">
+              <view
+                class="photo-item"
+                wx:for="{{photos}}"
+                wx:key="index"
+                bindtap="previewPhoto"
+                data-index="{{index}}"
+                bindlongpress="deletePhoto"
+                data-del-index="{{index}}"
+              >
+                <image class="photo-img" src="{{item}}" mode="aspectFill"/>
+                <view class="photo-delete" catchtap="deletePhoto" data-del-index="{{index}}">
+                  <view class="photo-delete-icon"></view>
+                </view>
+              </view>
+              <view wx:if="{{photos.length < 8}}" class="photo-add" bindtap="choosePhoto">
+                <view class="photo-add-icon"></view>
+                <text class="photo-add-text">添加</text>
+              </view>
+            </view>
+            <text class="photo-hint">长按图片可删除</text>
+          </view>
         </view>
       </view>
 

@@ -1,0 +1,10 @@
+<view class="page-header page-header-{{variant}}">
+  <view class="header-side header-left {{showBack || showAvatar ? 'header-side-tap' : ''}}" bindtap="onLeftTap">
+    <view wx:if="{{showBack}}" class="back-arrow"></view>
+    <image wx:elif="{{showAvatar}}" class="header-avatar" src="{{avatar}}" mode="aspectFill"/>
+  </view>
+  <text class="header-title">{{title}}</text>
+  <view class="header-side header-action">
+    <view wx:if="{{showDot}}" class="notification-dot"></view>
+  </view>
+</view>

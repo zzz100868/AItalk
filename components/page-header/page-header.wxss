@@ -1,0 +1,94 @@
+.page-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx;
+  padding-top: calc(20rpx + max(48rpx, env(safe-area-inset-top)));
+  box-sizing: border-box;
+}
+
+.page-header-light {
+  background: rgba(250, 249, 247, 0.78);
+  backdrop-filter: saturate(200%) blur(40rpx);
+  -webkit-backdrop-filter: saturate(200%) blur(40rpx);
+  border-bottom: 1rpx solid rgba(28, 25, 23, 0.04);
+}
+
+.header-side {
+  width: 120rpx;
+  min-width: 120rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+}
+
+.header-side-tap {
+  padding: 16rpx;
+  margin-left: -16rpx;
+  box-sizing: border-box;
+}
+
+.header-action {
+  justify-content: flex-end;
+}
+
+.header-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 9999rpx;
+  object-fit: cover;
+  border: 2rpx solid rgba(28, 25, 23, 0.1);
+}
+
+.page-header-light .header-avatar {
+  width: 60rpx;
+  height: 60rpx;
+  border: 1rpx solid rgba(28, 25, 23, 0.08);
+}
+
+.header-title {
+  max-width: 420rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.page-header-light .header-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.page-header-dark .header-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #57534e;
+  letter-spacing: 0;
+}
+
+.notification-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #c4715a;
+  box-shadow: 0 0 12rpx rgba(196, 113, 90, 0.45);
+}
+
+.page-header-light .notification-dot {
+  width: 10rpx;
+  height: 10rpx;
+}
+
+.back-arrow {
+  width: 24rpx;
+  height: 24rpx;
+  border-left: 3rpx solid #1c1917;
+  border-bottom: 3rpx solid #1c1917;
+  transform: rotate(45deg);
+}

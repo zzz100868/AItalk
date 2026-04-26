@@ -1,20 +1,22 @@
+const common = require('../../utils/common.js')
+const userStore = require('../../stores/userStore.js')
+const mockData = require('../../data/mockData.js')
+
 Page({
   data: {
-    avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
-    nickName: '林夕',
-    id: 'LX_9527',
-    bio: '在喧嚣中寻找宁静。🌿✨',
-    canSave: true,
+    avatar: mockData.DEFAULT_USER.avatar,
+    nickName: mockData.DEFAULT_USER.nickName,
+    id: mockData.DEFAULT_USER.id,
+    bio: mockData.DEFAULT_USER.bio,
+    canSave: false,
     original: {}
   },
 
   onLoad() {
-    const app = getApp()
-    const cache = app.globalData._cache
-    const saved = cache?.profile || wx.getStorageSync('userProfile') || {}
-    const avatar = saved.avatar || app.globalData.userInfo.avatarUrl || this.data.avatar
-    const nickName = saved.nickName || app.globalData.userInfo.nickName || this.data.nickName
-    const bio = saved.bio || this.data.bio
+    const profile = userStore.getProfile()
+    const avatar = profile.avatar
+    const nickName = profile.nickName
+    const bio = profile.bio
 
     const data = {
       avatar,
@@ -26,57 +28,46 @@ Page({
     this.setData(data)
   },
 
+  _checkCanSave() {
+    const { avatar, nickName, bio, original } = this.data
+    const hasChanged = avatar !== original.avatar || nickName !== original.nickName || bio !== original.bio
+    const valid = nickName.trim().length > 0
+    const canSave = hasChanged && valid
+    if (canSave !== this.data.canSave) {
+      this.setData({ canSave })
+    }
+  },
+
   onInputNickName(e) {
-    this.setData({ nickName: e.detail.value })
+    this.setData({ nickName: e.detail.value }, () => this._checkCanSave())
   },
 
   onInputBio(e) {
-    this.setData({ bio: e.detail.value })
+    this.setData({ bio: e.detail.value }, () => this._checkCanSave())
   },
 
   chooseAvatar() {
-    wx.chooseMedia({
+    common.safeChooseMedia({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
-        this.setData({ avatar: tempPath })
+        this.setData({ avatar: tempPath }, () => this._checkCanSave())
       }
     })
   },
 
   saveProfile() {
+    if (!this.data.canSave) return
     const { avatar, nickName, bio } = this.data
     const profile = {
       avatar,
-      nickName: nickName.trim() || '林夕',
+      nickName: nickName.trim() || mockData.DEFAULT_USER.nickName,
       bio: bio.trim()
     }
 
-    wx.setStorage({ key: 'userProfile', data: profile })
-
-    const app = getApp()
-    app.globalData.userInfo.avatarUrl = profile.avatar
-    app.globalData.userInfo.nickName = profile.nickName
-    if (app.globalData._cache) {
-      app.globalData._cache.profile = profile
-    }
-
-    // 同步更新已发布动态的昵称和头像
-    const myPosts = wx.getStorageSync('myPosts') || []
-    if (myPosts.length > 0) {
-      const updated = myPosts.map(p => ({
-        ...p,
-        author: profile.nickName,
-        avatar: profile.avatar
-      }))
-      wx.setStorage({ key: 'myPosts', data: updated })
-      if (app.globalData._cache) {
-        app.globalData._cache.myPosts = updated
-        app.globalData._cache.myPostsHash = updated.length > 0 ? updated[updated.length - 1].id : 0
-      }
-    }
+    userStore.updateProfile(profile)
 
     wx.showToast({ title: '已保存', icon: 'success' })
 

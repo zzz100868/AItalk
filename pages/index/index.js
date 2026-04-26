@@ -1,3 +1,6 @@
+const common = require('../../utils/common.js')
+const mockData = require('../../data/mockData.js')
+
 Page({
   data: {
     viewMode: 'landing',
@@ -7,9 +10,10 @@ Page({
     callDate: '今天 14:20',
     isMuted: false,
     isSpeakerOn: false,
-    aiName: '小雅',
-    aiAvatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoya&size=400&backgroundColor=e8dff5',
-    userAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5'
+    userName: mockData.DEFAULT_USER.nickName,
+    aiName: mockData.AI_USERS.xiaoya.name,
+    aiAvatar: mockData.AI_USERS.xiaoya.avatar,
+    userAvatar: mockData.DEFAULT_USER.avatarSmall
   },
 
   onLoad(options) {
@@ -18,8 +22,21 @@ Page({
     }
   },
 
+  onShow() {
+    const info = common.loadUserInfo()
+    this.setData({ userName: info.name, userAvatar: info.avatar })
+    if (this.data.isCalling && this.callStartedAt) {
+      this._syncCallDuration()
+      this.startCallTimer()
+    }
+  },
+
+  onHide() {
+    this._clearCallTimer()
+  },
+
   onUnload() {
-    if (this.timer) clearInterval(this.timer)
+    this._clearCallTimer()
   },
 
   enterApp() {
@@ -31,37 +48,52 @@ Page({
   },
 
   startCall() {
+    this._clearCallTimer()
+    this.callStartedAt = Date.now()
     this.setData({ isCalling: true, callDuration: '00:00' })
     this.startCallTimer()
   },
 
   startCallTimer() {
-    let seconds = 0
+    this._clearCallTimer()
+    this._syncCallDuration()
     this.timer = setInterval(() => {
-      seconds++
-      const mins = Math.floor(seconds / 60).toString().padStart(2, '0')
-      const secs = (seconds % 60).toString().padStart(2, '0')
-      this.setData({ callDuration: `${mins}:${secs}` })
+      this._syncCallDuration()
     }, 1000)
   },
 
-  endCall() {
+  _clearCallTimer() {
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = null
     }
+  },
+
+  _syncCallDuration() {
+    if (!this.callStartedAt) return
+    const seconds = Math.floor((Date.now() - this.callStartedAt) / 1000)
+    const mins = Math.floor(seconds / 60).toString().padStart(2, '0')
+    const secs = (seconds % 60).toString().padStart(2, '0')
+    this.setData({ callDuration: `${mins}:${secs}` })
+  },
+
+  endCall() {
+    this._syncCallDuration()
+    this._clearCallTimer()
+    this.callStartedAt = null
     const now = new Date()
     const hours = now.getHours().toString().padStart(2, '0')
     const minutes = now.getMinutes().toString().padStart(2, '0')
+    getApp().globalData.memoryTargetTab = 'archive'
     this.setData({
       viewMode: 'landing',
       isCalling: false,
       callDate: `今天 ${hours}:${minutes}`,
       isMuted: false,
       isSpeakerOn: false
+    }, () => {
+      wx.switchTab({ url: '/pages/memory/memory' })
     })
-    wx.setStorageSync('memoryTargetTab', 'archive')
-    wx.switchTab({ url: '/pages/memory/memory' })
   },
 
   toggleMute() {
@@ -75,8 +107,6 @@ Page({
   },
 
   goToUserHome(e) {
-    const author = e.currentTarget.dataset.author
-    if (!author) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+    common.goToUserHome(e.detail?.author || e.currentTarget.dataset.author)
   }
 })

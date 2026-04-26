@@ -1,12 +1,5 @@
 <view class="page edit-profile-page">
-  <!-- Header -->
-  <view class="page-header-bar edit-header">
-    <view class="header-left" bindtap="goBack">
-      <view class="back-arrow"></view>
-    </view>
-    <text class="header-title">编辑资料</text>
-    <view class="header-action"></view>
-  </view>
+  <page-header title="编辑资料" show-back bind:back="goBack" />
 
   <scroll-view scroll-y class="content safe-bottom" enable-back-to-top>
     <view class="content-inner">

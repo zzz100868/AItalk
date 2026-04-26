@@ -1,39 +1,89 @@
-var common = require('../../utils/common.js')
+const common = require('../../utils/common.js')
+const userStore = require('../../stores/userStore.js')
+const mockData = require('../../data/mockData.js')
+const tabPage = require('../../behaviors/tabPage.js')
+const storage = common.storage
 
 Page({
+  behaviors: [tabPage(2)],
+
   data: {
     userInfo: {
-      nickName: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
-      id: 'LX_9527',
-      bio: '在喧嚣中寻找宁静。🌿✨'
+      nickName: mockData.DEFAULT_USER.nickName,
+      avatar: mockData.DEFAULT_USER.avatar,
+      id: mockData.DEFAULT_USER.id,
+      bio: mockData.DEFAULT_USER.bio
     },
+    photos: [],
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 2 })
-    }
     this.loadUserInfo()
   },
 
   onLoad() {
-    this.loadUserInfo()
+    this.loadPhotos()
   },
 
   loadUserInfo() {
-    const app = getApp()
-    const cache = app.globalData._cache
-    const saved = cache?.profile || wx.getStorageSync('userProfile') || {}
-    this.setData({
-      'userInfo.avatar': saved.avatar || app.globalData.userInfo.avatarUrl || this.data.userInfo.avatar,
-      'userInfo.nickName': saved.nickName || app.globalData.userInfo.nickName || this.data.userInfo.nickName,
-      'userInfo.bio': saved.bio || this.data.userInfo.bio
+    const profile = userStore.getProfile()
+    if (profile.avatar !== this.data.userInfo.avatar ||
+        profile.nickName !== this.data.userInfo.nickName ||
+        profile.bio !== this.data.userInfo.bio) {
+      this.setData({
+        'userInfo.avatar': profile.avatar,
+        'userInfo.nickName': profile.nickName,
+        'userInfo.bio': profile.bio
+      })
+    }
+  },
+
+  loadPhotos() {
+    const photos = storage.get('profilePhotos', [])
+    this.setData({ photos })
+  },
+
+  savePhotos(photos) {
+    storage.set('profilePhotos', photos)
+    this.setData({ photos })
+  },
+
+  choosePhoto() {
+    const remain = 8 - this.data.photos.length
+    if (remain <= 0) {
+      wx.showToast({ title: '最多上传8张', icon: 'none' })
+      return
+    }
+    common.safeChooseMedia({
+      count: remain,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const newPaths = res.tempFiles.map(f => f.tempFilePath)
+        const photos = [...this.data.photos, ...newPaths].slice(0, 8)
+        this.savePhotos(photos)
+      }
     })
   },
 
-  goToAppearance() {
-    wx.showToast({ title: '我的形象', icon: 'none' })
+  previewPhoto(e) {
+    const index = e.currentTarget.dataset.index
+    common.safePreviewImage(this.data.photos, this.data.photos[index])
+  },
+
+  deletePhoto(e) {
+    const index = e.currentTarget.dataset.delIndex
+    wx.showModal({
+      title: '删除照片',
+      content: '确定要删除这张照片吗？',
+      confirmColor: '#c4715a',
+      success: (res) => {
+        if (res.confirm) {
+          const photos = this.data.photos.filter((_, i) => i !== index)
+          this.savePhotos(photos)
+        }
+      }
+    })
   },
 
   goToSettings() {
@@ -41,15 +91,7 @@ Page({
   },
 
   copyId() {
-    wx.setClipboardData({
-      data: this.data.userInfo.id,
-      success: () => {
-        wx.showToast({ title: '已复制 ID', icon: 'none' })
-      }
-    })
+    common.safeSetClipboardData(this.data.userInfo.id, '已复制 ID')
   },
 
-  goToMyHome() {
-    common.goToUserHome(common.loadUserInfo().name)
-  }
 })

@@ -4,19 +4,19 @@
   <view class="ambient-glow ambient-glow-2"></view>
   <view class="ambient-gradient"></view>
 
-  <!-- Header -->
-  <view class="dark-header">
-    <view bindtap="goToUserHome" data-author="林夕">
-      <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
-    </view>
-    <text class="header-title">记忆库</text>
-    <view class="header-action">
-      <view class="notification-dot"></view>
-    </view>
-  </view>
+  <page-header
+    variant="dark"
+    title="记忆库"
+    show-avatar
+    avatar="{{userAvatar}}"
+    author="{{userName}}"
+    show-dot
+    bind:avatartap="goToUserHome"
+  />
 
   <scroll-view scroll-y class="content {{activeTab === 'chat' ? 'content-chat' : ''}}" enable-back-to-top scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
-    <view class="content-inner">
+    <view id="memory-scroll-top"></view>
+    <view class="content-inner {{activeTab === 'chat' ? 'content-inner-chat' : ''}}" style="padding-bottom: {{activeTab === 'chat' ? 32 : 140}}rpx;">
       <!-- Tab Switcher -->
       <view class="tab-switcher anim-fade-in">
         <view class="tab-slider" style="transform: translateX({{tabSliderX}}%);"></view>
@@ -56,7 +56,6 @@
           <view
             wx:for="{{messages}}"
             wx:key="id"
-            id="{{index === messages.length - 1 ? 'msg-last' : ''}}"
             class="msg-row {{item.sender === 'user' ? 'msg-user' : 'msg-ai'}}"
             style="animation-delay: {{index * 0.08}}s"
           >
@@ -65,10 +64,10 @@
               <text class="msg-text">{{item.content}}</text>
             </view>
           </view>
+          <view class="chat-bottom-spacer" style="height: {{chatPaddingBottom}}rpx;"></view>
+          <view id="chat-scroll-bottom"></view>
         </view>
 
-        <!-- Spacer for fixed chat input -->
-        <view class="chat-input-spacer"></view>
       </view>
 
       <!-- Memory View -->
@@ -166,6 +165,7 @@
         placeholder-class="input-placeholder" 
         cursor-spacing="20"
         value="{{inputValue}}"
+        hold-keyboard
         bindfocus="onInputFocus" 
         bindblur="onInputBlur"
         bindinput="onInputChange"
@@ -179,18 +179,14 @@
     <view class="footer-safe-area"></view>
   </view>
 
-  <!-- Edit Modal -->
-  <view wx:if="{{showEditModal}}" class="modal-overlay" bindtap="cancelEdit">
-    <view class="modal-dialog" catchtap="preventBubble">
-      <view class="modal-header">编辑记忆</view>
-      <view class="modal-body">
-        <input class="modal-input" placeholder="标题" value="{{editTitle}}" bindinput="onEditTitleInput"/>
-        <textarea class="modal-textarea" placeholder="内容" value="{{editContent}}" bindinput="onEditContentInput" maxlength="-1"/>
-      </view>
-      <view class="modal-footer">
-        <view class="modal-btn cancel" bindtap="cancelEdit">取消</view>
-        <view class="modal-btn confirm" bindtap="saveEdit">保存</view>
-      </view>
-    </view>
-  </view>
+  <edit-modal
+    visible="{{showEditModal}}"
+    title="编辑记忆"
+    input-title="{{editTitle}}"
+    input-content="{{editContent}}"
+    bind:titleinput="onEditTitleInput"
+    bind:contentinput="onEditContentInput"
+    bind:cancel="cancelEdit"
+    bind:confirm="saveEdit"
+  />
 </view>

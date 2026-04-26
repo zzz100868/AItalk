@@ -1,9 +1,12 @@
+const userStore = require('../../stores/userStore.js')
+const mockData = require('../../data/mockData.js')
+
 Page({
   data: {
     userInfo: {
-      nickName: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
-      id: 'LX_9527'
+      nickName: mockData.DEFAULT_USER.nickName,
+      avatar: mockData.DEFAULT_USER.avatar,
+      id: mockData.DEFAULT_USER.id
     },
     phone: '138****8888',
     email: 'linxi@example.com',
@@ -23,13 +26,11 @@ Page({
   },
 
   onShow() {
-    const saved = wx.getStorageSync('userProfile') || {}
-    if (saved.nickName || saved.avatar) {
-      this.setData({
-        'userInfo.nickName': saved.nickName || this.data.userInfo.nickName,
-        'userInfo.avatar': saved.avatar || this.data.userInfo.avatar
-      })
-    }
+    const profile = userStore.getProfile()
+    this.setData({
+      'userInfo.nickName': profile.nickName,
+      'userInfo.avatar': profile.avatar
+    })
   },
 
   changePhone() {

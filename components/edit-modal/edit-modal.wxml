@@ -1,0 +1,13 @@
+<view wx:if="{{visible}}" class="modal-overlay" bindtap="onCancel">
+  <view class="modal-dialog" catchtap="preventBubble">
+    <view class="modal-header">{{title}}</view>
+    <view class="modal-body">
+      <input class="modal-input" placeholder="标题" value="{{inputTitle}}" bindinput="onTitleInput"/>
+      <textarea class="modal-textarea" placeholder="内容" value="{{inputContent}}" bindinput="onContentInput" maxlength="-1"/>
+    </view>
+    <view class="modal-footer">
+      <view class="modal-btn cancel" bindtap="onCancel">取消</view>
+      <view class="modal-btn confirm" bindtap="onConfirm">保存</view>
+    </view>
+  </view>
+</view>

@@ -56,36 +56,6 @@
   background-size: 256rpx 256rpx;
 }
 
-/* ── Header (dark mode) ── */
-.dark-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 32rpx;
-  padding-top: calc(20rpx + max(48rpx, env(safe-area-inset-top)));
-}
-
-.dark-header .header-avatar {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 9999rpx;
-  object-fit: cover;
-  border: 2rpx solid rgba(28, 25, 23, 0.1);
-}
-
-.dark-header .header-title {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #57534e;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 /* ── Content ── */
 .content {
   padding-top: calc(110rpx + max(48rpx, env(safe-area-inset-top)));
@@ -425,10 +395,7 @@
   animation: ringPulse 4s ease-in-out infinite;
 }
 
-@keyframes ringPulse {
-  0%, 100% { transform: scale(1); opacity: 0.3; }
-  50% { transform: scale(1.03); opacity: 0.8; }
-}
+
 
 .hero-name {
   font-size: 64rpx;
@@ -651,7 +618,7 @@
 /* ── Start Chat Button ── */
 .start-chat-bar {
   position: fixed;
-  bottom: calc(88rpx + env(safe-area-inset-bottom));
+  bottom: calc(120rpx + env(safe-area-inset-bottom));
   left: 0;
   right: 0;
   z-index: 50;
@@ -1131,12 +1098,3 @@
   animation: fadeInUp 0.7s var(--ease-out-expo) both;
 }
 
-@keyframes scaleIn {
-  from { transform: scale(0.9); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-@keyframes fadeInUp {
-  from { transform: translateY(40rpx); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}

@@ -6,22 +6,6 @@
   overflow: hidden;
 }
 
-/* ── Header ── */
-.security-header .header-left {
-  display: flex;
-  align-items: center;
-  padding: 16rpx;
-  margin-left: -16rpx;
-}
-
-.back-arrow {
-  width: 24rpx;
-  height: 24rpx;
-  border-left: 3rpx solid var(--text-primary);
-  border-bottom: 3rpx solid var(--text-primary);
-  transform: rotate(45deg);
-}
-
 /* ── Content ── */
 .content {
   padding-top: calc(110rpx + max(48rpx, env(safe-area-inset-top)));

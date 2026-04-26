@@ -1,183 +1,162 @@
+const common = require('../../utils/common.js')
+const mockData = require('../../data/mockData.js')
+const tabPage = require('../../behaviors/tabPage.js')
+const storage = common.storage
+const memoryData = mockData.getMemoryData()
+
 Page({
+  behaviors: [tabPage(1)],
+
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1 })
-    }
-    const targetTab = wx.getStorageSync('memoryTargetTab')
+    const info = common.loadUserInfo()
+    this.setData({ userName: info.name, userAvatar: info.avatar })
+    const app = getApp()
+    const targetTab = app.globalData.memoryTargetTab
+    console.log('[memory] onShow, targetTab:', targetTab, 'current activeTab:', this.data.activeTab)
     if (targetTab) {
-      wx.removeStorageSync('memoryTargetTab')
+      app.globalData.memoryTargetTab = null
       const tabMap = { chat: 0, memory: 100, archive: 200 }
-      this.setData({ activeTab: targetTab, tabSliderX: tabMap[targetTab] || 0 })
+      console.log('[memory] switching to tab:', targetTab, 'sliderX:', tabMap[targetTab])
+      this.setData({
+        activeTab: targetTab,
+        tabSliderX: tabMap[targetTab] || 0
+      }, () => {
+        console.log('[memory] setData callback, activeTab:', this.data.activeTab)
+        if (targetTab === 'chat') {
+          this.scrollChatToBottom()
+        } else {
+          this.scrollContentToTop()
+        }
+      })
     }
     this.loadInsights()
+    this._setupKeyboardListener()
+    if (this.data.activeTab === 'chat') {
+      setTimeout(() => this.scrollChatToBottom(), 100)
+    }
+  },
+
+  onHide() {
+    this._removeKeyboardListener()
   },
 
   data: {
-    userAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
-    aiAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=StitchAI&size=200&backgroundColor=e8dff5',
+    userAvatar: mockData.DEFAULT_USER.avatarSmall,
+    aiAvatar: mockData.AI_USERS.stitch.avatarSmall,
+    userName: mockData.DEFAULT_USER.nickName,
     activeTab: 'chat',
     tabSliderX: 0,
     activeCategory: 'all',
-    categories: [
-      { id: 'all', name: '全部' },
-      { id: 'life', name: '生活' },
-      { id: 'emotion', name: '情绪' },
-      { id: 'hobby', name: '兴趣' },
-      { id: 'growth', name: '成长' }
-    ],
-    insights: [
-      {
-        id: 1,
-        date: '2024.01.15',
-        title: '职业转型期的焦虑与重构',
-        content: '你表达了在当前的人生阶段，对于稳定工作与个人创造力之间的矛盾感到焦虑。倾向于寻找能带来更多内驱力，而非仅仅是物质回报的生活方式。建议你先从副业或业余项目入手，逐步验证新的可能性。',
-        tag: '生活',
-        tagColor: 'secondary',
-        category: 'life'
-      },
-      {
-        id: 2,
-        date: '2024.01.12',
-        title: '建立情感边界',
-        content: '在最近的对话中，你开始尝试在人际关系中建立更加明确的情感边界，学会拒绝，不再将周围人的所有情绪期待都背负在自己身上。这是一个非常健康的转变。',
-        tag: '情绪',
-        tagColor: 'tertiary',
-        category: 'emotion'
-      },
-      {
-        id: 3,
-        date: '2024.01.08',
-        title: '向内探索的渴望',
-        content: '你最近对数字断舍离和冥想练习表现出浓厚的兴趣，这反映了你内在对平静、专注以及剔除无效信息的深层渴望。尝试每天固定 15 分钟的「无屏幕时间」。',
-        tag: '兴趣',
-        tagColor: 'primary',
-        category: 'hobby'
-      },
-      {
-        id: 4,
-        date: '2024.01.05',
-        title: '完美主义的松动',
-        content: '你提到开始接受「完成比完美更重要」的想法。这种思维转变将显著降低你的行动阻力，让你更容易开始新项目，而不是被困在无尽的准备阶段。',
-        tag: '成长',
-        tagColor: 'primary',
-        category: 'growth'
-      },
-      {
-        id: 5,
-        date: '2024.01.02',
-        title: '深夜创作高峰',
-        content: '数据显示你在晚间 11 点至凌晨 1 点的表达最为流畅和深刻。这与你提到的「夜深人静时思路最清晰」高度吻合。建议将重要创作任务安排在这个时间段。',
-        tag: '生活',
-        tagColor: 'secondary',
-        category: 'life'
-      },
-      {
-        id: 6,
-        date: '2023.12.28',
-        title: '对归属感的重新定义',
-        content: '你正在从「被一群人接纳」转向「与少数几个人深度连接」。这种转变标志着你从外向型社交需求向内向型质量需求的进化。',
-        tag: '情绪',
-        tagColor: 'tertiary',
-        category: 'emotion'
-      },
-      {
-        id: 7,
-        date: '2023.12.20',
-        title: '咖啡与灵感的关联',
-        content: '你多次提到手冲咖啡带来的仪式感。这种「慢动作」实际上是你给自己创造的心理缓冲带，让大脑从任务模式切换到创意模式。',
-        tag: '兴趣',
-        tagColor: 'primary',
-        category: 'hobby'
-      }
-    ],
+    categories: memoryData.categories,
+    insights: memoryData.insights,
     filteredInsights: [],
     chatDays: '12天',
     chatMood: '平静',
     chatTopics: 8,
-    messages: [
-      {
-        id: 1,
-        sender: 'user',
-        content: '最近一直在想，我是不是应该给自己放个假，感觉每天都被工作填满了。'
-      },
-      {
-        id: 2,
-        sender: 'ai',
-        content: '听起来你最近有点累了。给自己留一些「什么都不做」的时间，其实是很重要的。你有没有想过，理想的休息日会是什么样的？'
-      },
-      {
-        id: 3,
-        sender: 'user',
-        content: '可能就是睡到自然醒，然后泡一杯咖啡，看看书，不用回任何消息。'
-      },
-      {
-        id: 4,
-        sender: 'ai',
-        content: '这听起来很治愈。其实这种「慢下来」的时刻，往往能让你更清楚地听见自己内心的声音。'
-      },
-      {
-        id: 5,
-        sender: 'user',
-        content: '嗯，我觉得我最近总是活在别人的期待里，很少问自己真正想要什么。'
-      },
-      {
-        id: 6,
-        sender: 'ai',
-        content: '能意识到这一点已经很了不起了。或许可以从一件小事开始，比如今天晚餐吃什么，完全按照你自己的喜好来选择。'
-      }
-    ],
-
-    aboutMe: '你是一个在安静中寻找力量的人。你喜欢手冲咖啡的仪式感，享受深夜独处的时光。你对世界充满好奇，常常沉浸在书本和音乐里。虽然外表看起来有些疏离，但内心深处渴望被真正理解。',
-    personalities: [
-      { name: '内向而敏感', desc: '你喜欢独处，对周围的情绪变化很敏锐，常常能察觉到别人忽略的细节。' },
-      { name: '富有创造力', desc: '你的思维不受常规束缚，总能从独特的角度看待问题，提出让人眼前一亮的想法。' },
-      { name: '追求完美', desc: '你对自己要求很高，这让你做事很出色，但也容易因为达不到理想状态而焦虑。' },
-      { name: '重视深度', desc: '比起广泛的社交，你更珍惜少数几个能真正理解你的人，讨厌浮于表面的寒暄。' }
-    ],
-    traits: [
-      { name: '深度思考者', color: 'warm' },
-      { name: '创意灵魂', color: 'sun' },
-      { name: '夜猫子', color: 'night' },
-      { name: '细节控', color: 'mint' },
-      { name: '慢热型', color: 'bloom' },
-      { name: '理想主义者', color: 'sky' }
-    ],
+    messages: memoryData.messages,
+    aboutMe: memoryData.aboutMe,
+    personalities: memoryData.personalities,
+    traits: memoryData.traits,
     showEditModal: false,
     editId: null,
     editTitle: '',
     editContent: '',
     scrollIntoView: '',
     inputValue: '',
-    isSending: false
+    isSending: false,
+    chatPaddingBottom: 188
   },
 
-  mockReplies: [
-    '这确实是个值得思考的问题。你怎么看？',
-    '我明白你的感受，有时候停下来反而能看得更清楚。',
-    '你提到的这个角度很有意思，能再多说一些吗？',
-    '听起来你最近经历了不少，想聊聊细节吗？',
-    '这种想法很有深度，我也有过类似的体会。',
-    '或许可以尝试从另一个角度来看待这件事。',
-    '你说得对，有时候我们需要给自己多一点耐心。',
-    '这让我想起了之前读过的一句话：「慢慢来，比较快」。'
-  ],
+  _msgCounter: 0,
+
+  _nextMsgId() {
+    return Date.now() + '_' + (++this._msgCounter)
+  },
+
+  _scrollThrottle() {
+    if (this._scrollPending) return
+    this._scrollPending = true
+    setTimeout(() => {
+      this._scrollPending = false
+      this.scrollChatToBottom()
+    }, 200)
+  },
+
+  mockReplies: mockData.MEMORY_REPLIES,
 
   onLoad(options) {
-    if (options.tab) {
+    console.log('[memory] onLoad, options:', options, 'current activeTab:', this.data.activeTab)
+    const app = getApp()
+    const tab = app.globalData.memoryTargetTab || options.tab
+    if (tab) {
+      app.globalData.memoryTargetTab = null
       const tabMap = { chat: 0, memory: 100, archive: 200 }
-      this.setData({ activeTab: options.tab, tabSliderX: tabMap[options.tab] || 0 })
+      this.setData({
+        activeTab: tab,
+        tabSliderX: tabMap[tab] || 0
+      }, () => {
+        if (tab === 'chat') {
+          this.scrollChatToBottom()
+        } else {
+          this.scrollContentToTop()
+        }
+      })
     }
     this.loadInsights()
+    this._setupKeyboardListener()
+    if (this.data.activeTab === 'chat') {
+      setTimeout(() => this.scrollChatToBottom(), 100)
+    }
+  },
+
+  onUnload() {
+    this._removeKeyboardListener()
+    if (this._typeTimer) {
+      clearTimeout(this._typeTimer)
+      this._typeTimer = null
+    }
+  },
+
+  _setupKeyboardListener() {
+    if (this._keyboardListener) return
+    this._keyboardListener = () => {
+      setTimeout(() => this._calcChatPadding(), 100)
+    }
+    wx.onKeyboardHeightChange(this._keyboardListener)
+    setTimeout(() => this._calcChatPadding(), 500)
+  },
+
+  _removeKeyboardListener() {
+    if (this._keyboardListener) {
+      wx.offKeyboardHeightChange(this._keyboardListener)
+      this._keyboardListener = null
+    }
+  },
+
+  _calcChatPadding() {
+    const sysInfo = common.getSystemInfo()
+    const rpxRatio = 750 / sysInfo.windowWidth
+    const safeRpx = (sysInfo.safeAreaInsets?.bottom || 0) * rpxRatio
+    // Reserve just enough room for the fixed input footer so the latest
+    // message sits close to the composer without being covered.
+    const padding = Math.ceil(188 + safeRpx)
+    if (this.data.chatPaddingBottom !== padding) {
+      this.setData({ chatPaddingBottom: padding }, () => {
+        if (this.data.activeTab === 'chat') {
+          this.scrollChatToBottom()
+        }
+      })
+    }
   },
 
   loadInsights() {
-    const stored = wx.getStorageSync('memoryInsights')
+    const stored = storage.get('memoryInsights', null)
     if (stored && stored.length > 0) {
       this.setData({ insights: stored }, () => {
         this.filterInsights()
       })
     } else {
-      wx.setStorage({ key: 'memoryInsights', data: this.data.insights })
+      storage.set('memoryInsights', this.data.insights)
       this.filterInsights()
     }
   },
@@ -185,11 +164,17 @@ Page({
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
     const tabMap = { chat: 0, memory: 100, archive: 200 }
-    this.setData({ activeTab: tab, tabSliderX: tabMap[tab] })
-  },
-
-  goToChat() {
-    this.setData({ activeTab: 'chat', tabSliderX: 0 })
+    console.log('[memory] manual switchTab to:', tab)
+    this.setData({
+      activeTab: tab,
+      tabSliderX: tabMap[tab]
+    }, () => {
+      if (tab === 'chat') {
+        setTimeout(() => this.scrollChatToBottom(), 100)
+      } else {
+        this.scrollContentToTop()
+      }
+    })
   },
 
   switchCategory(e) {
@@ -211,9 +196,7 @@ Page({
 
   onInputFocus() {
     this.setData({ inputFocused: true })
-    setTimeout(() => {
-      this.setData({ scrollIntoView: 'msg-last' })
-    }, 200)
+    setTimeout(() => this.scrollChatToBottom(), 200)
   },
 
   onInputBlur() {
@@ -224,46 +207,70 @@ Page({
     this.setData({ inputValue: e.detail.value })
   },
 
+  scrollChatToBottom() {
+    this.scrollToAnchor('chat-scroll-bottom')
+  },
+
+  scrollContentToTop() {
+    this.scrollToAnchor('memory-scroll-top')
+  },
+
+  scrollToAnchor(anchor) {
+    this.setData({ scrollIntoView: '' }, () => {
+      setTimeout(() => {
+        this.setData({ scrollIntoView: anchor })
+      }, 0)
+    })
+  },
+
   sendMessage() {
     const content = this.data.inputValue.trim()
     if (!content || this.data.isSending) return
 
-    const messages = this.data.messages
-    const userMsg = {
-      id: Date.now(),
+    const messages = [...this.data.messages, {
+      id: this._nextMsgId(),
       sender: 'user',
       content: content
-    }
-    messages.push(userMsg)
+    }]
 
     this.setData({
       messages,
       inputValue: '',
-      isSending: true,
-      scrollIntoView: 'msg-last'
-    })
+      isSending: true
+    }, () => this.scrollChatToBottom())
 
-    // Mock AI reply after 1-2 seconds
-    const delay = 1000 + Math.random() * 1000
-    setTimeout(() => {
+    const delay = 600 + Math.random() * 600
+    this._typeTimer = setTimeout(() => {
       const reply = this.mockReplies[Math.floor(Math.random() * this.mockReplies.length)]
       const aiMsg = {
-        id: Date.now() + 1,
+        id: this._nextMsgId(),
         sender: 'ai',
-        content: reply
+        content: ''
       }
-      messages.push(aiMsg)
+      const newMessages = [...messages, aiMsg]
       this.setData({
-        messages,
-        isSending: false,
-        scrollIntoView: 'msg-last'
-      })
+        messages: newMessages
+      }, () => this.scrollChatToBottom())
+
+      let i = 0
+      const batchSize = 3
+      const typeNext = () => {
+        if (i >= reply.length) {
+          this.setData({ isSending: false })
+          return
+        }
+        const chunk = reply.slice(i, i + batchSize)
+        aiMsg.content += chunk
+        i += chunk.length
+        this.setData({
+          [`messages[${newMessages.length - 1}].content`]: aiMsg.content
+        })
+        this._scrollThrottle()
+        this._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
+      }
+      typeNext()
     }, delay)
   },
-
-  showAttachMenu() {},
-
-  startVoice() {},
 
   onInsightLongPress(e) {
     const id = e.currentTarget.dataset.id
@@ -290,7 +297,7 @@ Page({
           this.setData({ insights }, () => {
             this.filterInsights()
           })
-          wx.setStorage({ key: 'memoryInsights', data: insights })
+          storage.set('memoryInsights', insights)
           wx.showToast({ title: '已删除', icon: 'none' })
         }
       }
@@ -311,8 +318,6 @@ Page({
   cancelEdit() {
     this.setData({ showEditModal: false, editId: null })
   },
-
-  preventBubble() {},
 
   onEditTitleInput(e) {
     this.setData({ editTitle: e.detail.value })
@@ -335,13 +340,11 @@ Page({
     this.setData({ insights, showEditModal: false, editId: null }, () => {
       this.filterInsights()
     })
-    wx.setStorage({ key: 'memoryInsights', data: insights })
+    storage.set('memoryInsights', insights)
     wx.showToast({ title: '已保存', icon: 'none' })
   },
 
   goToUserHome(e) {
-    const author = e.currentTarget.dataset.author
-    if (!author) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+    common.goToUserHome(e.detail?.author || e.currentTarget.dataset.author)
   }
 })

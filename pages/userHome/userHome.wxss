@@ -8,14 +8,6 @@
   overflow: hidden;
 }
 
-/* ── Header ── */
-.user-home-header .header-left {
-  display: flex;
-  align-items: center;
-  padding: 16rpx;
-  margin-left: -16rpx;
-}
-
 /* ── Content ── */
 .content {
   padding-top: calc(110rpx + max(48rpx, env(safe-area-inset-top)));
