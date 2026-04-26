@@ -1,77 +1,4 @@
-const EMOJIS = [...new Set([
-  '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇',
-  '🥰','😍','🤩','😘','😗','☺️','😚','😙','😋','😛','😜','🤪','😝',
-  '🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄',
-  '😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧',
-  '🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐','😕','😟','🙁',
-  '☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭',
-  '😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈',
-  '👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸',
-  '😹','😻','😼','😽','🙀','😿','😾','❤️','🧡','💛','💚','💙','💜',
-  '🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟',
-  '👍','👎','👊','✊','🤛','🤜','🤞','✌️','🤟','🤘','👌','🤏','☝️',
-  '👆','👇','👉','👈','✋','🤚','🖐️','🖖','👋','🤙','💪','🦾','🖕',
-  '✍️','🙏','🦶','🦵','👂','🦻','👃','🧠','🦷','🦴','👀','👁️','👅',
-  '👄','💋','🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁',
-  '🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤',
-  '🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋',
-  '🐌','🐞','🐜','🦟','🦗','🕷️','🕸️','🦂','🐢','🐍','🦎','🦖','🦕',
-  '🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊',
-  '🐅','🐆','🦓','🦍','🦧','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🐃',
-  '🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺',
-  '🐈','🐈‍⬛','🐓','🦃','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡',
-  '🦦','🦥','🐁','🐀','🐿️','🦔','🐾','🐉','🐲','🌵','🎄','🌲','🌳',
-  '🌴','🌱','🌿','☘️','🍀','🎍','🎋','🍃','🍂','🍁','🍄','🐚','🌾',
-  '💐','🌷','🌹','🥀','🌺','🌸','🌼','🌻','🌞','🌝','🌛','🌜','🌚',
-  '🌕','🌖','🌗','🌘','🌑','🌒','🌓','🌔','🌙','🌎','🌍','🌏','🪐',
-  '💫','⭐','🌟','✨','⚡','🔥','💥','☄️','☀️','🌤️','⛅','🌥️','☁️',
-  '🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','🌬️','💨','🌪️','🌫️','🌈',
-  '☂️','☔','💧','💦','🌊','🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇',
-  '🍓','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬',
-  '🥒','🌶️','🌽','🥕','🧄','🧅','🥔','🍠','🥐','🥯','🍞','🥖','🥨',
-  '🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔',
-  '🍟','🍕','🥪','🥙','🧆','🌮','🌯','🥗','🥘','🥫','🍝','🍜','🍲',
-  '🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍚','🍘','🍥','🥠','🥮','🍢',
-  '🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿',
-  '🍩','🍪','🌰','🥜','🍯','🥛','🍼','☕','🍵','🧃','🥤','🍶','🍺',
-  '🍻','🥂','🍷','🥃','🍸','🍹','🧉','🍾','🧊','🥄','🍴','🍽️','🥣',
-  '🥡','🥢','🧂','⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱',
-  '🪀','🏓','🏸','🏒','🏑','🥍','🏏','🥅','⛳','🪁','🏹','🎣','🤿',
-  '🥊','🥋','🎽','🛹','🛷','⛸️','🥌','🎿','⛷️','🏂','🏋️‍♀️','🏋️‍♂️',
-  '🤼‍♀️','🤼‍♂️','🤸‍♀️','🤸‍♂️','⛹️‍♀️','⛹️‍♂️','🤺','🤾‍♀️','🤾‍♂️','🏌️‍♀️',
-  '🏌️‍♂️','🏇','🧘‍♀️','🧘‍♂️','🏄‍♀️','🏄‍♂️','🏊‍♀️','🏊‍♂️','🤽‍♀️','🤽‍♂️',
-  '🚣‍♀️','🚣‍♂️','🧗‍♀️','🧗‍♂️','🚵‍♀️','🚵‍♂️','🚴‍♀️','🚴‍♂️','🏆','🥇',
-  '🥈','🥉','🏅','🎖️','🏵️','🎗️','🎫','🎟️','🎪','🤹‍♀️','🤹‍♂️','🎭',
-  '🩰','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🎷','🎺','🎸','🪕','🎻',
-  '🎲','♟️','🎯','🎳','🎮','🎰','🧩','🚗','🚕','🚙','🚌','🚎','🏎️',
-  '🚓','🚑','🚒','🚐','🚚','🚛','🚜','🦯','🦽','🦼','🛴','🚲','🛵',
-  '🏍️','🛺','🚨','🚔','🚍','🚘','🚖','🚡','🚠','🚟','🚃','🚋','🚞',
-  '🚝','🚄','🚅','🚈','🚂','🚆','🚇','🚊','🚉','✈️','🛫','🛬','🛩️',
-  '💺','🛰️','🚀','🛸','🚁','🛶','⛵','🚤','🛳️','⛴️','🚢','⚓','⛽',
-  '🚧','🚦','🚥','🚏','🗺️','🗿','🗽','🗼','🏰','🏯','🏟️','🎡','🎢',
-  '🎠','⛲','🎑','🏞️','🌅','🌄','🌠','🎇','🎆','🌇','🌆','🏙️','🌃',
-  '🌌','🌉','🌁','⌚','⏰','⏱️','⏲️','🕰️','🕛','🕧','🕐','🕜','🕑',
-  '🕝','🕒','🕞','🕓','🕟','🕔','🕠','🕕','🕡','🕖','🕢','🕗','🕣',
-  '🕘','🕤','🕙','🕥','🕚','🕦','🌡️','☀️','🌝','🌞','🪐','⭐','🌟',
-  '🌠','☁️','⛅','⛈️','🌤️','🌥️','🌦️','🌧️','🌨️','☃️','⛄','🌬️','💨',
-  '🌪️','🌫️','🌈','☂️','☔','💧','💦','🌊','💤','💢','💬','💭','🗯️',
-  '💣','💥','💫','💯','🔇','🔈','🔉','🔊','📢','📣','📯','🔔','🔕',
-  '🎼','🎵','🎶','🎙️','🎚️','🎛️','📱','📲','☎️','📞','📟','📠','🔋',
-  '🔌','💻','🖥️','🖨️','⌨️','🖱️','🖲️','💽','💾','💿','📀','🧮','🎥',
-  '🎞️','📽️','📺','📷','📸','📹','📼','🔍','🔎','🕯️','💡','🔦','🏮',
-  '🪔','📔','📕','📖','📗','📘','📙','📚','📓','📒','📃','📜','📄',
-  '📰','🗞️','📑','🔖','🏷️','💰','🪙','💴','💵','💶','💷','💸','💳',
-  '🧾','💹','✉️','📧','📨','📩','📤','📥','📦','📫','📪','📬','📭',
-  '📮','🗳️','✏️','✒️','🖋️','🖊️','🖌️','🖍️','📝','💼','📁','📂','🗂️',
-  '📅','📆','🗒️','🗓️','📇','📈','📉','📊','📋','📌','📍','📎','🖇️',
-  '📏','📐','✂️','🗃️','🗄️','🗑️','🔒','🔓','🔏','🔐','🔑','🗝️','🔨',
-  '🪓','⛏️','⚒️','🛠️','🗡️','⚔️','🛡️','🔧','🔩','⚙️','🗜️','⚖️','🦯',
-  '🔗','⛓️','🪝','🧰','🧲','🧪','🧫','🧬','🔬','🔭','📡','💉','🩸',
-  '💊','🩹','🩺','🚽','🚰','🪥','🪠','🧻','🧼','🧽','🧴','🛁','🛀',
-  '🧹','🧺','🪑','🚪','🛋️','🛏️','🧸','🖼️','🪞','🛍️','🛒','🎁','🎈',
-  '🎉','🎊','🎋','🎍','🎎','🎏','🎐','🎑','🧧','🎀','🎗️','🎟️','🎫',
-  '🎖️','🏅','🥇','🥈','🥉'
-])]
+var common = require('../../utils/common.js')
 
 Page({
   data: {
@@ -81,13 +8,13 @@ Page({
     messages: [],
     inputValue: '',
     focusInput: false,
-    scrollIntoView: '',
+    scrollTop: 0,
     showEmojiPanel: false,
     areaOffset: 0,
-    bottomPaddingPx: 120,
+    bottomPad: 130,
     keyboardHeight: 0,
-    emojiPanelOffsetPx: 250,
-    emojis: EMOJIS
+    emojiPanelHeight: 250,
+    emojis: []
   },
 
   onLoad(options) {
@@ -103,34 +30,78 @@ Page({
     this.loadMyAvatar()
     this.loadMessages()
 
-    // 计算 emoji 面板对应的 px 偏移（固定 500rpx）
     const sysInfo = wx.getSystemInfoSync()
-    const emojiPanelOffsetPx = Math.round(500 * sysInfo.screenWidth / 750)
-    this.setData({ emojiPanelOffsetPx })
+    this._defaultPanelH = Math.round(500 * sysInfo.screenWidth / 750)
+    const safeBottom = sysInfo.screenHeight - (sysInfo.safeArea ? sysInfo.safeArea.bottom : sysInfo.screenHeight)
+    this._inputAreaBase = Math.round(180 * sysInfo.screenWidth / 750) + safeBottom
+    this.setData({ emojiPanelHeight: this._defaultPanelH, bottomPad: this._inputAreaBase })
 
-    // 监听键盘高度变化
+    this._keyboardVisible = false
+    this._pendingEmoji = null
+    this._choosingImage = false
+    this._lastKeyboardH = 0
+    this._sendTime = 0
+    this._emojisLoaded = false
+
     this._keyboardCallback = (res) => {
       const h = res.height
+      const base = this._inputAreaBase
+
       if (h > 0) {
-        this.setData({ keyboardHeight: h })
-        if (!this.data.showEmojiPanel) {
-          this.setData({
-            areaOffset: h,
-            bottomPaddingPx: 120 + h
-          })
-        }
+        this._keyboardVisible = true
+        this._lastKeyboardH = h
+        this._sendTime = 0
+
+        if (this._pendingEmoji) return
+
+        this.setData({
+          keyboardHeight: h,
+          showEmojiPanel: false,
+          areaOffset: h,
+          bottomPad: base + h
+        })
         this.scrollToBottom()
       } else {
-        // 键盘收起
-        if (!this.data.showEmojiPanel) {
+        this._keyboardVisible = false
+
+        if (this._sendTime && Date.now() - this._sendTime < 500) {
+          this._sendTime = 0
+          this.setData({ focusInput: false })
+          setTimeout(() => { this.setData({ focusInput: true }) }, 50)
+          return
+        }
+
+        if (this._pendingEmoji) {
+          const panelH = this._pendingEmoji.panelH
+          this._pendingEmoji = null
           this.setData({
+            showEmojiPanel: true,
+            emojiPanelHeight: panelH,
             areaOffset: 0,
-            bottomPaddingPx: 120
+            bottomPad: base + panelH
           })
+          this.scrollToBottom()
+        } else if (this._choosingImage) {
+        } else if (this.data.showEmojiPanel) {
+        } else {
+          this.setData({ areaOffset: 0, bottomPad: base })
         }
       }
     }
     wx.onKeyboardHeightChange(this._keyboardCallback)
+  },
+
+  onReady() {
+    setTimeout(() => {
+      wx.createSelectorQuery().select('.input-area').boundingClientRect((rect) => {
+        if (rect && rect.height > 0) {
+          this._inputAreaBase = rect.height
+          if (!this._keyboardVisible && !this.data.showEmojiPanel) {
+            this.setData({ bottomPad: rect.height })
+          }
+        }
+      }).exec()
+    }, 200)
   },
 
   onUnload() {
@@ -140,66 +111,99 @@ Page({
   },
 
   loadMyAvatar() {
-    const saved = wx.getStorageSync('userProfile')
-    const app = getApp()
-    this.setData({
-      myAvatar: saved?.avatar || app.globalData?.userInfo?.avatarUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5'
-    })
+    const info = common.loadUserInfo()
+    this.setData({ myAvatar: info.avatar })
   },
 
   loadMessages() {
-    const all = wx.getStorageSync('privateMessages') || {}
-    const conv = all[this.data.userName] || {}
-    this.setData({
-      userAvatar: conv.avatar || '',
-      messages: conv.messages || []
-    })
+    try {
+      const all = wx.getStorageSync('privateMessages') || {}
+      const conv = all[this.data.userName] || {}
+      this.setData({
+        userAvatar: conv.avatar || '',
+        messages: conv.messages || []
+      })
+    } catch (e) {
+      this.setData({ messages: [] })
+    }
     this.scrollToBottom()
   },
 
   scrollToBottom() {
-    const msgs = this.data.messages
-    if (msgs.length > 0) {
-      this.setData({ scrollIntoView: `msg-${msgs[msgs.length - 1].id}` })
-    }
+    wx.nextTick(() => {
+      this.setData({ scrollTop: this.data.scrollTop >= 99999 ? 99998 : 99999 })
+    })
   },
 
   onInput(e) {
     this.setData({ inputValue: e.detail.value })
   },
 
-  onInputFocus() {
-    const h = this.data.keyboardHeight || this.data.emojiPanelOffsetPx
+  onMessagesTap() {
+    this._pendingEmoji = null
+    this._sendTime = 0
+    wx.hideKeyboard()
     this.setData({
+      focusInput: false,
       showEmojiPanel: false,
-      areaOffset: h,
-      bottomPaddingPx: 120 + h
+      areaOffset: 0,
+      bottomPad: this._inputAreaBase
     })
   },
 
+  onInputFocus() {
+    this._pendingEmoji = null
+    this._sendTime = 0
+    if (this.data.showEmojiPanel) {
+      this.setData({
+        showEmojiPanel: false,
+        bottomPad: this._inputAreaBase
+      })
+    }
+  },
+
   toggleEmojiPanel() {
+    if (!this._emojisLoaded) {
+      this.setData({ emojis: require('../../utils/emojis.js') })
+      this._emojisLoaded = true
+    }
+
     const show = !this.data.showEmojiPanel
-    const h = this.data.emojiPanelOffsetPx
-    this.setData({
-      showEmojiPanel: show,
-      focusInput: false,
-      areaOffset: show ? h : 0,
-      bottomPaddingPx: 120 + (show ? h : 0)
-    })
     if (show) {
-      setTimeout(() => this.scrollToBottom(), 100)
+      const panelH = this._lastKeyboardH || this._defaultPanelH
+      if (this._keyboardVisible) {
+        this._pendingEmoji = { panelH }
+        this.setData({ focusInput: false })
+        wx.hideKeyboard()
+      } else {
+        this.setData({
+          showEmojiPanel: true,
+          focusInput: false,
+          emojiPanelHeight: panelH,
+          areaOffset: 0,
+          bottomPad: this._inputAreaBase + panelH
+        })
+        this.scrollToBottom()
+      }
+    } else {
+      this.setData({
+        showEmojiPanel: false,
+        areaOffset: 0,
+        bottomPad: this._inputAreaBase
+      })
     }
   },
 
   selectEmoji(e) {
     const emoji = e.currentTarget.dataset.emoji
-    const newValue = this.data.inputValue + emoji
-    this.setData({ inputValue: newValue })
+    this.setData({ inputValue: this.data.inputValue + emoji })
   },
 
   sendMessage() {
     const content = this.data.inputValue.trim()
     if (!content) return
+    if (this._sending) return
+    this._sending = true
 
     this.pushMessage({
       id: Date.now(),
@@ -209,7 +213,9 @@ Page({
       type: 'text'
     })
 
+    this._sendTime = Date.now()
     this.setData({ inputValue: '' })
+    this._sending = false
 
     setTimeout(() => {
       this.simulateReply()
@@ -217,7 +223,11 @@ Page({
   },
 
   chooseImage() {
-    wx.chooseMedia({
+    this._choosingImage = true
+    if (this.data.showEmojiPanel) {
+      this.setData({ showEmojiPanel: false, bottomPad: this._inputAreaBase })
+    }
+    common.safeChooseMedia({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
@@ -234,21 +244,28 @@ Page({
         setTimeout(() => {
           this.simulateImageReply()
         }, 2000)
+      },
+      complete: () => {
+        this._choosingImage = false
+        if (!this._keyboardVisible && !this.data.showEmojiPanel) {
+          this.setData({ areaOffset: 0, bottomPad: this._inputAreaBase })
+        }
       }
     })
   },
 
   pushMessage(msg) {
-    const all = wx.getStorageSync('privateMessages') || {}
-    if (!all[this.data.userName]) {
-      all[this.data.userName] = { avatar: this.data.userAvatar, messages: [] }
-    }
-    all[this.data.userName].messages.push(msg)
-    wx.setStorageSync('privateMessages', all)
+    try {
+      const all = wx.getStorageSync('privateMessages') || {}
+      if (!all[this.data.userName]) {
+        all[this.data.userName] = { avatar: this.data.userAvatar, messages: [] }
+      }
+      all[this.data.userName].messages.push(msg)
+      wx.setStorageSync('privateMessages', all)
+    } catch (e) {}
 
-    this.setData({
-      messages: [...this.data.messages, msg]
-    })
+    const len = this.data.messages.length
+    this.setData({ ['messages[' + len + ']']: msg })
     this.scrollToBottom()
   },
 
@@ -289,7 +306,7 @@ Page({
 
   previewImage(e) {
     const src = e.currentTarget.dataset.src
-    wx.previewImage({ urls: [src], current: src })
+    common.safePreviewImage([src], src)
   },
 
   goBack() {
@@ -297,8 +314,6 @@ Page({
   },
 
   goToUserHome() {
-    wx.navigateTo({
-      url: `/pages/userHome/userHome?author=${encodeURIComponent(this.data.userName)}`
-    })
+    common.goToUserHome(this.data.userName)
   }
 })

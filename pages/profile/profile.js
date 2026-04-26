@@ -1,3 +1,5 @@
+var common = require('../../utils/common.js')
+
 Page({
   data: {
     userInfo: {
@@ -17,7 +19,7 @@ Page({
     const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
     this.setData({
       'stats.following': (followData.following || []).length,
-      'stats.followers': followData.followerCounts['林夕'] || '3.2k'
+      'stats.followers': followData.followerCounts[common.loadUserInfo().name] || '3.2k'
     })
   },
 
@@ -74,6 +76,6 @@ Page({
   },
 
   goToMyHome() {
-    wx.navigateTo({ url: '/pages/userHome/userHome?author=林夕' })
+    common.goToUserHome(common.loadUserInfo().name)
   }
 })

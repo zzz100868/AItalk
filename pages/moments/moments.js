@@ -1,9 +1,14 @@
+var common = require('../../utils/common.js')
+var postUtils = require('../../utils/post.js')
+
 Page({
   data: {
     posts: [],
     myAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
     myName: '林夕',
     scrollIntoView: '',
+    replyingComment: null,
+    focusInputPostId: null,
     isLoading: true,
     isRefreshing: false,
     isLoadingMore: false,
@@ -62,11 +67,8 @@ Page({
   },
 
   loadUserInfo() {
-    const saved = wx.getStorageSync('userProfile')
-    this.setData({
-      myAvatar: saved?.avatar || this.data.myAvatar,
-      myName: saved?.nickName || this.data.myName
-    })
+    const info = common.loadUserInfo()
+    this.setData({ myAvatar: info.avatar, myName: info.name })
   },
 
   loadPosts() {
@@ -79,33 +81,9 @@ Page({
   },
 
   toggleLike(e) {
-    const id = e.currentTarget.dataset.id
-    const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === id)
-    if (idx === -1) return
-
-    const post = posts[idx]
-    const newLiked = !post.liked
-    post.liked = newLiked
-    post.likes = newLiked ? post.likes + 1 : post.likes - 1
-
-    const update = {
-      [`posts[${idx}].liked`]: newLiked,
-      [`posts[${idx}].likes`]: post.likes
-    }
-    if (newLiked) {
-      post.heartBeating = true
-      update[`posts[${idx}].heartBeating`] = true
-    }
-    this.setData(update)
-    wx.setStorage({ key: 'myPosts', data: posts })
-
-    if (newLiked) {
-      setTimeout(() => {
-        post.heartBeating = false
-        this.setData({ [`posts[${idx}].heartBeating`]: false })
-      }, 500)
-    }
+    postUtils.toggleLike(this, e, function(posts) {
+      wx.setStorage({ key: 'myPosts', data: posts })
+    })
   },
 
   toggleComments(e) {
@@ -119,29 +97,46 @@ Page({
     wx.setStorage({ key: 'myPosts', data: posts })
   },
 
-  addComment(e) {
-    const postId = e.currentTarget.dataset.id
-    const content = e.detail.value
-    if (!content || !content.trim()) return
+  doStartReply(postId, commentId, author) {
+    postUtils.doStartReply(this, postId, commentId, author)
+  },
 
-    const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === postId)
-    if (idx === -1) return
+  cancelReply() {
+    postUtils.cancelReply(this)
+  },
 
-    const newComment = {
-      id: Date.now(),
-      author: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
-      content: content.trim()
-    }
-    posts[idx].comments.push(newComment)
-    posts[idx].commentInput = ''
-
-    this.setData({
-      [`posts[${idx}].comments`]: posts[idx].comments,
-      [`posts[${idx}].commentInput`]: ''
+  onCommentTap(e) {
+    postUtils.onCommentTap(this, e, function(posts) {
+      wx.setStorage({ key: 'myPosts', data: posts })
     })
-    wx.setStorage({ key: 'myPosts', data: posts })
+  },
+
+  onReplyTap(e) {
+    postUtils.onReplyTap(this, e, function(posts) {
+      wx.setStorage({ key: 'myPosts', data: posts })
+    })
+  },
+
+  deleteComment(postId, commentId) {
+    postUtils.deleteComment(this, postId, commentId, function(posts) {
+      wx.setStorage({ key: 'myPosts', data: posts })
+    })
+  },
+
+  deleteReply(postId, commentId, replyId) {
+    postUtils.deleteReply(this, postId, commentId, replyId, function(posts) {
+      wx.setStorage({ key: 'myPosts', data: posts })
+    })
+  },
+
+  onInputBlur() {
+    this.setData({ focusInputPostId: null })
+  },
+
+  addComment(e) {
+    postUtils.addComment(this, e, function(posts) {
+      wx.setStorage({ key: 'myPosts', data: posts })
+    })
   },
 
   showPostMenu(e) {
@@ -181,30 +176,18 @@ Page({
     })
   },
 
-  showReportSheet(targetType) {
-    wx.showActionSheet({
-      itemList: ['色情低俗', '违法违规', '人身攻击', '广告骚扰', '其他'],
-      itemColor: '#c45a5a',
-      success: () => {
-        wx.showToast({ title: '举报成功，我们会尽快处理', icon: 'none' })
-      }
-    })
+  showReportSheet() {
+    common.showReportSheet()
   },
 
   previewImage(e) {
     const src = e.currentTarget.dataset.src
     const urls = e.currentTarget.dataset.urls
-    getApp()._ignoreRelaunch = true
-    wx.previewImage({
-      current: src,
-      urls: urls
-    })
+    common.safePreviewImage(urls, src)
   },
 
   goToUserHome(e) {
-    const author = e.currentTarget.dataset.author
-    if (!author) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+    common.goToUserHome(e.currentTarget.dataset.author)
   },
 
   goBack() {

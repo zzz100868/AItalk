@@ -109,13 +109,34 @@
               <view class="comment-item" wx:for="{{item.comments}}" wx:for-item="c" wx:key="id">
                 <image class="comment-avatar" src="{{c.avatar}}" mode="aspectFill" lazy-load bindtap="goToUserHome" data-author="{{c.author}}"/>
                 <view class="comment-content">
-                  <text class="comment-author">{{c.author}}</text>
-                  <text class="comment-text">{{c.content}}</text>
+                  <view class="comment-header-row">
+                    <text class="comment-author">{{c.author}}</text>
+                  </view>
+                  <text class="comment-text" bindtap="onCommentTap" data-post-id="{{item.id}}" data-comment-id="{{c.id}}" data-author="{{c.author}}" data-content="{{c.content}}">{{c.content}}</text>
+                  <!-- Replies -->
+                  <view wx:if="{{c.replies && c.replies.length > 0}}" class="replies-wrap">
+                    <view class="reply-item {{index === c.replies.length - 1 ? 'reply-item-last' : ''}}" wx:for="{{c.replies}}" wx:for-item="r" wx:key="id">
+                      <image class="reply-avatar" src="{{r.avatar}}" mode="aspectFill" lazy-load/>
+                      <view class="reply-content">
+                        <view class="reply-meta">
+                          <text class="reply-author">{{r.author}}</text>
+                          <text class="reply-target">回复 {{r.replyTo}}</text>
+                        </view>
+                        <text class="reply-text" bindtap="onReplyTap" data-post-id="{{item.id}}" data-comment-id="{{c.id}}" data-reply-id="{{r.id}}" data-author="{{r.author}}" data-content="{{r.content}}">{{r.content}}</text>
+                      </view>
+                    </view>
+                  </view>
                 </view>
               </view>
             </view>
             <view class="comment-input-row">
-              <input class="comment-input" placeholder="写下你的评论..." placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" bindconfirm="addComment"/>
+              <view wx:if="{{replyingComment && replyingComment.postId === item.id}}" class="reply-hint">
+                <text>回复 @{{replyingComment.author}}</text>
+                <view class="reply-hint-close" bindtap="cancelReply">
+                  <view class="close-x"></view>
+                </view>
+              </view>
+              <input class="comment-input" placeholder="{{replyingComment && replyingComment.postId === item.id ? '回复评论...' : '写下你的评论...'}}" placeholder-class="comment-placeholder" value="{{item.commentInput}}" data-id="{{item.id}}" focus="{{focusInputPostId === item.id}}" bindblur="onInputBlur" bindconfirm="addComment"/>
             </view>
           </view>
         </view>

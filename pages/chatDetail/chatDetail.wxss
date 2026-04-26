@@ -2,8 +2,9 @@
 .chat-detail-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   background: var(--bg-base);
+  overflow: hidden;
 }
 
 /* ── Header ── */
@@ -39,15 +40,22 @@
 /* ── Messages ── */
 .messages-wrap {
   flex: 1;
+  height: 0;
   padding-top: calc(110rpx + max(48rpx, env(safe-area-inset-top)));
   box-sizing: border-box;
 }
 
 .messages-inner {
-  padding: 24rpx;
+  min-height: 100vh;
+  padding: 24rpx 24rpx 0;
   display: flex;
   flex-direction: column;
   gap: 24rpx;
+  box-sizing: border-box;
+}
+
+.messages-spacer {
+  flex: 1;
 }
 
 .msg-row {
@@ -119,7 +127,6 @@
   background: var(--bg-elevated);
   border-top: 1rpx solid var(--border-subtle);
   z-index: 10;
-  /* bottom 通过内联样式动态控制 */
 }
 
 /* Toolbar */
@@ -200,10 +207,8 @@
   margin-left: 4rpx;
 }
 
-/* Emoji Panel */
+/* Emoji Panel — height controlled by inline style */
 .emoji-panel {
-  margin-top: 16rpx;
-  height: 500rpx;
   background: var(--bg-base);
   border-radius: 16rpx;
   overflow: hidden;

@@ -1,3 +1,6 @@
+var common = require('../../utils/common.js')
+var postUtils = require('../../utils/post.js')
+
 const MOCK_USERS = {
   '陈默': {
     name: '陈默',
@@ -160,7 +163,7 @@ Page({
     this.setData({ _author: author })
 
     const app = getApp()
-    const isMe = author === '林夕'
+    const isMe = author === common.loadUserInfo().name
     const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
 
     const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
@@ -178,7 +181,7 @@ Page({
           avatar: saved.avatar || app.globalData.userInfo.avatarUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
           bio: saved.bio || '在喧嚣中寻找宁静。🌿✨'
         },
-        stats: { following: (followData.following || []).length, followers: followData.followerCounts['林夕'] || '3.2k', likes: '15k' },
+        stats: { following: (followData.following || []).length, followers: followData.followerCounts[common.loadUserInfo().name] || '3.2k', likes: '15k' },
         posts: myPosts
       })
     } else {
@@ -344,39 +347,13 @@ Page({
 
   // ── 帖子交互 ──
   toggleLike(e) {
-    const id = e.currentTarget.dataset.id
-    const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id == id)
-    if (idx === -1) return
-
-    const post = posts[idx]
-    const newLiked = !post.liked
-    post.liked = newLiked
-    post.likes = newLiked ? post.likes + 1 : post.likes - 1
-
-    const update = {
-      [`posts[${idx}].liked`]: newLiked,
-      [`posts[${idx}].likes`]: post.likes
-    }
-    if (newLiked) {
-      post.heartBeating = true
-      update[`posts[${idx}].heartBeating`] = true
-    }
-    this.setData(update)
-    this._savePosts(posts)
-
-    if (newLiked) {
-      setTimeout(() => {
-        post.heartBeating = false
-        this.setData({ [`posts[${idx}].heartBeating`]: false })
-      }, 500)
-    }
+    postUtils.toggleLike(this, e, function(posts) { this._savePosts(posts) }.bind(this))
   },
 
   toggleComments(e) {
     const id = e.currentTarget.dataset.id
     const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id == id)
+    const idx = posts.findIndex(p => p.id === id)
     if (idx === -1) return
     const newShow = !posts[idx].showComments
     posts[idx].showComments = newShow
@@ -389,109 +366,27 @@ Page({
   },
 
   doStartReply(postId, commentId, author) {
-    this.setData({
-      replyingComment: { postId, commentId, author },
-      focusInputPostId: postId
-    })
+    postUtils.doStartReply(this, postId, commentId, author)
   },
 
   cancelReply() {
-    this.setData({ replyingComment: null })
+    postUtils.cancelReply(this)
   },
 
   onCommentTap(e) {
-    const { postId, commentId, author, content } = e.currentTarget.dataset
-    if (author === '林夕') {
-      wx.showActionSheet({
-        itemList: ['删除'],
-        itemColor: '#c45a5a',
-        success: (res) => {
-          if (res.tapIndex === 0) this.deleteComment(postId, commentId)
-        }
-      })
-    } else {
-      wx.showActionSheet({
-        itemList: ['回复', '举报'],
-        itemColor: '#c45a5a',
-        success: (res) => {
-          if (res.tapIndex === 0) {
-            this.doStartReply(postId, commentId, author)
-          } else if (res.tapIndex === 1) {
-            wx.showToast({ title: '举报已提交', icon: 'none' })
-          }
-        }
-      })
-    }
+    postUtils.onCommentTap(this, e, function(posts) { this._savePosts(posts) }.bind(this))
   },
 
   onReplyTap(e) {
-    const { postId, commentId, replyId, author, content } = e.currentTarget.dataset
-    if (author === '林夕') {
-      wx.showActionSheet({
-        itemList: ['复制', '删除'],
-        success: (res) => {
-          if (res.tapIndex === 0) {
-            wx.setClipboardData({
-              data: content,
-              success: () => wx.showToast({ title: '已复制', icon: 'none' })
-            })
-          } else if (res.tapIndex === 1) {
-            this.deleteReply(postId, commentId, replyId)
-          }
-        }
-      })
-    } else {
-      wx.showActionSheet({
-        itemList: ['回复', '举报'],
-        itemColor: '#c45a5a',
-        success: (res) => {
-          if (res.tapIndex === 0) {
-            this.doStartReply(postId, commentId, author)
-          } else if (res.tapIndex === 1) {
-            wx.showToast({ title: '举报已提交', icon: 'none' })
-          }
-        }
-      })
-    }
+    postUtils.onReplyTap(this, e, function(posts) { this._savePosts(posts) }.bind(this))
   },
 
   deleteComment(postId, commentId) {
-    wx.showModal({
-      title: '确认删除',
-      content: '确定要删除这条评论吗？',
-      confirmColor: '#c45a5a',
-      success: (res) => {
-        if (res.confirm) {
-          const posts = this.data.posts
-          const idx = posts.findIndex(p => p.id == postId)
-          if (idx === -1) return
-          posts[idx].comments = posts[idx].comments.filter(c => c.id != commentId)
-          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
-          this._savePosts(posts)
-        }
-      }
-    })
+    postUtils.deleteComment(this, postId, commentId, function(posts) { this._savePosts(posts) }.bind(this))
   },
 
   deleteReply(postId, commentId, replyId) {
-    wx.showModal({
-      title: '确认删除',
-      content: '确定要删除这条回复吗？',
-      confirmColor: '#c45a5a',
-      success: (res) => {
-        if (res.confirm) {
-          const posts = this.data.posts
-          const idx = posts.findIndex(p => p.id == postId)
-          if (idx === -1) return
-          const commentIdx = posts[idx].comments.findIndex(c => c.id == commentId)
-          if (commentIdx === -1) return
-          const replies = posts[idx].comments[commentIdx].replies || []
-          posts[idx].comments[commentIdx].replies = replies.filter(r => r.id != replyId)
-          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
-          this._savePosts(posts)
-        }
-      }
-    })
+    postUtils.deleteReply(this, postId, commentId, replyId, function(posts) { this._savePosts(posts) }.bind(this))
   },
 
   onInputBlur() {
@@ -500,58 +395,18 @@ Page({
 
   onCommentInput(e) {
     const postId = e.currentTarget.dataset.id
-    const idx = this.data.posts.findIndex(p => p.id == postId)
+    const idx = this.data.posts.findIndex(p => p.id === postId)
     if (idx === -1) return
     this.setData({ [`posts[${idx}].commentInput`]: e.detail.value })
   },
 
   addComment(e) {
-    const postId = e.currentTarget.dataset.id
-    const idx = this.data.posts.findIndex(p => p.id == postId)
-    if (idx === -1) return
-
-    const content = e.detail.value || this.data.posts[idx].commentInput || ''
-    if (!content.trim()) return
-
-    const posts = this.data.posts
-    const replying = this.data.replyingComment
-    const newReply = {
-      id: Date.now(),
-      author: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
-      content: content.trim()
-    }
-
-    if (replying && replying.postId == postId) {
-      const commentIdx = posts[idx].comments.findIndex(c => c.id == replying.commentId)
-      if (commentIdx !== -1) {
-        newReply.replyTo = replying.author
-        if (!posts[idx].comments[commentIdx].replies) {
-          posts[idx].comments[commentIdx].replies = []
-        }
-        posts[idx].comments[commentIdx].replies.push(newReply)
-        this.setData({
-          [`posts[${idx}].comments`]: posts[idx].comments,
-          [`posts[${idx}].commentInput`]: '',
-          replyingComment: null,
-          focusInputPostId: null
-        })
-      }
-    } else {
-      posts[idx].comments.push(newReply)
-      posts[idx].commentInput = ''
-      this.setData({
-        [`posts[${idx}].comments`]: posts[idx].comments,
-        [`posts[${idx}].commentInput`]: '',
-        focusInputPostId: null
-      })
-    }
-    this._savePosts(posts)
+    postUtils.addComment(this, e, function(posts) { this._savePosts(posts) }.bind(this))
   },
 
   _savePosts(posts) {
     const author = this.data._author
-    if (author === '林夕') {
+    if (author === common.loadUserInfo().name) {
       wx.setStorage({ key: 'myPosts', data: posts })
     } else {
       wx.setStorage({ key: `postCache_${author}`, data: posts })
@@ -574,7 +429,6 @@ Page({
   previewImage(e) {
     const src = e.currentTarget.dataset.src
     const urls = e.currentTarget.dataset.urls
-    getApp()._ignoreRelaunch = true
-    wx.previewImage({ current: src, urls })
+    common.safePreviewImage(urls, src)
   }
 })

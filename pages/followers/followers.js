@@ -1,3 +1,5 @@
+var common = require('../../utils/common.js')
+
 Page({
   data: {
     followers: [
@@ -13,15 +15,10 @@ Page({
     this.syncFollowStatus()
   },
 
-  getBlockedUsers() {
-    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
-    return new Set(blockData.blockedUsers || [])
-  },
-
   syncFollowStatus() {
     const followData = wx.getStorageSync('followData') || { following: [] }
     const followingSet = new Set(followData.following || [])
-    const blocked = this.getBlockedUsers()
+    const blocked = common.getBlockedUsers()
     const followers = this.data.followers
       .filter(f => !blocked.has(f.name))
       .map(f => ({
@@ -58,8 +55,6 @@ Page({
   },
 
   goToUserHome(e) {
-    const name = e.currentTarget.dataset.name
-    if (!name) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(name)}` })
+    common.goToUserHome(e.currentTarget.dataset.name)
   }
 })

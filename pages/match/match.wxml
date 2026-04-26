@@ -2,7 +2,7 @@
   <view class="ambient-bg"></view>
 
   <view class="page-header-bar">
-    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
+    <view class="header-left" bindtap="goToUserHome" data-author="{{myName}}">
       <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
     </view>
     <text class="header-title">匹配</text>
@@ -11,7 +11,7 @@
     </view>
   </view>
 
-  <scroll-view scroll-y class="content" enable-back-to-top>
+  <view class="content">
     <view class="content-inner">
 
       <!-- 匹配关闭状态 -->
@@ -47,6 +47,12 @@
 
       <!-- 已匹配：结果页 -->
       <view wx:else class="matched-result">
+        <!-- Back to blind box -->
+        <view class="result-back-btn" bindtap="resetMatch">
+          <view class="result-back-arrow"></view>
+          <text class="result-back-text">重新匹配</text>
+        </view>
+
         <!-- Profile Card -->
         <view class="profile-card anim-scale-in">
           <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
@@ -94,7 +100,7 @@
         <view class="bottom-spacer"></view>
       </view>
     </view>
-  </scroll-view>
+  </view>
 
   <!-- Floating Button -->
   <view wx:if="{{isMatchOpen && isMatched}}" class="floating-action-bar anim-fade-in-up" style="animation-delay: 0.45s">

@@ -4,7 +4,6 @@
   left: 0;
   right: 0;
   z-index: 999;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .tab-bar-bg {
@@ -12,6 +11,7 @@
   backdrop-filter: saturate(180%) blur(32rpx);
   -webkit-backdrop-filter: saturate(180%) blur(32rpx);
   border-top: 1rpx solid rgba(28, 25, 23, 0.06);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .tab-bar-inner {

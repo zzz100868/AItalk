@@ -1,3 +1,5 @@
+var common = require('../../utils/common.js')
+
 const MOCK_CHAT_USERS = {
   '陈默': {
     avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=200&backgroundColor=b6e3f4'
@@ -19,7 +21,9 @@ const MOCK_MESSAGES = {
 
 Page({
   data: {
-    conversations: [],
+    activeTab: 'private',
+    privateConversations: [],
+    crushConversations: [],
     userAvatar: ''
   },
 
@@ -32,11 +36,8 @@ Page({
   },
 
   loadUserInfo() {
-    const saved = wx.getStorageSync('userProfile')
-    const app = getApp()
-    this.setData({
-      userAvatar: saved?.avatar || app.globalData?.userInfo?.avatarUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5'
-    })
+    const info = common.loadUserInfo()
+    this.setData({ userAvatar: info.avatar })
   },
 
   loadConversations() {
@@ -46,35 +47,53 @@ Page({
       for (const name in MOCK_MESSAGES) {
         messages[name] = {
           avatar: MOCK_CHAT_USERS[name]?.avatar || '',
+          matchType: 'private',
           messages: MOCK_MESSAGES[name]
         }
       }
       wx.setStorageSync('privateMessages', messages)
     }
 
-    const conversations = []
+    const privateList = []
+    const crushList = []
+
     for (const name in messages) {
       const item = messages[name]
       const msgs = item.messages || []
       const lastMsg = msgs[msgs.length - 1]
-      conversations.push({
+      const conv = {
         name,
         avatar: item.avatar || '',
         lastContent: lastMsg ? (lastMsg.type === 'image' ? '[图片]' : lastMsg.content) : '',
         lastTime: lastMsg ? this._formatTime(lastMsg.time) : '',
         unread: 0
+      }
+      if (item.matchType === 'crush') {
+        crushList.push(conv)
+      } else {
+        privateList.push(conv)
+      }
+    }
+
+    const sortByTime = (list) => {
+      return list.sort((a, b) => {
+        const msgsA = messages[a.name]?.messages || []
+        const msgsB = messages[b.name]?.messages || []
+        const timeA = msgsA[msgsA.length - 1]?.time || 0
+        const timeB = msgsB[msgsB.length - 1]?.time || 0
+        return timeB - timeA
       })
     }
 
-    conversations.sort((a, b) => {
-      const msgsA = messages[a.name]?.messages || []
-      const msgsB = messages[b.name]?.messages || []
-      const timeA = msgsA[msgsA.length - 1]?.time || 0
-      const timeB = msgsB[msgsB.length - 1]?.time || 0
-      return timeB - timeA
+    this.setData({
+      privateConversations: sortByTime(privateList),
+      crushConversations: sortByTime(crushList)
     })
+  },
 
-    this.setData({ conversations })
+  switchTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    this.setData({ activeTab: tab })
   },
 
   _formatTime(timestamp) {
@@ -94,9 +113,7 @@ Page({
   },
 
   goToUserHome(e) {
-    const author = e.currentTarget.dataset.author
-    if (!author) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+    common.goToUserHome(e.currentTarget.dataset.author)
   },
 
   onConversationLongPress(e) {
@@ -116,8 +133,6 @@ Page({
     const all = wx.getStorageSync('privateMessages') || {}
     delete all[user]
     wx.setStorageSync('privateMessages', all)
-
-    const conversations = this.data.conversations.filter(c => c.name !== user)
-    this.setData({ conversations })
+    this.loadConversations()
   }
 })

@@ -1,3 +1,6 @@
+var common = require('../../utils/common.js')
+var postUtils = require('../../utils/post.js')
+
 Page({
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
@@ -6,18 +9,20 @@ Page({
     this.loadUserInfo()
     this.filterBlockedPosts()
 
-    // 骨架屏模拟加载
-    this.setData({ isLoading: true, loadError: false })
-    setTimeout(() => {
-      this.loadMyPosts()
-      this.setData({ isLoading: false })
-    }, 600)
-
     const highlightPostId = getApp()._highlightPostId
     if (highlightPostId) {
       delete getApp()._highlightPostId
-      this.highlightPost(highlightPostId)
     }
+
+    this.setData({ isLoading: true, loadError: false })
+    setTimeout(() => {
+      this.loadMyPosts()
+      this.setData({ isLoading: false }, () => {
+        if (highlightPostId) {
+          this.highlightPost(highlightPostId)
+        }
+      })
+    }, 600)
   },
 
   onPullDownRefresh() {
@@ -49,24 +54,16 @@ Page({
     })
   },
 
-  getBlockedUsers() {
-    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
-    return new Set(blockData.blockedUsers || [])
-  },
-
   filterBlockedPosts() {
-    const blocked = this.getBlockedUsers()
+    const blocked = common.getBlockedUsers()
     if (blocked.size === 0) return
     const posts = this.data.posts.filter(p => !blocked.has(p.author))
     this.setData({ posts })
   },
 
   loadUserInfo() {
-    const saved = wx.getStorageSync('userProfile')
-    const updates = {}
-    if (saved?.avatar) updates.userAvatar = saved.avatar
-    if (saved?.nickName) updates.myName = saved.nickName
-    this.setData(updates)
+    const info = common.loadUserInfo()
+    this.setData({ userAvatar: info.avatar, myName: info.name })
   },
 
   loadMyPosts() {
@@ -75,7 +72,7 @@ Page({
     const lastId = myPosts[myPosts.length - 1].id
     if (lastId === this._lastMyPostsId) return
     this._lastMyPostsId = lastId
-    const blocked = this.getBlockedUsers()
+    const blocked = common.getBlockedUsers()
     const existingIds = new Set(this.data.posts.map(p => p.id))
     const newPosts = myPosts.filter(p => !existingIds.has(p.id) && !blocked.has(p.author))
     if (newPosts.length > 0) {
@@ -206,32 +203,7 @@ Page({
   },
 
   toggleLike(e) {
-    const id = e.currentTarget.dataset.id
-    const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === id)
-    if (idx === -1) return
-
-    const post = posts[idx]
-    const newLiked = !post.liked
-    post.liked = newLiked
-    post.likes = newLiked ? post.likes + 1 : post.likes - 1
-
-    const update = {
-      [`posts[${idx}].liked`]: newLiked,
-      [`posts[${idx}].likes`]: post.likes
-    }
-    if (newLiked) {
-      post.heartBeating = true
-      update[`posts[${idx}].heartBeating`] = true
-    }
-    this.setData(update)
-
-    if (newLiked) {
-      setTimeout(() => {
-        post.heartBeating = false
-        this.setData({ [`posts[${idx}].heartBeating`]: false })
-      }, 500)
-    }
+    postUtils.toggleLike(this, e)
   },
 
   toggleComments(e) {
@@ -246,161 +218,27 @@ Page({
 
   startReply(e) {
     const { postId, commentId, author } = e.currentTarget.dataset
-    this.doStartReply(postId, commentId, author)
-  },
-
-  doStartReply(postId, commentId, author) {
-    this.setData({
-      replyingComment: { postId, commentId, author },
-      focusInputPostId: postId
-    })
+    postUtils.doStartReply(this, postId, commentId, author)
   },
 
   cancelReply() {
-    this.setData({ replyingComment: null })
+    postUtils.cancelReply(this)
   },
 
   onCommentTap(e) {
-    const { postId, commentId, author, content } = e.currentTarget.dataset
-    if (author === this.data.myName) {
-      wx.showActionSheet({
-        itemList: ['删除'],
-        itemColor: '#c45a5a',
-        success: (res) => {
-          if (res.tapIndex === 0) this.deleteComment(postId, commentId)
-        }
-      })
-    } else {
-      wx.showActionSheet({
-        itemList: ['回复', '举报'],
-        itemColor: '#c45a5a',
-        success: (res) => {
-          if (res.tapIndex === 0) {
-            this.doStartReply(postId, commentId, author)
-          } else if (res.tapIndex === 1) {
-            this.showReportSheet('评论')
-          }
-        }
-      })
-    }
+    postUtils.onCommentTap(this, e)
   },
 
   onReplyTap(e) {
-    const { postId, commentId, replyId, author, content } = e.currentTarget.dataset
-    if (author === this.data.myName) {
-      wx.showActionSheet({
-        itemList: ['复制', '删除'],
-        success: (res) => {
-          if (res.tapIndex === 0) {
-            wx.setClipboardData({
-              data: content,
-              success: () => wx.showToast({ title: '已复制', icon: 'none' })
-            })
-          } else if (res.tapIndex === 1) {
-            this.deleteReply(postId, commentId, replyId)
-          }
-        }
-      })
-    } else {
-      wx.showActionSheet({
-        itemList: ['回复', '举报'],
-        itemColor: '#c45a5a',
-        success: (res) => {
-          if (res.tapIndex === 0) {
-            this.doStartReply(postId, commentId, author)
-          } else if (res.tapIndex === 1) {
-            this.showReportSheet('回复')
-          }
-        }
-      })
-    }
-  },
-
-  deleteComment(postId, commentId) {
-    wx.showModal({
-      title: '确认删除',
-      content: '确定要删除这条评论吗？',
-      confirmColor: '#c45a5a',
-      success: (res) => {
-        if (res.confirm) {
-          const posts = this.data.posts
-          const idx = posts.findIndex(p => p.id === postId)
-          if (idx === -1) return
-          posts[idx].comments = posts[idx].comments.filter(c => c.id !== commentId)
-          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
-        }
-      }
-    })
-  },
-
-  deleteReply(postId, commentId, replyId) {
-    wx.showModal({
-      title: '确认删除',
-      content: '确定要删除这条回复吗？',
-      confirmColor: '#c45a5a',
-      success: (res) => {
-        if (res.confirm) {
-          const posts = this.data.posts
-          const idx = posts.findIndex(p => p.id === postId)
-          if (idx === -1) return
-          const commentIdx = posts[idx].comments.findIndex(c => c.id === commentId)
-          if (commentIdx === -1) return
-          const replies = posts[idx].comments[commentIdx].replies || []
-          posts[idx].comments[commentIdx].replies = replies.filter(r => r.id !== replyId)
-          this.setData({ [`posts[${idx}].comments`]: posts[idx].comments })
-        }
-      }
-    })
+    postUtils.onReplyTap(this, e)
   },
 
   onInputBlur() {
     this.setData({ focusInputPostId: null })
   },
 
-
   addComment(e) {
-    const postId = e.currentTarget.dataset.id
-    const content = e.detail.value
-    if (!content || !content.trim()) return
-
-    const posts = this.data.posts
-    const idx = posts.findIndex(p => p.id === postId)
-    if (idx === -1) return
-
-    const replying = this.data.replyingComment
-    const newReply = {
-      id: Date.now(),
-      author: '林夕',
-      avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=100&backgroundColor=c7e6f5',
-      content: content.trim()
-    }
-
-    if (replying && replying.postId === postId) {
-      // 回复某条评论
-      const commentIdx = posts[idx].comments.findIndex(c => c.id === replying.commentId)
-      if (commentIdx !== -1) {
-        newReply.replyTo = replying.author
-        if (!posts[idx].comments[commentIdx].replies) {
-          posts[idx].comments[commentIdx].replies = []
-        }
-        posts[idx].comments[commentIdx].replies.push(newReply)
-        this.setData({
-          [`posts[${idx}].comments`]: posts[idx].comments,
-          [`posts[${idx}].commentInput`]: '',
-          replyingComment: null,
-          focusInputPostId: null
-        })
-      }
-    } else {
-      // 直接评论帖子
-      posts[idx].comments.push(newReply)
-      posts[idx].commentInput = ''
-      this.setData({
-        [`posts[${idx}].comments`]: posts[idx].comments,
-        [`posts[${idx}].commentInput`]: '',
-        focusInputPostId: null
-      })
-    }
+    postUtils.addComment(this, e)
   },
 
   goToNotifications() {
@@ -411,7 +249,7 @@ Page({
   showShareMenu(e) {
     const id = e.currentTarget.dataset.id
     const post = this.data.posts.find(p => p.id === id)
-    const isMine = post.author === '林夕'
+    const isMine = post.author === this.data.myName
     const itemList = isMine
       ? ['分享给好友', '复制链接', '收藏', '删除']
       : ['分享给好友', '复制链接', '收藏', '举报']
@@ -451,24 +289,12 @@ Page({
     })
   },
 
-  showReportSheet(targetType) {
-    wx.showActionSheet({
-      itemList: ['色情低俗', '违法违规', '人身攻击', '广告骚扰', '其他'],
-      itemColor: '#c45a5a',
-      success: () => {
-        wx.showToast({ title: '举报成功，我们会尽快处理', icon: 'none' })
-      }
-    })
-  },
-
   goToProfile() {
     wx.switchTab({ url: '/pages/profile/profile' })
   },
 
   goToUserHome(e) {
-    const author = e.currentTarget.dataset.author
-    if (!author) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+    common.goToUserHome(e.currentTarget.dataset.author)
   },
 
   openPostPanel() {
@@ -494,8 +320,7 @@ Page({
       wx.showToast({ title: '最多9张图片', icon: 'none' })
       return
     }
-    getApp()._ignoreRelaunch = true
-    wx.chooseMedia({
+    common.safeChooseMedia({
       count: remainCount,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
@@ -520,11 +345,7 @@ Page({
   previewPostImage(e) {
     const src = e.currentTarget.dataset.src
     const urls = e.currentTarget.dataset.urls
-    getApp()._ignoreRelaunch = true
-    wx.previewImage({
-      current: src,
-      urls: urls
-    })
+    common.safePreviewImage(urls, src)
   },
 
   deleteImage(e) {
@@ -544,9 +365,9 @@ Page({
 
     this.setData({ isSubmitting: true })
 
-    const saved = wx.getStorageSync('userProfile')
-    const author = saved?.nickName || '林夕'
-    const avatar = saved?.avatar || 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5'
+    const info = common.loadUserInfo()
+    const author = info.name
+    const avatar = info.avatar
     const newPost = {
       id: Date.now(),
       author,
@@ -566,7 +387,7 @@ Page({
     this._lastMyPostsId = newPost.id
 
     // 如果自己被自己拉黑（理论上不会），需要过滤
-    const blocked = this.getBlockedUsers()
+    const blocked = common.getBlockedUsers()
     const updatedPosts = blocked.has(author) ? this.data.posts : [newPost, ...this.data.posts]
 
     this.setData({

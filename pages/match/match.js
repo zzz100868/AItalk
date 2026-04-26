@@ -1,13 +1,17 @@
+var common = require('../../utils/common.js')
+
 Page({
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
     }
-    // 每次进入匹配页都重置为盲盒入口（动画播放中不重置）
-    if (!this.data.isMatching) {
-      this.setData({ isMatched: false, showChat: false })
-    }
+    const info = common.loadUserInfo()
+    this.setData({ myName: info.name, userAvatar: info.avatar })
     this.checkMatchStatus()
+  },
+
+  resetMatch() {
+    this.setData({ isMatched: false, showChat: false })
   },
 
   checkMatchStatus() {
@@ -59,6 +63,7 @@ Page({
     isMatching: false,
     matchPhase: '',
     countdownText: '',
+    myName: '林夕',
     userAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
 
     // 当前匹配对象（由 doMatch 填充）
@@ -153,13 +158,10 @@ Page({
     lastMsgId: 0
   },
 
-  getBlockedUsers() {
-    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
-    return new Set(blockData.blockedUsers || [])
-  },
-
   doMatch() {
-    const blocked = this.getBlockedUsers()
+    if (this._matching) return
+    this._matching = true
+    const blocked = common.getBlockedUsers()
     const candidates = this.data.candidates.filter(c => !blocked.has(c.name))
     if (candidates.length === 0) {
       wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
@@ -206,6 +208,7 @@ Page({
 
     // 动画结束，显示完整结果页（3000ms）
     this._animTimer3 = setTimeout(() => {
+      this._matching = false
       this.setData({ isMatching: false, isMatched: true, matchPhase: '' })
     }, 3000)
   },
@@ -221,10 +224,26 @@ Page({
   },
 
   startChat() {
-    this.setData({ showChat: true, chatFocus: false })
-    setTimeout(() => {
-      this.setData({ chatFocus: true })
-    }, 400)
+    const matchName = this.data.matchName
+    const matchAvatar = this.data.matchAvatar
+    if (!matchName) return
+
+    // Save crush match to privateMessages
+    const all = wx.getStorageSync('privateMessages') || {}
+    if (!all[matchName]) {
+      all[matchName] = {
+        avatar: matchAvatar,
+        matchType: 'crush',
+        messages: [
+          { id: Date.now(), content: `嗨，很高兴认识你。我是 ${matchName}。`, time: Date.now(), self: false, type: 'text' }
+        ]
+      }
+      wx.setStorageSync('privateMessages', all)
+    }
+
+    wx.navigateTo({
+      url: `/pages/chatDetail/chatDetail?user=${encodeURIComponent(matchName)}`
+    })
   },
 
   closeChat() {
@@ -275,8 +294,6 @@ Page({
   },
 
   goToUserHome(e) {
-    const author = e.currentTarget.dataset.author
-    if (!author) return
-    wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+    common.goToUserHome(e.currentTarget.dataset.author)
   }
 })

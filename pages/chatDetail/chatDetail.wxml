@@ -12,8 +12,9 @@
   </view>
 
   <!-- Messages -->
-  <scroll-view scroll-y class="messages-wrap" style="padding-bottom: {{bottomPaddingPx}}px;" scroll-into-view="{{scrollIntoView}}" enable-back-to-top>
-    <view class="messages-inner">
+  <scroll-view scroll-y class="messages-wrap" scroll-top="{{scrollTop}}" scroll-with-animation bindtap="onMessagesTap">
+    <view class="messages-inner" style="padding-bottom: {{bottomPad}}px;">
+      <view class="messages-spacer"></view>
       <view
         wx:for="{{messages}}"
         wx:key="id"
@@ -38,7 +39,7 @@
   </scroll-view>
 
   <!-- Input Area -->
-  <view class="input-area safe-bottom" style="bottom: {{areaOffset}}px;">
+  <view class="input-area" style="bottom: {{areaOffset}}px;">
     <!-- Toolbar -->
     <view class="input-toolbar">
       <view class="tool-btn {{showEmojiPanel ? 'tool-btn-active' : ''}}" bindtap="toggleEmojiPanel">
@@ -58,6 +59,7 @@
         value="{{inputValue}}"
         focus="{{focusInput}}"
         adjust-position="{{false}}"
+        hold-keyboard="{{true}}"
         bindinput="onInput"
         confirm-type="send"
         bindconfirm="sendMessage"
@@ -69,7 +71,7 @@
     </view>
 
     <!-- Emoji Panel -->
-    <view wx:if="{{showEmojiPanel}}" class="emoji-panel">
+    <view hidden="{{!showEmojiPanel}}" class="emoji-panel" style="height: {{emojiPanelHeight}}px;">
       <scroll-view scroll-y class="emoji-scroll">
         <view class="emoji-grid">
           <view
