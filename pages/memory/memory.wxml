@@ -20,68 +20,11 @@
       <!-- Tab Switcher -->
       <view class="tab-switcher anim-fade-in">
         <view class="tab-slider" style="transform: translateX({{tabSliderX}}%);"></view>
-        <view class="tab-pill {{activeTab === 'chat' ? 'tab-pill-active' : ''}}" bindtap="switchTab" data-tab="chat">
-          <text>对话</text>
-        </view>
         <view class="tab-pill {{activeTab === 'memory' ? 'tab-pill-active' : ''}}" bindtap="switchTab" data-tab="memory">
           <text>记忆</text>
         </view>
         <view class="tab-pill {{activeTab === 'archive' ? 'tab-pill-active' : ''}}" bindtap="switchTab" data-tab="archive">
           <text>档案</text>
-        </view>
-      </view>
-
-      <!-- Chat View -->
-      <view wx:if="{{activeTab === 'chat'}}" class="chat-view">
-        <!-- Chat Status Bar -->
-        <view class="chat-status-bar anim-fade-in-up">
-          <view class="status-item">
-            <text class="status-num">{{chatDays}}</text>
-            <text class="status-label">连续对话</text>
-          </view>
-          <view class="status-divider"></view>
-          <view class="status-item">
-            <text class="status-num">{{chatMood}}</text>
-            <text class="status-label">今日心情</text>
-          </view>
-          <view class="status-divider"></view>
-          <view class="status-item">
-            <text class="status-num">{{chatTopics}}</text>
-            <text class="status-label">话题数</text>
-          </view>
-        </view>
-
-        <!-- Messages -->
-        <view class="messages">
-          <view
-            wx:for="{{messages}}"
-            wx:key="id"
-            id="{{index === messages.length - 1 ? 'msg-last' : ''}}"
-            class="msg-row {{item.sender === 'user' ? 'msg-user' : 'msg-ai'}}"
-            style="animation-delay: {{index * 0.08}}s"
-          >
-            <image wx:if="{{item.sender === 'ai'}}" class="ai-avatar-small" src="{{aiAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="Stitch AI"/>
-            <view class="msg-bubble {{item.sender === 'user' ? 'msg-bubble-user' : 'msg-bubble-ai'}}">
-              <text class="msg-text">{{item.content}}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- Chat Input -->
-        <view class="chat-input-area">
-          <view class="chat-input-box {{inputFocused ? 'chat-input-box-focused' : ''}}">
-            <input 
-              class="chat-input" 
-              placeholder="说点什么..." 
-              placeholder-class="input-placeholder" 
-              cursor-spacing="20"
-              bindfocus="onInputFocus" 
-              bindblur="onInputBlur"
-            />
-            <view class="send-btn">
-              <view class="send-arrow"></view>
-            </view>
-          </view>
         </view>
       </view>
 

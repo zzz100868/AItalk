@@ -49,9 +49,6 @@
         <view class="action-btn {{isFollowing ? 'action-btn-active' : ''}}" bindtap="toggleFollow">
           <text>{{isFollowing ? '已关注' : '关注'}}</text>
         </view>
-        <view class="action-btn action-btn-chat" bindtap="goToChat" wx:if="{{canPrivateMessage}}">
-          <text>私信</text>
-        </view>
         <view class="action-btn action-btn-danger" bindtap="toggleBlock">
           <text>拉黑</text>
         </view>
@@ -78,7 +75,7 @@
         <view wx:if="{{posts.length === 0 && !isBlocked}}" class="empty-state">
           <view class="empty-icon"></view>
           <text class="empty-title">还没有发布过动态</text>
-          <text class="empty-desc">去广场分享你此刻的想法吧</text>
+          <text class="empty-desc">还没有发布过动态</text>
         </view>
 
         <!-- Blocked State -->

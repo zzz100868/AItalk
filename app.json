@@ -2,16 +2,12 @@
   "pages": [
     "pages/index/index",
     "pages/landing/landing",
-    "pages/chat/chat",
-    "pages/chatDetail/chatDetail",
-    "pages/explore/explore",
     "pages/match/match",
     "pages/memory/memory",
     "pages/archive/archive",
     "pages/profile/profile",
     "pages/followers/followers",
     "pages/following/following",
-    "pages/moments/moments",
     "pages/settings/settings",
     "pages/editProfile/editProfile",
     "pages/userHome/userHome",
@@ -34,18 +30,6 @@
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [
-      {
-        "pagePath": "pages/chat/chat",
-        "text": "聊天",
-        "iconPath": "images/tab_chat.png",
-        "selectedIconPath": "images/tab_chat_active.png"
-      },
-      {
-        "pagePath": "pages/explore/explore",
-        "text": "广场",
-        "iconPath": "images/tab_explore.png",
-        "selectedIconPath": "images/tab_explore_active.png"
-      },
       {
         "pagePath": "pages/match/match",
         "text": "匹配",

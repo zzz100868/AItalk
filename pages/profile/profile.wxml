@@ -57,14 +57,6 @@
           <view class="section-line"></view>
         </view>
         <view class="menu-card">
-          <view class="menu-item" bindtap="goToMoments">
-            <view class="menu-item-content">
-              <text class="menu-title">我的动态</text>
-              <text class="menu-desc">查看你发布的内容</text>
-            </view>
-            <view class="menu-arrow"></view>
-          </view>
-
         </view>
       </view>
 

@@ -1,12 +1,12 @@
 Page({
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 3 })
+      this.getTabBar().setData({ selected: 1 })
     }
     const targetTab = wx.getStorageSync('memoryTargetTab')
     if (targetTab) {
       wx.removeStorageSync('memoryTargetTab')
-      const tabMap = { chat: 0, memory: 100, archive: 200 }
+      const tabMap = { memory: 0, archive: 100 }
       this.setData({ activeTab: targetTab, tabSliderX: tabMap[targetTab] || 0 })
     }
     this.loadInsights()
@@ -15,7 +15,7 @@ Page({
   data: {
     userAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=200&backgroundColor=c7e6f5',
     aiAvatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=StitchAI&size=200&backgroundColor=e8dff5',
-    activeTab: 'chat',
+    activeTab: 'memory',
     tabSliderX: 0,
     activeCategory: 'all',
     categories: [
@@ -91,41 +91,7 @@ Page({
       }
     ],
     filteredInsights: [],
-    chatDays: '12天',
-    chatMood: '平静',
-    chatTopics: 8,
-    messages: [
-      {
-        id: 1,
-        sender: 'user',
-        content: '最近一直在想，我是不是应该给自己放个假，感觉每天都被工作填满了。'
-      },
-      {
-        id: 2,
-        sender: 'ai',
-        content: '听起来你最近有点累了。给自己留一些「什么都不做」的时间，其实是很重要的。你有没有想过，理想的休息日会是什么样的？'
-      },
-      {
-        id: 3,
-        sender: 'user',
-        content: '可能就是睡到自然醒，然后泡一杯咖啡，看看书，不用回任何消息。'
-      },
-      {
-        id: 4,
-        sender: 'ai',
-        content: '这听起来很治愈。其实这种「慢下来」的时刻，往往能让你更清楚地听见自己内心的声音。'
-      },
-      {
-        id: 5,
-        sender: 'user',
-        content: '嗯，我觉得我最近总是活在别人的期待里，很少问自己真正想要什么。'
-      },
-      {
-        id: 6,
-        sender: 'ai',
-        content: '能意识到这一点已经很了不起了。或许可以从一件小事开始，比如今天晚餐吃什么，完全按照你自己的喜好来选择。'
-      }
-    ],
+
     aboutMe: '你是一个在安静中寻找力量的人。你喜欢手冲咖啡的仪式感，享受深夜独处的时光。你对世界充满好奇，常常沉浸在书本和音乐里。虽然外表看起来有些疏离，但内心深处渴望被真正理解。',
     personalities: [
       { name: '内向而敏感', desc: '你喜欢独处，对周围的情绪变化很敏锐，常常能察觉到别人忽略的细节。' },
@@ -150,7 +116,7 @@ Page({
 
   onLoad(options) {
     if (options.tab) {
-      const tabMap = { chat: 0, memory: 100, archive: 200 }
+      const tabMap = { memory: 0, archive: 100 }
       this.setData({ activeTab: options.tab, tabSliderX: tabMap[options.tab] || 0 })
     }
     this.loadInsights()
@@ -170,7 +136,7 @@ Page({
 
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
-    const tabMap = { chat: 0, memory: 100, archive: 200 }
+    const tabMap = { memory: 0, archive: 100 }
     this.setData({ activeTab: tab, tabSliderX: tabMap[tab] })
   },
 
@@ -189,10 +155,6 @@ Page({
       const filtered = insights.filter(item => item.category === activeCategory)
       this.setData({ filteredInsights: filtered })
     }
-  },
-
-  goToChat() {
-    this.setData({ activeTab: 'chat', tabSliderX: 0 })
   },
 
   onInputFocus() {

@@ -147,8 +147,7 @@ Page({
     isBlocked: false,
     _author: '',
     replyingComment: null,
-    focusInputPostId: null,
-    canPrivateMessage: false
+    focusInputPostId: null
   },
 
   onLoad(options) {
@@ -193,7 +192,6 @@ Page({
         this.setData({
           isMe: false,
           isFollowing,
-          canPrivateMessage: false,
           userInfo: {
             name: author,
             handle: '',
@@ -217,7 +215,6 @@ Page({
         isMe: false,
         isFollowing: isBlocked ? false : isFollowing,
         isBlocked,
-        canPrivateMessage: mockUser.acceptPrivateMessage !== false,
         userInfo: mockUser,
         stats: {
           following: DEFAULT_STATS[author]?.following || 0,
@@ -263,8 +260,7 @@ Page({
         isFollowing: isBlocked ? false : isFollowing,
         isBlocked,
         posts,
-        'stats.followers': followerCount,
-        canPrivateMessage: this.data.userInfo.acceptPrivateMessage !== false
+        'stats.followers': followerCount
       })
     }
   },
@@ -411,11 +407,6 @@ Page({
     } else {
       wx.setStorage({ key: `postCache_${author}`, data: posts })
     }
-  },
-
-  goToChat() {
-    const author = this.data._author
-    wx.navigateTo({ url: `/pages/chatDetail/chatDetail?user=${encodeURIComponent(author)}` })
   },
 
   goToEditProfile() {

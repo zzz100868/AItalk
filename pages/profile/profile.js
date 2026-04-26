@@ -25,7 +25,7 @@ Page({
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 4 })
+      this.getTabBar().setData({ selected: 2 })
     }
     this.loadUserInfo()
     this.loadStats()
@@ -52,10 +52,6 @@ Page({
 
   goToFollowing() {
     wx.navigateTo({ url: '/pages/following/following' })
-  },
-
-  goToMoments() {
-    wx.navigateTo({ url: '/pages/moments/moments' })
   },
 
   goToAppearance() {

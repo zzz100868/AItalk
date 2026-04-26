@@ -16,30 +16,6 @@ Page({
         read: false
       },
       {
-        id: 2,
-        type: 'comment',
-        author: '林小雨',
-        avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Xiaoyu&size=200&backgroundColor=ffd5dc',
-        content: '评论了你的动态',
-        detail: '周末一起去山里走走？',
-        time: '5小时前',
-        read: false,
-        postId: 99999,
-        source: 'explore'
-      },
-      {
-        id: 3,
-        type: 'reply',
-        author: '陈默',
-        avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=200&backgroundColor=b6e3f4',
-        content: '回复了你的评论',
-        detail: '一起加油！',
-        time: '昨天',
-        read: false,
-        postId: 1,
-        source: 'explore'
-      },
-      {
         id: 4,
         type: 'follow',
         author: '周晚',
@@ -47,18 +23,6 @@ Page({
         content: '关注了你',
         time: '昨天',
         read: true
-      },
-      {
-        id: 5,
-        type: 'comment',
-        author: '阿北',
-        avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Abei&size=200&backgroundColor=d1d4f9',
-        content: '评论了你的动态',
-        detail: '同感，早起真的改变状态',
-        time: '3天前',
-        read: true,
-        postId: 99999,
-        source: 'explore'
       }
     ]
   },
@@ -115,15 +79,6 @@ Page({
       wx.navigateTo({
         url: `/pages/userHome/userHome?author=${encodeURIComponent(item.author)}`
       })
-    } else if ((item.type === 'comment' || item.type === 'reply') && item.postId) {
-      if (item.source === 'explore') {
-        getApp()._highlightPostId = item.postId
-        wx.switchTab({ url: '/pages/explore/explore' })
-      } else if (item.source === 'moments') {
-        wx.navigateTo({
-          url: `/pages/moments/moments?highlightPostId=${item.postId}`
-        })
-      }
     }
   },
 

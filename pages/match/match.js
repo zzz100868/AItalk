@@ -3,7 +3,7 @@ var common = require('../../utils/common.js')
 Page({
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 2 })
+      this.getTabBar().setData({ selected: 0 })
     }
     const info = common.loadUserInfo()
     this.setData({ myName: info.name, userAvatar: info.avatar })
@@ -151,11 +151,6 @@ Page({
       }
     ],
 
-    showChat: false,
-    chatMessages: [],
-    chatInput: '',
-    chatFocus: false,
-    lastMsgId: 0
   },
 
   doMatch() {
@@ -188,12 +183,6 @@ Page({
       tags: match.tags,
       icebreakers: match.icebreakers,
       matchInsight: match.insight,
-      showChat: false,
-      chatMessages: [
-        { id: msgId, sender: 'match', content: `嗨，很高兴认识你。我是 ${match.name}。` }
-      ],
-      chatInput: '',
-      lastMsgId: msgId
     })
 
     // 阶段1 → 阶段2：光芒发散（900ms）
@@ -221,66 +210,6 @@ Page({
     if (this._animTimer1) clearTimeout(this._animTimer1)
     if (this._animTimer2) clearTimeout(this._animTimer2)
     if (this._animTimer3) clearTimeout(this._animTimer3)
-  },
-
-  startChat() {
-    const matchName = this.data.matchName
-    const matchAvatar = this.data.matchAvatar
-    if (!matchName) return
-
-    // Save crush match to privateMessages
-    const all = wx.getStorageSync('privateMessages') || {}
-    if (!all[matchName]) {
-      all[matchName] = {
-        avatar: matchAvatar,
-        matchType: 'crush',
-        messages: [
-          { id: Date.now(), content: `嗨，很高兴认识你。我是 ${matchName}。`, time: Date.now(), self: false, type: 'text' }
-        ]
-      }
-      wx.setStorageSync('privateMessages', all)
-    }
-
-    wx.navigateTo({
-      url: `/pages/chatDetail/chatDetail?user=${encodeURIComponent(matchName)}`
-    })
-  },
-
-  closeChat() {
-    this.setData({ showChat: false, chatFocus: false })
-  },
-
-  onChatInput(e) {
-    this.setData({ chatInput: e.detail.value })
-  },
-
-  sendMessage() {
-    const content = this.data.chatInput.trim()
-    if (!content) return
-
-    const newMsg = { id: Date.now(), sender: 'user', content }
-    const messages = [...this.data.chatMessages, newMsg]
-    this.setData({
-      chatMessages: messages,
-      chatInput: '',
-      lastMsgId: newMsg.id
-    })
-
-    setTimeout(() => {
-      const replies = [
-        '这个角度很有意思，能再多说说吗？',
-        '我也有类似的经历，感觉真的很奇妙。',
-        '哈哈哈，完全理解你的感受。',
-        '嗯……让我想想，可能是因为我们都喜欢安静吧。',
-        '说得太好了，我也一直在思考这个问题。'
-      ]
-      const reply = replies[Math.floor(Math.random() * replies.length)]
-      const replyMsg = { id: Date.now() + 1, sender: 'match', content: reply }
-      this.setData({
-        chatMessages: [...this.data.chatMessages, replyMsg],
-        lastMsgId: replyMsg.id
-      })
-    }, 1200)
   },
 
   copyIcebreaker(e) {
