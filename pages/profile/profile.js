@@ -8,19 +8,6 @@ Page({
       id: 'LX_9527',
       bio: '在喧嚣中寻找宁静。🌿✨'
     },
-    stats: {
-      following: 128,
-      followers: '3.2k',
-      likes: '15k'
-    }
-  },
-
-  loadStats() {
-    const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
-    this.setData({
-      'stats.following': (followData.following || []).length,
-      'stats.followers': followData.followerCounts[common.loadUserInfo().name] || '3.2k'
-    })
   },
 
   onShow() {
@@ -28,7 +15,6 @@ Page({
       this.getTabBar().setData({ selected: 2 })
     }
     this.loadUserInfo()
-    this.loadStats()
   },
 
   onLoad() {
@@ -44,14 +30,6 @@ Page({
       'userInfo.nickName': saved.nickName || app.globalData.userInfo.nickName || this.data.userInfo.nickName,
       'userInfo.bio': saved.bio || this.data.userInfo.bio
     })
-  },
-
-  goToFollowers() {
-    wx.navigateTo({ url: '/pages/followers/followers' })
-  },
-
-  goToFollowing() {
-    wx.navigateTo({ url: '/pages/following/following' })
   },
 
   goToAppearance() {

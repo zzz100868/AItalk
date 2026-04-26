@@ -128,20 +128,10 @@ const MOCK_POSTS = [
   }
 ]
 
-const DEFAULT_STATS = {
-  '陈默': { following: 56, followers: 124, likes: '2.1k' },
-  '林小雨': { following: 89, followers: 342, likes: '5.6k' },
-  '阿北': { following: 120, followers: 89, likes: '3.2k' },
-  '周晚': { following: 67, followers: 256, likes: '8.9k' },
-  '方塘': { following: 45, followers: 512, likes: '12k' },
-  'Kael': { following: 34, followers: 89, likes: '1.2k' }
-}
-
 Page({
   data: {
     isMe: false,
     userInfo: {},
-    stats: {},
     posts: [],
     isFollowing: false,
     isBlocked: false,
@@ -180,13 +170,12 @@ Page({
           avatar: saved.avatar || app.globalData.userInfo.avatarUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
           bio: saved.bio || '在喧嚣中寻找宁静。🌿✨'
         },
-        stats: { following: (followData.following || []).length, followers: followData.followerCounts[common.loadUserInfo().name] || '3.2k', likes: '15k' },
         posts: myPosts
       })
     } else {
       const mockUser = MOCK_USERS[author]
       const isFollowing = (followData.following || []).includes(author)
-      const followerCount = followData.followerCounts[author] ?? (DEFAULT_STATS[author]?.followers || 0)
+      const followerCount = followData.followerCounts[author] ?? 0
 
       if (!mockUser) {
         this.setData({
@@ -198,7 +187,6 @@ Page({
             avatar: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(author)}&size=400&backgroundColor=c7e6f5`,
             bio: ''
           },
-          stats: { following: 0, followers: followerCount, likes: 0 },
           posts: []
         })
         return
@@ -216,11 +204,6 @@ Page({
         isFollowing: isBlocked ? false : isFollowing,
         isBlocked,
         userInfo: mockUser,
-        stats: {
-          following: DEFAULT_STATS[author]?.following || 0,
-          followers: followerCount,
-          likes: DEFAULT_STATS[author]?.likes || 0
-        },
         posts: isBlocked ? [] : posts
       })
     }
@@ -240,11 +223,9 @@ Page({
     if (this.data.isMe) {
       const myPosts = wx.getStorageSync('myPosts') || []
       this.setData({
-        posts: myPosts,
-        'stats.following': (followData.following || []).length
+        posts: myPosts
       })
     } else {
-      const followerCount = followData.followerCounts[author] ?? this.data.stats.followers
       let posts = this.data.posts
       if (isBlocked) {
         posts = []
@@ -259,8 +240,7 @@ Page({
       this.setData({
         isFollowing: isBlocked ? false : isFollowing,
         isBlocked,
-        posts,
-        'stats.followers': followerCount
+        posts
       })
     }
   },
@@ -334,8 +314,7 @@ Page({
     wx.setStorageSync('followData', followData)
 
     this.setData({
-      isFollowing: !wasFollowing,
-      'stats.followers': followData.followerCounts[author]
+      isFollowing: !wasFollowing
     })
 
     wx.showToast({ title: !wasFollowing ? '已关注' : '已取消关注', icon: 'none' })

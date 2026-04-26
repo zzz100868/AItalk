@@ -32,24 +32,6 @@
         </view>
       </view>
 
-      <!-- Stats -->
-      <view class="stats-card anim-fade-in-up" style="animation-delay: 0.1s">
-        <view class="stat-item" bindtap="goToFollowing">
-          <text class="stat-num">{{stats.following}}</text>
-          <text class="stat-label">关注</text>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat-item" bindtap="goToFollowers">
-          <text class="stat-num">{{stats.followers}}</text>
-          <text class="stat-label">粉丝</text>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat-item">
-          <text class="stat-num">{{stats.likes}}</text>
-          <text class="stat-label">获赞</text>
-        </view>
-      </view>
-
       <!-- Menu Section: 个人中心 -->
       <view class="menu-section anim-fade-in-up" style="animation-delay: 0.18s">
         <view class="section-header">
