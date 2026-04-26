@@ -51,57 +51,12 @@
           <view class="section-line"></view>
         </view>
         <view class="menu-card">
-          <view class="menu-item menu-item-switch">
-            <view class="menu-item-content">
-              <text class="menu-title">公开动态</text>
-              <text class="menu-desc">允许所有人查看我的广场动态</text>
-            </view>
-            <switch class="menu-switch" color="#c4715a" checked="{{settings.publicMoments}}" data-key="publicMoments" bindchange="toggleSetting"/>
-          </view>
-          <view class="menu-item menu-item-switch">
-            <view class="menu-item-content">
-              <text class="menu-title">允许陌生人评论</text>
-              <text class="menu-desc">未关注的人也可以评论我的动态</text>
-            </view>
-            <switch class="menu-switch" color="#c4715a" checked="{{settings.allowStrangerComment}}" data-key="allowStrangerComment" bindchange="toggleSetting"/>
-          </view>
-          <view class="menu-item menu-item-switch">
-            <view class="menu-item-content">
-              <text class="menu-title">接受私信</text>
-              <text class="menu-desc">允许其他人通过主页给我发送私信</text>
-            </view>
-            <switch class="menu-switch" color="#c4715a" checked="{{settings.acceptPrivateMessage}}" data-key="acceptPrivateMessage" bindchange="toggleSetting"/>
-          </view>
           <view class="menu-item" bindtap="goToBlockedList">
             <view class="menu-item-content">
               <text class="menu-title">黑名单</text>
               <text class="menu-desc">管理已屏蔽的用户</text>
             </view>
             <view class="menu-arrow"></view>
-          </view>
-        </view>
-      </view>
-
-      <!-- Section: 通知 -->
-      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.24s">
-        <view class="section-header">
-          <text class="section-label">通知</text>
-          <view class="section-line"></view>
-        </view>
-        <view class="menu-card">
-          <view class="menu-item menu-item-switch">
-            <view class="menu-item-content">
-              <text class="menu-title">新消息提醒</text>
-              <text class="menu-desc">接收聊天与评论的推送通知</text>
-            </view>
-            <switch class="menu-switch" color="#c4715a" checked="{{settings.pushNewMessage}}" data-key="pushNewMessage" bindchange="toggleSetting"/>
-          </view>
-          <view class="menu-item menu-item-switch">
-            <view class="menu-item-content">
-              <text class="menu-title">点赞提醒</text>
-              <text class="menu-desc">当有人点赞我的动态时通知我</text>
-            </view>
-            <switch class="menu-switch" color="#c4715a" checked="{{settings.pushLike}}" data-key="pushLike" bindchange="toggleSetting"/>
           </view>
         </view>
       </view>

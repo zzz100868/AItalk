@@ -5,13 +5,7 @@ Page({
       avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Linxi&size=400&backgroundColor=c7e6f5',
       id: 'LX_9527'
     },
-    settings: {
-      publicMoments: true,
-      allowStrangerComment: true,
-      acceptPrivateMessage: true,
-      pushNewMessage: true,
-      pushLike: true
-    },
+    settings: {},
     cacheSize: '12.5 MB',
     version: '1.0.0'
   },
