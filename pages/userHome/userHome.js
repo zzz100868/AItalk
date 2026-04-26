@@ -134,7 +134,6 @@ Page({
     userInfo: {},
     posts: [],
     isFollowing: false,
-    isBlocked: false,
     _author: '',
     replyingComment: null,
     focusInputPostId: null
@@ -155,15 +154,11 @@ Page({
     const isMe = author === common.loadUserInfo().name
     const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
 
-    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
-    const isBlocked = (blockData.blockedUsers || []).includes(author)
-
     if (isMe) {
       const saved = wx.getStorageSync('userProfile') || {}
       const myPosts = wx.getStorageSync('myPosts') || []
       this.setData({
         isMe: true,
-        isBlocked: false,
         userInfo: {
           name: saved.nickName || '林夕',
           handle: '@linxi',
@@ -175,7 +170,6 @@ Page({
     } else {
       const mockUser = MOCK_USERS[author]
       const isFollowing = (followData.following || []).includes(author)
-      const followerCount = followData.followerCounts[author] ?? 0
 
       if (!mockUser) {
         this.setData({
@@ -201,10 +195,9 @@ Page({
 
       this.setData({
         isMe: false,
-        isFollowing: isBlocked ? false : isFollowing,
-        isBlocked,
+        isFollowing,
         userInfo: mockUser,
-        posts: isBlocked ? [] : posts
+        posts
       })
     }
   },
@@ -217,82 +210,15 @@ Page({
     const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
     const isFollowing = (followData.following || []).includes(author)
 
-    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
-    const isBlocked = (blockData.blockedUsers || []).includes(author)
-
     if (this.data.isMe) {
       const myPosts = wx.getStorageSync('myPosts') || []
       this.setData({
         posts: myPosts
       })
     } else {
-      let posts = this.data.posts
-      if (isBlocked) {
-        posts = []
-      } else if (this.data.isBlocked && !isBlocked) {
-        // 刚解除拉黑，恢复帖子
-        const cacheKey = `postCache_${author}`
-        const cachedPosts = wx.getStorageSync(cacheKey)
-        posts = cachedPosts && cachedPosts.length > 0
-          ? cachedPosts
-          : MOCK_POSTS.filter(p => p.author === author)
-      }
       this.setData({
-        isFollowing: isBlocked ? false : isFollowing,
-        isBlocked,
-        posts
-      })
-    }
-  },
-
-  toggleBlock() {
-    const author = this.data._author
-    const blockData = wx.getStorageSync('blockData') || { blockedUsers: [] }
-    const blockedUsers = blockData.blockedUsers || []
-    const wasBlocked = blockedUsers.includes(author)
-
-    if (wasBlocked) {
-      // 解除拉黑
-      blockData.blockedUsers = blockedUsers.filter(name => name !== author)
-      wx.setStorageSync('blockData', blockData)
-      this.setData({ isBlocked: false })
-
-      // 恢复帖子显示
-      const cacheKey = `postCache_${author}`
-      const cachedPosts = wx.getStorageSync(cacheKey)
-      const posts = cachedPosts && cachedPosts.length > 0
-        ? cachedPosts
-        : MOCK_POSTS.filter(p => p.author === author)
-      this.setData({ posts })
-
-      wx.showToast({ title: '已解除拉黑', icon: 'none' })
-    } else {
-      // 拉黑
-      wx.showModal({
-        title: '确认拉黑',
-        content: `拉黑后，你将不再看到 ${author} 的动态，也不会在匹配中遇到对方。确定要继续吗？`,
-        confirmColor: '#c45a5a',
-        success: (res) => {
-          if (res.confirm) {
-            blockData.blockedUsers.push(author)
-            wx.setStorageSync('blockData', blockData)
-
-            // 拉黑时自动取消关注
-            const followData = wx.getStorageSync('followData') || { following: [], followerCounts: {} }
-            if ((followData.following || []).includes(author)) {
-              followData.following = followData.following.filter(name => name !== author)
-              followData.followerCounts[author] = (followData.followerCounts[author] || 1) - 1
-              wx.setStorageSync('followData', followData)
-            }
-
-            this.setData({
-              isBlocked: true,
-              isFollowing: false,
-              posts: []
-            })
-            wx.showToast({ title: '已拉黑', icon: 'none' })
-          }
-        }
+        isFollowing,
+        posts: this.data.posts
       })
     }
   },

@@ -44,23 +44,6 @@
         </view>
       </view>
 
-      <!-- Section: 隐私 -->
-      <view class="menu-section anim-fade-in-up" style="animation-delay: 0.16s">
-        <view class="section-header">
-          <text class="section-label">隐私</text>
-          <view class="section-line"></view>
-        </view>
-        <view class="menu-card">
-          <view class="menu-item" bindtap="goToBlockedList">
-            <view class="menu-item-content">
-              <text class="menu-title">黑名单</text>
-              <text class="menu-desc">管理已屏蔽的用户</text>
-            </view>
-            <view class="menu-arrow"></view>
-          </view>
-        </view>
-      </view>
-
       <!-- Section: 通用 -->
       <view class="menu-section anim-fade-in-up" style="animation-delay: 0.32s">
         <view class="section-header">

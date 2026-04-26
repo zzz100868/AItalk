@@ -18,9 +18,7 @@ Page({
   syncFollowStatus() {
     const followData = wx.getStorageSync('followData') || { following: [] }
     const followingSet = new Set(followData.following || [])
-    const blocked = common.getBlockedUsers()
     const followers = this.data.followers
-      .filter(f => !blocked.has(f.name))
       .map(f => ({
         ...f,
         status: followingSet.has(f.name) ? 'mutual' : 'follow_back'

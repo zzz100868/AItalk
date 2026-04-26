@@ -156,8 +156,7 @@ Page({
   doMatch() {
     if (this._matching) return
     this._matching = true
-    const blocked = common.getBlockedUsers()
-    const candidates = this.data.candidates.filter(c => !blocked.has(c.name))
+    const candidates = this.data.candidates
     if (candidates.length === 0) {
       wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
       return

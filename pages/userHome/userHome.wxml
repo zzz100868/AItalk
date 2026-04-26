@@ -21,23 +21,15 @@
         </view>
         <view class="profile-info">
           <text class="profile-name">{{userInfo.name}}</text>
-          <text class="profile-handle">{{isBlocked ? '***' : userInfo.handle}}</text>
-          <text class="profile-bio">{{isBlocked ? '该用户已被你拉黑' : userInfo.bio}}</text>
+          <text class="profile-handle">{{userInfo.handle}}</text>
+          <text class="profile-bio">{{userInfo.bio}}</text>
         </view>
       </view>
 
       <!-- Action Buttons -->
-      <view class="action-bar anim-fade-in-up" style="animation-delay: 0.15s" wx:if="{{!isMe && !isBlocked}}">
+      <view class="action-bar anim-fade-in-up" style="animation-delay: 0.15s" wx:if="{{!isMe}}">
         <view class="action-btn {{isFollowing ? 'action-btn-active' : ''}}" bindtap="toggleFollow">
           <text>{{isFollowing ? '已关注' : '关注'}}</text>
-        </view>
-        <view class="action-btn action-btn-danger" bindtap="toggleBlock">
-          <text>拉黑</text>
-        </view>
-      </view>
-      <view class="action-bar anim-fade-in-up" style="animation-delay: 0.15s" wx:if="{{!isMe && isBlocked}}">
-        <view class="action-btn action-btn-secondary" bindtap="toggleBlock">
-          <text>解除拉黑</text>
         </view>
       </view>
       <view class="action-bar anim-fade-in-up" style="animation-delay: 0.15s" wx:if="{{isMe}}">
@@ -54,17 +46,10 @@
         </view>
 
         <!-- Empty State -->
-        <view wx:if="{{posts.length === 0 && !isBlocked}}" class="empty-state">
+        <view wx:if="{{posts.length === 0}}" class="empty-state">
           <view class="empty-icon"></view>
           <text class="empty-title">还没有发布过动态</text>
           <text class="empty-desc">还没有发布过动态</text>
-        </view>
-
-        <!-- Blocked State -->
-        <view wx:if="{{isBlocked}}" class="empty-state">
-          <view class="empty-icon blocked-icon"></view>
-          <text class="empty-title">已屏蔽该用户</text>
-          <text class="empty-desc">你无法查看对方的动态与资料</text>
         </view>
 
         <!-- Post List -->

@@ -54,10 +54,6 @@ Page({
     wx.navigateTo({ url: '/pages/accountSecurity/accountSecurity' })
   },
 
-  goToBlockedList() {
-    wx.navigateTo({ url: '/pages/blockList/blockList' })
-  },
-
   clearCache() {
     wx.showModal({
       title: '清除缓存',
