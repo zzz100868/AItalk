@@ -74,6 +74,7 @@ Page({
     tags: [],
     icebreakers: [],
     matchInsight: '',
+    showPayModal: false,
 
     // 盲盒候选池
     candidates: [
@@ -219,6 +220,21 @@ Page({
         wx.showToast({ title: '已复制', icon: 'none' })
       }
     })
+  },
+
+  showPayModal() {
+    this.setData({ showPayModal: true })
+  },
+
+  hidePayModal() {
+    this.setData({ showPayModal: false })
+  },
+
+  preventBubble() {},
+
+  confirmPay() {
+    wx.showToast({ title: '支付功能开发中', icon: 'none' })
+    this.setData({ showPayModal: false })
   },
 
   goToUserHome(e) {

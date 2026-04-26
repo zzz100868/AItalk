@@ -13,9 +13,9 @@ page {
   --bg-glass-ultra: rgba(255, 255, 255, 0.6);
 
   --text-primary: #1c1917;
-  --text-secondary: #57534e;
-  --text-tertiary: #78716c;
-  --text-muted: #a8a29e;
+  --text-secondary: #44403c;
+  --text-tertiary: #57534e;
+  --text-muted: #78716c;
 
   --accent: #c4715a;
   --accent-dim: rgba(196, 113, 90, 0.15);
@@ -33,9 +33,9 @@ page {
 
   /* ── Shadows (warm-tinted) ── */
   --shadow-sm: 0 2rpx 8rpx rgba(196, 113, 90, 0.04), 0 1rpx 3rpx rgba(0, 0, 0, 0.03);
-  --shadow-md: 0 8rpx 24rpx rgba(196, 113, 90, 0.06), 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 16rpx 48rpx rgba(196, 113, 90, 0.08), 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 24rpx 64rpx rgba(196, 113, 90, 0.12), 0 8rpx 24rpx rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8rpx 24rpx rgba(196, 113, 90, 0.06), 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 16rpx 48rpx rgba(196, 113, 90, 0.08), 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 24rpx 64rpx rgba(196, 113, 90, 0.12), 0 8rpx 24rpx rgba(0, 0, 0, 0.06);
   --shadow-glow: 0 0 40rpx rgba(196, 113, 90, 0.15);
 
   /* ── Motion ── */
@@ -289,7 +289,6 @@ page {
   backdrop-filter: saturate(200%) blur(40rpx);
   -webkit-backdrop-filter: saturate(200%) blur(40rpx);
   border-bottom: 1rpx solid rgba(28, 25, 23, 0.04);
-  box-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.5);
 }
 
 .page-header-bar .header-left {

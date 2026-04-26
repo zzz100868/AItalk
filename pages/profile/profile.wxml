@@ -1,10 +1,8 @@
 <view class="page">
-  <!-- 顶部氛围光晕背景 -->
   <view class="hero-glow"></view>
 
-  <!-- Header -->
-  <view class="page-header-bar">
-    <view class="header-left"></view>
+  <view class="dark-header">
+    <view style="width: 56rpx;"></view>
     <text class="header-title">我的</text>
     <view class="header-action">
       <view class="notification-dot"></view>

@@ -1,98 +1,110 @@
 <view class="page">
+  <!-- Cinematic Background -->
   <view class="ambient-bg">
-    <view class="mesh-orb mesh-orb-3" style="top: 40%; left: -10%;"></view>
+    <view class="orb orb-1"></view>
+    <view class="orb orb-2"></view>
+    <view class="orb orb-3"></view>
+    <view class="noise-layer"></view>
   </view>
 
-  <view class="page-header-bar">
-    <view class="header-left" bindtap="goToUserHome" data-author="{{myName}}">
+  <!-- Dark Header -->
+  <view class="dark-header">
+    <view bindtap="goToUserHome" data-author="{{myName}}">
       <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
     </view>
     <text class="header-title">匹配</text>
-    <view class="header-action">
-      <view class="notification-dot"></view>
-    </view>
+    <view style="width: 56rpx;"></view>
   </view>
 
   <view class="content">
     <view class="content-inner">
 
-      <!-- 匹配关闭状态 -->
+      <!-- Closed: Cinematic Timer -->
       <view wx:if="{{!isMatchOpen}}" class="closed-state anim-fade-in">
-        <view class="closed-icon">
-          <view class="clock-ring"></view>
-          <view class="clock-hand-hour"></view>
-          <view class="clock-hand-minute"></view>
+        <view class="closed-visual">
+          <view class="closed-ring">
+            <view class="closed-ring-inner">
+              <view class="closed-ring-dot"></view>
+            </view>
+          </view>
+          <text class="closed-emoji">🌙</text>
         </view>
-        <text class="closed-title">匹配尚未开启</text>
-        <text class="closed-desc">每周二开放一次匹配机会</text>
-        <view class="countdown-card">
-          <text class="countdown-label">距离下次开启</text>
+        <view class="closed-text">
+          <text class="closed-title">休眠中</text>
+          <text class="closed-desc">每周二开放一次灵魂匹配</text>
+        </view>
+        <view class="countdown-display">
+          <text class="countdown-label">下次开启</text>
           <text class="countdown-value">{{countdownText}}</text>
         </view>
       </view>
 
-      <!-- 未匹配：入口页 -->
+      <!-- Entry: Blind Box -->
       <view wx:elif="{{!isMatched}}" class="entry-state anim-fade-in">
-        <view class="entry-content">
-          <view class="entry-icon">
-            <view class="blind-box-icon"></view>
+        <view class="entry-hero">
+          <view class="box-stage">
+            <view class="box-glow"></view>
+            <view class="box-shape">
+              <text class="box-q">?</text>
+            </view>
+            <view class="box-orbit">
+              <view class="box-orbit-dot"></view>
+            </view>
           </view>
-          <text class="entry-title">周二盲盒</text>
-          <text class="entry-subtitle">每周一次，打开一个未知灵魂</text>
-          <view class="entry-btn-wrapper">
+          <view class="entry-text">
+            <text class="entry-title">盲盒</text>
+            <text class="entry-subtitle">每周一次，打开一个未知灵魂</text>
+          </view>
+          <view class="entry-cta">
             <view class="btn-match" bindtap="doMatch">
-              <text>匹配</text>
+              <text>开始匹配</text>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- 已匹配：结果页 -->
+      <!-- Result: Editorial Layout -->
       <view wx:else class="matched-result">
-        <!-- Back to blind box -->
         <view class="result-back-btn" bindtap="resetMatch">
           <view class="result-back-arrow"></view>
           <text class="result-back-text">重新匹配</text>
         </view>
 
-        <!-- Profile Card -->
-        <view class="profile-card anim-scale-in">
-          <image class="profile-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
-          <view class="profile-info">
-            <text class="profile-name">{{matchName}}</text>
-            <text class="profile-bio">{{matchBio}}</text>
-            <view class="tag-list">
-              <view class="tag" wx:for="{{tags}}" wx:key="index">{{item}}</view>
-            </view>
+        <!-- Hero -->
+        <view class="result-hero anim-scale-in">
+          <view class="hero-avatar-wrap">
+            <image class="hero-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
+            <view class="hero-avatar-ring"></view>
+          </view>
+          <text class="hero-name">{{matchName}}</text>
+          <text class="hero-bio">{{matchBio}}</text>
+          <view class="hero-tags">
+            <view class="hero-tag" wx:for="{{tags}}" wx:key="index">{{item}}</view>
           </view>
         </view>
 
-        <!-- Compatibility -->
-        <view class="compatibility-section anim-fade-in-up" style="animation-delay: 0.15s">
-          <view class="compatibility-header">
-            <text class="section-label">契合度</text>
-            <text class="compatibility-score">{{compatibility}}%</text>
+        <!-- Score -->
+        <view class="score-section anim-fade-in-up" style="animation-delay: 0.2s">
+          <text class="score-label">契合度</text>
+          <text class="score-number">{{compatibility}}<text class="score-unit">%</text></text>
+          <view class="score-bar">
+            <view class="score-fill" style="width: {{compatibility}}%;"></view>
           </view>
-          <view class="compatibility-bar">
-            <view class="compatibility-fill" style="width: {{compatibility}}%;"></view>
-          </view>
-          <text class="compatibility-desc">你们在生活节奏和价值观上高度同频</text>
+          <text class="score-desc">你们在生活节奏和价值观上高度同频</text>
         </view>
 
-        <!-- Why Matched -->
-        <view class="insight-section anim-fade-in-up" style="animation-delay: 0.25s">
-          <text class="section-label">为什么匹配</text>
-          <view class="insight-card">
-            <text class="quote-mark">"</text>
-            <text class="insight-text">{{matchInsight}}</text>
-          </view>
+        <!-- Insight -->
+        <view class="insight-block anim-fade-in-up" style="animation-delay: 0.35s">
+          <text class="insight-label">为什么匹配</text>
+          <text class="insight-quote">{{matchInsight}}</text>
         </view>
 
         <!-- Icebreakers -->
-        <view class="icebreaker-section anim-fade-in-up" style="animation-delay: 0.35s">
-          <text class="section-label">试试这样开场</text>
+        <view class="icebreaker-block anim-fade-in-up" style="animation-delay: 0.5s">
+          <text class="icebreaker-label">试试这样开场</text>
           <view class="icebreaker-list">
             <view class="icebreaker-item" wx:for="{{icebreakers}}" wx:key="index" bindtap="copyIcebreaker" data-text="{{item}}">
+              <text class="icebreaker-num">0{{index + 1}}</text>
               <text class="icebreaker-text">{{item}}</text>
               <view class="copy-btn">复制</view>
             </view>
@@ -101,6 +113,51 @@
 
         <view class="bottom-spacer"></view>
       </view>
+
+      <!-- Start Chat Button -->
+      <view wx:if="{{isMatched && !showPayModal}}" class="start-chat-bar anim-fade-in-up">
+        <view class="start-chat-btn" bindtap="showPayModal">
+          <text>开始聊天</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Pay Modal -->
+  <view wx:if="{{showPayModal}}" class="pay-modal-overlay" bindtap="hidePayModal">
+    <view class="pay-modal-dialog" catchtap="preventBubble">
+      <view class="pay-modal-close" bindtap="hidePayModal">
+        <view class="pay-close-icon"></view>
+      </view>
+      <view class="pay-modal-header">
+        <text class="pay-modal-title">解锁私密对话</text>
+        <text class="pay-modal-subtitle">与 {{matchName}} 开启一对一深度聊天</text>
+      </view>
+      <view class="pay-modal-body">
+        <view class="pay-price-tag">
+          <text class="pay-currency">¥</text>
+          <text class="pay-price">9.9</text>
+        </view>
+        <view class="pay-benefits">
+          <view class="pay-benefit-item">
+            <view class="pay-check"></view>
+            <text>无限条消息畅聊</text>
+          </view>
+          <view class="pay-benefit-item">
+            <view class="pay-check"></view>
+            <text>AI 智能匹配话题推荐</text>
+          </view>
+          <view class="pay-benefit-item">
+            <view class="pay-check"></view>
+            <text>聊天记录永久保存</text>
+          </view>
+        </view>
+      </view>
+      <view class="pay-modal-footer">
+        <view class="pay-btn" bindtap="confirmPay">
+          <text>立即解锁</text>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -108,27 +165,30 @@
   <view class="match-animation-overlay {{isMatching ? 'overlay-visible' : ''}}">
     <view class="animation-dim"></view>
 
-    <!-- 光芒爆发 -->
+    <!-- Light Burst -->
     <view class="light-burst {{matchPhase === 'glow' || matchPhase === 'reveal' ? 'light-burst-active' : ''}}">
-      <view class="light-ray-wrap" wx:for="{{12}}" wx:key="index" style="transform: rotate({{index * 30}}deg)">
-        <view class="light-ray-bar" style="animation-delay: {{index * 0.03}}s"></view>
+      <view class="light-ray-wrap" wx:for="{{16}}" wx:key="index" style="transform: rotate({{index * 22.5}}deg)">
+        <view class="light-ray-bar" style="animation-delay: {{index * 0.04}}s"></view>
       </view>
     </view>
 
-    <!-- 中心舞台 -->
+    <!-- Particles -->
+    <view class="particle-ring {{matchPhase === 'glow' || matchPhase === 'reveal' ? 'particle-active' : ''}}">
+      <view class="particle" wx:for="{{8}}" wx:key="index" style="--particle-end: translate({{(index % 2 === 0 ? 1 : -1) * (80 + index * 20)}}rpx, {{(index < 4 ? -1 : 1) * (60 + index * 15)}}rpx); animation-delay: {{0.1 + index * 0.06}}s;"></view>
+    </view>
+
+    <!-- Center Stage -->
     <view class="animation-center">
-      <!-- 摇晃盲盒 -->
       <view class="shake-box {{matchPhase === 'shake' ? 'shake-box-active' : 'shake-box-hidden'}}">
         <view class="shake-box-inner">
           <text class="shake-box-q">?</text>
         </view>
       </view>
 
-      <!-- 翻转卡片 -->
       <view class="flip-wrap {{matchPhase !== 'shake' ? 'flip-wrap-visible' : ''}}">
         <view class="flip-card {{matchPhase === 'reveal' ? 'flip-card-flipped' : ''}}">
           <view class="flip-side flip-side-front">
-            <view class="shake-box-inner">
+            <view class="shake-box-inner" style="width:100%;height:100%;border-radius:50%;">
               <text class="shake-box-q">?</text>
             </view>
           </view>
@@ -139,7 +199,6 @@
         </view>
       </view>
 
-      <!-- 揭示信息 -->
       <view class="reveal-meta {{matchPhase === 'reveal' ? 'reveal-meta-visible' : ''}}">
         <text class="reveal-meta-name">{{matchName}}</text>
         <text class="reveal-meta-score">契合度 {{compatibility}}%</text>

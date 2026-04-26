@@ -5,8 +5,8 @@
   <view class="ambient-gradient"></view>
 
   <!-- Header -->
-  <view class="page-header-bar">
-    <view class="header-left" bindtap="goToUserHome" data-author="林夕">
+  <view class="dark-header">
+    <view bindtap="goToUserHome" data-author="林夕">
       <image class="header-avatar" src="{{userAvatar}}" mode="aspectFill"/>
     </view>
     <text class="header-title">记忆库</text>
@@ -15,7 +15,7 @@
     </view>
   </view>
 
-  <scroll-view scroll-y class="content" enable-back-to-top scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
+  <scroll-view scroll-y class="content {{activeTab === 'chat' ? 'content-chat' : ''}}" enable-back-to-top scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
     <view class="content-inner">
       <!-- Tab Switcher -->
       <view class="tab-switcher anim-fade-in">
@@ -67,22 +67,8 @@
           </view>
         </view>
 
-        <!-- Chat Input -->
-        <view class="chat-input-area">
-          <view class="chat-input-box {{inputFocused ? 'chat-input-box-focused' : ''}}">
-            <input 
-              class="chat-input" 
-              placeholder="说点什么..." 
-              placeholder-class="input-placeholder" 
-              cursor-spacing="20"
-              bindfocus="onInputFocus" 
-              bindblur="onInputBlur"
-            />
-            <view class="send-btn">
-              <view class="send-arrow"></view>
-            </view>
-          </view>
-        </view>
+        <!-- Spacer for fixed chat input -->
+        <view class="chat-input-spacer"></view>
       </view>
 
       <!-- Memory View -->
@@ -170,6 +156,28 @@
       </view>
     </view>
   </scroll-view>
+
+  <!-- Fixed Chat Input Footer -->
+  <view wx:if="{{activeTab === 'chat'}}" class="chat-input-footer {{inputFocused ? 'chat-input-footer-focused' : ''}}">
+    <view class="chat-input-box">
+      <input 
+        class="chat-input" 
+        placeholder="说点什么..." 
+        placeholder-class="input-placeholder" 
+        cursor-spacing="20"
+        value="{{inputValue}}"
+        bindfocus="onInputFocus" 
+        bindblur="onInputBlur"
+        bindinput="onInputChange"
+        confirm-type="send"
+        bindconfirm="sendMessage"
+      />
+      <view class="send-btn {{inputValue ? 'send-btn-active' : ''}}" bindtap="sendMessage">
+        <view class="send-arrow"></view>
+      </view>
+    </view>
+    <view class="footer-safe-area"></view>
+  </view>
 
   <!-- Edit Modal -->
   <view wx:if="{{showEditModal}}" class="modal-overlay" bindtap="cancelEdit">

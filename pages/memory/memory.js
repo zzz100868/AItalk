@@ -146,8 +146,21 @@ Page({
     editId: null,
     editTitle: '',
     editContent: '',
-    scrollIntoView: ''
+    scrollIntoView: '',
+    inputValue: '',
+    isSending: false
   },
+
+  mockReplies: [
+    '这确实是个值得思考的问题。你怎么看？',
+    '我明白你的感受，有时候停下来反而能看得更清楚。',
+    '你提到的这个角度很有意思，能再多说一些吗？',
+    '听起来你最近经历了不少，想聊聊细节吗？',
+    '这种想法很有深度，我也有过类似的体会。',
+    '或许可以尝试从另一个角度来看待这件事。',
+    '你说得对，有时候我们需要给自己多一点耐心。',
+    '这让我想起了之前读过的一句话：「慢慢来，比较快」。'
+  ],
 
   onLoad(options) {
     if (options.tab) {
@@ -198,14 +211,54 @@ Page({
 
   onInputFocus() {
     this.setData({ inputFocused: true })
-    // 键盘唤起后滚动到最后一条消息，确保输入框不被遮挡
     setTimeout(() => {
       this.setData({ scrollIntoView: 'msg-last' })
     }, 200)
   },
 
   onInputBlur() {
-    this.setData({ inputFocused: false, scrollIntoView: '' })
+    this.setData({ inputFocused: false })
+  },
+
+  onInputChange(e) {
+    this.setData({ inputValue: e.detail.value })
+  },
+
+  sendMessage() {
+    const content = this.data.inputValue.trim()
+    if (!content || this.data.isSending) return
+
+    const messages = this.data.messages
+    const userMsg = {
+      id: Date.now(),
+      sender: 'user',
+      content: content
+    }
+    messages.push(userMsg)
+
+    this.setData({
+      messages,
+      inputValue: '',
+      isSending: true,
+      scrollIntoView: 'msg-last'
+    })
+
+    // Mock AI reply after 1-2 seconds
+    const delay = 1000 + Math.random() * 1000
+    setTimeout(() => {
+      const reply = this.mockReplies[Math.floor(Math.random() * this.mockReplies.length)]
+      const aiMsg = {
+        id: Date.now() + 1,
+        sender: 'ai',
+        content: reply
+      }
+      messages.push(aiMsg)
+      this.setData({
+        messages,
+        isSending: false,
+        scrollIntoView: 'msg-last'
+      })
+    }, delay)
   },
 
   showAttachMenu() {},
