@@ -1,5 +1,7 @@
 <view class="page">
-  <view class="ambient-bg"></view>
+  <view class="ambient-bg">
+    <view class="mesh-orb mesh-orb-3" style="top: 40%; left: -10%;"></view>
+  </view>
 
   <view class="page-header-bar">
     <view class="header-left" bindtap="goToUserHome" data-author="{{myName}}">
