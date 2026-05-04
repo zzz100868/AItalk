@@ -1,62 +1,69 @@
 # AItalk — 赛博聊机
 
-一个以「安静社交」为理念的小程序，主打 AI 陪伴、灵魂匹配和情绪广场。在喧嚣的社交网络中，为喜欢独处、深度思考和情绪敏感的人，提供一个低压力的数字空间。
+一个以「安静社交」为理念的微信小程序，主打 AI 陪伴和灵魂匹配。为喜欢独处、深度思考和情绪敏感的人提供一个低压力的数字空间。
+
+**当前阶段**：纯前端 Mock 实现，无后端服务接入。
 
 ---
 
-## 功能特性
+## 页面结构
 
-### 核心 Tab
+### 底部 Tab（3 项）
 
-| Tab | 功能描述 |
-|-----|---------|
-| **聊天** | 与 AI 伴侣「小雅」进行语音通话，支持静音、免提、通话计时 |
-| **广场** | 浏览社区动态，支持发帖（文字+图片）、点赞、评论、分享、删除自己的帖子 |
-| **匹配** | 查看契合度分析，获取破冰话术，与匹配对象发起对话 |
-| **记忆库** | AI 自动提炼对话中的洞察，分类归档（生活/情绪/兴趣/成长），生成用户人格档案 |
-| **我的** | 个人资料、关注/粉丝统计、我的动态、系统设置 |
 
-### 社交能力
+| Tab     | 页面                      | 功能                    |
+| ------- | ----------------------- | --------------------- |
+| **匹配**  | `pages/match/match`     | 灵魂匹配系统（当前 Mock 随机匹配）  |
+| **记忆库** | `pages/memory/memory`   | AI 对话、记忆洞察、人格档案（三栏结构） |
+| **我的**  | `pages/profile/profile` | 个人资料、相册管理、系统设置        |
 
-- **用户主页**：点击任何头像可进入个人主页，查看资料、统计和动态列表
-- **关注系统**：关注/取消关注实时联动，粉丝数跨页面同步
-- **互动体验**：进入他人主页后可点赞、评论对方的帖子
-- **编辑资料**：支持更换头像（相册/相机）、修改昵称和个人简介
 
-### 系统功能
+### 子页面
 
-- **设置中心**：账号与安全、隐私开关（公开动态、陌生人评论）、通知设置、清除缓存
-- **默认内容**：首次启动自动为当前用户预置 3 条动态，让广场不空
+
+| 页面                                               | 功能                               |
+| ------------------------------------------------ | -------------------------------- |
+| **聊天** `pages/index/index`                       | 与 AI「小雅」模拟语音通话（landing/call 双视图） |
+| **设置** `pages/settings/settings`                 | 编辑资料、账号安全、缓存清理                   |
+| **编辑资料** `pages/editProfile/editProfile`         | 修改头像/昵称/简介                       |
+| **用户主页** `pages/userHome/userHome`               | 查看自己和他人主页                        |
+| **账号安全** `pages/accountSecurity/accountSecurity` | 安全信息展示（纯 UI，操作 stub）             |
+| **通知** `pages/notifications/notifications`       | 通知中心（Mock 2 条）                   |
+
 
 ---
 
 ## 技术栈
 
 - **框架**：微信小程序原生开发
-- **样式**：CSS 变量 + rpx 响应式布局，自定义 Design System
+- **样式**：CSS 变量 + rpx 响应式布局
 - **数据持久化**：`wx.setStorage` / `wx.getStorage`
 - **头像生成**：DiceBear API（Notionists / Lorelei 风格）
+- **全局状态**：`app.globalData`（userInfo / memoryTargetTab / _cache）
 
 ---
 
 ## 项目结构
 
 ```
-├── app.js / app.json / app.wxss          # 小程序入口与全局配置
-├── custom-tab-bar/                       # 自定义底部 Tab Bar
+├── app.js / app.json / app.wxss     # 入口与全局配置
+├── custom-tab-bar/                  # 自定义底部 Tab Bar（3 项）
 ├── pages/
-│   ├── index/        # 聊天页（AI 语音通话）
-│   ├── explore/      # 广场（动态流、发帖面板）
-│   ├── match/        # 匹配（契合度、破冰话术、聊天弹窗）
-│   ├── memory/       # 记忆库（对话/记忆/档案三栏）
-│   ├── profile/      # 我的（个人资料、统计、入口菜单）
-│   ├── followers/    # 粉丝列表
-│   ├── following/    # 关注列表
-│   ├── moments/      # 我的动态
-│   ├── settings/     # 设置
-│   ├── editProfile/  # 编辑资料
-│   └── userHome/     # 用户主页（他人/自己）
-└── images/           # Tab Bar 图标资源
+│   ├── index/          # 聊天（AI 语音通话 Mock）
+│   ├── match/          # 匹配（随机匹配 + 动画）
+│   ├── memory/         # 记忆库（对话/记忆/档案）
+│   ├── profile/        # 我的（资料+相册）
+│   ├── settings/       # 设置
+│   ├── editProfile/    # 编辑资料
+│   ├── userHome/       # 用户主页
+│   ├── accountSecurity/ # 账号安全
+│   └── notifications/  # 通知中心
+├── components/         # 公共组件
+├── behaviors/          # 公共行为
+├── utils/              # 工具函数
+├── stores/             # 状态管理
+├── data/               # Mock 数据
+└── images/             # Tab Bar 图标
 ```
 
 ---
@@ -64,28 +71,16 @@
 ## 本地运行
 
 1. 克隆仓库
-   ```bash
-   git clone https://github.com/zzz100868/AItalk.git
-   cd AItalk
-   ```
-
 2. 使用 **微信开发者工具** 导入项目根目录
-
-3. 填写自己的 `appid`（测试号亦可），即可预览
-
----
-
-## 设计亮点
-
-- **低饱和度暖色调**：以 `#faf9f7` 为底，避免视觉疲劳
-- **CSS 动画系统**：fadeInUp、scaleIn、ringPulse 等统一动画变量
-- **自定义图标**：全部使用 CSS 伪元素绘制（心形、评论、箭头、相机等），零图标字体依赖
-- **安全区适配**：全局处理 `safe-area-inset-top` / `safe-area-inset-bottom`
+3. 填写 `appid`（测试号亦可），即可预览
 
 ---
 
-## 最近更新
+## 设计风格
 
-- 新增用户主页、设置、编辑资料、帖子删除
-- 关注/粉丝数字联动持久化
-- 性能优化：Storage 异步化、setData 路径更新、图片懒加载
+- **低饱和度暖色调**：以 `#faf9f7` 为底
+- **CSS 动画系统**：fadeInUp、scaleIn、ringPulse 等统一变量
+- **安全区适配**：全局处理 safe-area-inset-top/bottom
+
+---
+
