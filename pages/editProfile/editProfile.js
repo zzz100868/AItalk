@@ -13,19 +13,28 @@ Page({
   },
 
   onLoad() {
-    const profile = userStore.getProfile()
-    const avatar = profile.avatar
-    const nickName = profile.nickName
-    const bio = profile.bio
-
-    const data = {
-      avatar,
-      nickName,
-      id: this.data.id,
-      bio,
-      original: { avatar, nickName, bio }
-    }
-    this.setData(data)
+    // 从 API 拉最新数据（静默）
+    userStore.fetchProfile().then((profile) => {
+      const data = {
+        avatar: profile.avatar,
+        nickName: profile.nickName,
+        id: profile.id,
+        bio: profile.bio,
+        original: { avatar: profile.avatar, nickName: profile.nickName, bio: profile.bio }
+      }
+      this.setData(data)
+    }).catch(() => {
+      // 回落本地
+      const profile = userStore.getProfile()
+      const data = {
+        avatar: profile.avatar,
+        nickName: profile.nickName,
+        id: profile.id,
+        bio: profile.bio,
+        original: { avatar: profile.avatar, nickName: profile.nickName, bio: profile.bio }
+      }
+      this.setData(data)
+    })
   },
 
   _checkCanSave() {

@@ -1,4 +1,5 @@
 const common = require('../../utils/common.js')
+const api = require('../../utils/api.js')
 const mockData = require('../../data/mockData.js')
 const storage = common.storage
 
@@ -20,31 +21,33 @@ Page({
     }
     this.setData({ authorId: author })
 
-    const app = getApp()
-    const isMe = author === common.loadUserInfo().name
-
-    if (isMe) {
-      const saved = storage.get('userProfile', {})
-      this.setData({
-        isMe: true,
-        userInfo: {
-          name: saved.nickName || mockData.DEFAULT_USER.nickName,
-          handle: mockData.DEFAULT_USER.handle,
-          avatar: saved.avatar || app.globalData.userInfo.avatarUrl || mockData.DEFAULT_USER.avatar,
-          bio: saved.bio || mockData.DEFAULT_USER.bio
-        }
+    // 从 API 获取主页数据
+    api.get('/users/' + encodeURIComponent(author) + '/home')
+      .then((data) => {
+        this.setData({
+          isMe: data.isMe,
+          userInfo: {
+            name: data.name,
+            handle: data.handle,
+            avatar: data.avatar,
+            bio: data.bio
+          }
+        })
       })
-    } else {
-      this.setData({
-        isMe: false,
-        userInfo: {
-          name: author,
-          handle: '',
-          avatar: `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(author)}&size=400&backgroundColor=c7e6f5`,
-          bio: ''
-        }
+      .catch(() => {
+        // 回落本地 mock
+        const app = getApp()
+        const saved = storage.get('userProfile', {})
+        this.setData({
+          isMe: true,
+          userInfo: {
+            name: saved.nickName || mockData.DEFAULT_USER.nickName,
+            handle: mockData.DEFAULT_USER.handle,
+            avatar: saved.avatar || app.globalData.userInfo.avatarUrl || mockData.DEFAULT_USER.avatar,
+            bio: saved.bio || mockData.DEFAULT_USER.bio
+          }
+        })
       })
-    }
   },
 
   onShow() {

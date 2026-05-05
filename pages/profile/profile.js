@@ -1,5 +1,6 @@
 const common = require('../../utils/common.js')
 const userStore = require('../../stores/userStore.js')
+const api = require('../../utils/api.js')
 const mockData = require('../../data/mockData.js')
 const tabPage = require('../../behaviors/tabPage.js')
 const storage = common.storage
@@ -19,9 +20,6 @@ Page({
 
   onShow() {
     this.loadUserInfo()
-  },
-
-  onLoad() {
     this.loadPhotos()
   },
 
@@ -29,18 +27,30 @@ Page({
     const profile = userStore.getProfile()
     if (profile.avatar !== this.data.userInfo.avatar ||
         profile.nickName !== this.data.userInfo.nickName ||
-        profile.bio !== this.data.userInfo.bio) {
+        profile.bio !== this.data.userInfo.bio ||
+        profile.id !== this.data.userInfo.id) {
       this.setData({
+        'userInfo.id': profile.id,
         'userInfo.avatar': profile.avatar,
         'userInfo.nickName': profile.nickName,
         'userInfo.bio': profile.bio
       })
     }
+    // 静默从 API 拉最新数据
+    userStore.fetchProfile()
   },
 
   loadPhotos() {
-    const photos = storage.get('profilePhotos', [])
-    this.setData({ photos })
+    api.get('/me/photos')
+      .then((res) => {
+        const urls = res.photos.map(p => p.url)
+        this.setData({ photos: urls })
+        storage.set('profilePhotos', urls)
+      })
+      .catch(() => {
+        const photos = storage.get('profilePhotos', [])
+        this.setData({ photos })
+      })
   },
 
   savePhotos(photos) {
@@ -59,8 +69,9 @@ Page({
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       success: (res) => {
-        const newPaths = res.tempFiles.map(f => f.tempFilePath)
-        const photos = [...this.data.photos, ...newPaths].slice(0, 8)
+        const tempFile = res.tempFiles[0]
+        // Phase 1: 本地保存（后端 OSS 未接入，照片暂存本地路径）
+        const photos = [...this.data.photos, tempFile.tempFilePath].slice(0, 8)
         this.savePhotos(photos)
       }
     })

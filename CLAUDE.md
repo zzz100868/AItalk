@@ -114,6 +114,57 @@ All project documentation lives in `docs/` — see `docs/README.md` for the full
 - Treat `mockData.js` as the current frontend data contract and fallback source.
 - When adding backend APIs, add a service/API layer first; do not change page fields, UI structure, or interactions unless explicitly requested.
 
+## Backend (server/)
+
+NestJS + TypeScript + Prisma + PostgreSQL backend skeleton.
+
+```bash
+cd server
+npm install
+cp .env.example .env        # edit DATABASE_URL if needed
+npx prisma generate         # generate Prisma client
+npx prisma migrate dev      # create DB tables (requires running PostgreSQL)
+npm run start:dev           # dev mode with hot-reload on http://localhost:3000
+```
+
+Without PostgreSQL, the server starts in mock-only mode (DB operations will fail but /health works).
+
+### Key commands
+
+| Command | Purpose |
+|---|---|
+| `npm run start:dev` | Dev server with watch |
+| `npm run build` | Compile to dist/ |
+| `npx prisma studio` | Visual DB browser |
+| `npx prisma migrate dev --name <name>` | Create migration |
+
+### API routes (Phase 1)
+
+All routes are prefixed with `/api`. Auth routes require `Authorization: Bearer <token>` header.
+
+| Method | Path | Auth | Status |
+|---|---|---|---|
+| GET | /health | No | Returns `{status, timestamp}` |
+| POST | /auth/wx-login | No | Mock: generates user from code |
+| GET | /me | Yes | User profile |
+| PUT | /me | Yes | Update profile |
+| GET | /me/photos | Yes | Photo list |
+| POST | /me/photos | Yes | Add photo |
+| DELETE | /me/photos/:id | Yes | Delete photo |
+| GET | /users/:author/home | Yes | User home page |
+| GET | /memory/chat | Yes | Chat history |
+| POST | /memory/chat | Yes | Send message (mock AI reply) |
+| GET | /memory/insights | Yes | Insights list |
+| PUT | /memory/insights/:id | Yes | Edit insight |
+| DELETE | /memory/insights/:id | Yes | Delete insight |
+| GET | /memory/archive | Yes | Personality archive |
+| GET | /match/current | Yes | Match status |
+| POST | /match/do | Yes | Trigger match (mock candidates) |
+| POST | /match/:id/feedback | Yes | Submit feedback |
+| GET | /notifications | Yes | Notification list |
+| PUT | /notifications/read-all | Yes | Mark all read |
+| DELETE | /notifications | Yes | Clear all |
+
 ## Conventions
 
 - All documents are in Chinese (Simplified)

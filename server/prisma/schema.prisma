@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 用户域 ============
+
+model User {
+  id                String   @id @default(cuid())
+  openid            String   @unique
+  unionid           String?
+  nickname          String   @default("")
+  avatar            String   @default("")
+  gender            String?
+  city              String?
+  birthYear         Int?     @map("birth_year")
+  orientation       String?
+  bio               String   @default("")
+  realNameVerified  Boolean  @default(false) @map("real_name_verified")
+  verifyProvider    String?  @map("verify_provider")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  photos        UserPhoto[]
+  settings      UserSettings?
+  chatMessages  MemoryChatMessage[]
+  insights      MemoryInsight[]
+  profileDoc    ProfileDocument?
+  notifications Notification[]
+
+  matchResultsAsA MatchResult[] @relation("MatchUserA")
+  matchResultsAsB MatchResult[] @relation("MatchUserB")
+  matchFeedbacks  MatchFeedback[]
+
+  @@map("users")
+}
+
+model UserPhoto {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  photoUrl  String   @map("photo_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_photos")
+}
+
+model UserSettings {
+  userId            String  @id @map("user_id")
+  notifyWeeklyMatch Boolean @default(true) @map("notify_weekly_match")
+  privacyLevel      String  @default("normal") @map("privacy_level")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_settings")
+}
+
+// ============ 记忆域 ============
+
+model MemoryChatMessage {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  sender    String   // "user" | "ai"
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("memory_chat_messages")
+}
+
+model MemoryInsight {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String
+  content   String
+  tag       String   // "生活" | "情绪" | "兴趣" | "成长"
+  tagColor  String   @map("tag_color") // "secondary" | "tertiary" | "primary"
+  category  String   // "life" | "emotion" | "hobby" | "growth"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("memory_insights")
+}
+
+model ProfileDocument {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  data      Json     // 完整画像 JSONB, 含 dimensions / aboutMe / personalities / traits
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("profile_documents")
+}
+
+// ============ 语音域 (预留) ============
+
+model VoiceSession {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  durationSec Int?      @map("duration_sec")
+  status      String    @default("ongoing") // "ongoing" | "ended" | "timeout"
+  roundNo     Int       @default(1) @map("round_no")
+
+  turns DialogueTurn[]
+
+  @@map("voice_sessions")
+}
+
+model DialogueTurn {
+  id            String   @id @default(cuid())
+  sessionId     String   @map("session_id")
+  idx           Int
+  role          String   // "user" | "ai"
+  text          String
+  audioUrl      String?  @map("audio_url")
+  asrConfidence Float?   @map("asr_confidence")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  session VoiceSession @relation(fields: [sessionId], references: [id])
+
+  @@map("dialogue_turns")
+}
+
+// ============ 匹配域 ============
+
+model MatchRound {
+  id          String   @id @default(cuid())
+  scheduledAt DateTime @map("scheduled_at")
+  status      String   @default("pending") // "pending" | "generating" | "published"
+
+  results MatchResult[]
+
+  @@map("match_rounds")
+}
+
+model MatchResult {
+  id          String  @id @default(cuid())
+  roundId     String  @map("round_id")
+  userAId     String  @map("user_a_id")
+  userBId     String  @map("user_b_id")
+  score       Int
+  reasonText  String  @map("reason_text")
+  icebreakers Json    // string[]
+  insightText String  @map("insight_text")
+  unlockedByA Boolean @default(false) @map("unlocked_by_a")
+  unlockedByB Boolean @default(false) @map("unlocked_by_b")
+
+  round  MatchRound    @relation(fields: [roundId], references: [id])
+  userA  User          @relation("MatchUserA", fields: [userAId], references: [id])
+  userB  User          @relation("MatchUserB", fields: [userBId], references: [id])
+  feedbacks MatchFeedback[]
+
+  @@map("match_results")
+}
+
+model MatchFeedback {
+  id         String  @id @default(cuid())
+  matchId    String  @map("match_id")
+  userId     String  @map("user_id")
+  sentiment  String  // "positive" | "negative" | "skip"
+  skipReason String? @map("skip_reason")
+  comments   String?
+
+  match MatchResult @relation(fields: [matchId], references: [id])
+  user  User        @relation(fields: [userId], references: [id])
+
+  @@map("match_feedback")
+}
+
+// ============ 通知域 ============
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  type       String   // "match" | "system"
+  authorName String   @map("author_name")
+  authorAvatar String @map("author_avatar")
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}

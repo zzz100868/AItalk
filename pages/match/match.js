@@ -1,4 +1,5 @@
 const common = require('../../utils/common.js')
+const api = require('../../utils/api.js')
 const mockData = require('../../data/mockData.js')
 const tabPage = require('../../behaviors/tabPage.js')
 
@@ -22,23 +23,49 @@ Page({
       this.countdownTimer = null
     }
 
-    // 测试版开关：设为 true 则始终开放匹配，设为 false 则走正式逻辑（每周二开放）
-    const TEST_MODE = true
+    // 调 API 获取匹配状态
+    api.get('/match/current')
+      .then((res) => {
+        this.setData({
+          isMatchOpen: res.isOpen,
+          isMatched: res.hasResult,
+        })
 
-    let isOpen
-    if (TEST_MODE) {
-      isOpen = true
-    } else {
-      const now = new Date()
-      isOpen = now.getDay() === 2 // 每周二开放
-    }
+        // 如果有已匹配结果，直接加载到页面上
+        if (res.match) {
+          this.setData({
+            matchAvatar: res.match.avatar,
+            matchName: res.match.name,
+            matchBio: res.match.bio,
+            compatibility: res.match.compatibility,
+            tags: res.match.tags,
+            icebreakers: res.match.icebreakers,
+            matchInsight: res.match.insight,
+          })
+        }
 
-    this.setData({ isMatchOpen: isOpen })
+        if (!res.isOpen && res.nextOpenAt) {
+          this._nextOpenAt = new Date(res.nextOpenAt)
+          this.updateCountdown()
+          this.countdownTimer = setInterval(() => this.updateCountdown(), 1000)
+        }
+      })
+      .catch(() => {
+        // API 不可用时回退本地判断
+        const TEST_MODE = true
+        let isOpen
+        if (TEST_MODE) {
+          isOpen = true
+        } else {
+          isOpen = new Date().getDay() === 2
+        }
+        this.setData({ isMatchOpen: isOpen })
 
-    if (!isOpen) {
-      this.updateCountdown()
-      this.countdownTimer = setInterval(() => this.updateCountdown(), 1000)
-    }
+        if (!isOpen) {
+          this.updateCountdown()
+          this.countdownTimer = setInterval(() => this.updateCountdown(), 1000)
+        }
+      })
   },
 
   onHide() {
@@ -50,13 +77,17 @@ Page({
   },
 
   updateCountdown() {
-    const now = new Date()
-    const nextTuesday = new Date(now)
-    const daysUntilTuesday = (2 - now.getDay() + 7) % 7
-    nextTuesday.setDate(now.getDate() + daysUntilTuesday)
-    nextTuesday.setHours(0, 0, 0, 0)
+    const target = this._nextOpenAt || (() => {
+      const now = new Date()
+      const next = new Date(now)
+      const daysUntilTuesday = (2 - now.getDay() + 7) % 7
+      next.setDate(now.getDate() + daysUntilTuesday)
+      next.setHours(0, 0, 0, 0)
+      return next
+    })()
 
-    const diff = nextTuesday - now
+    const now = new Date()
+    const diff = target - now
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
@@ -87,39 +118,53 @@ Page({
     icebreakers: [],
     matchInsight: '',
     showPayModal: false,
-
-    candidates: mockData.getMatchCandidates(),
-
   },
+
+  _nextOpenAt: null,
 
   doMatch() {
     if (this._matching) return
     this._matching = true
-    const candidates = this.data.candidates
-    if (candidates.length === 0) {
-      this._matching = false
-      wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
-      return
-    }
-    let randomIndex
-    // 避免连续两次匹配到同一个人
-    do {
-      randomIndex = Math.floor(Math.random() * candidates.length)
-    } while (candidates.length > 1 && candidates[randomIndex].name === this.data.matchName)
 
-    const match = candidates[randomIndex]
+    // 调 API 触发匹配
+    api.post('/match/do')
+      .then((res) => {
+        if (!res.success || !res.match) {
+          this._matching = false
+          wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
+          return
+        }
+        const match = res.match
+        this._startMatchAnimation(match)
+      })
+      .catch((err) => {
+        // API 失败，回退本地 mock 随机抽取
+        const candidates = mockData.getMatchCandidates()
+        if (candidates.length === 0) {
+          this._matching = false
+          wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
+          return
+        }
+        let randomIndex
+        do {
+          randomIndex = Math.floor(Math.random() * candidates.length)
+        } while (candidates.length > 1 && candidates[randomIndex].name === this.data.matchName)
 
-    // 先准备好匹配数据并进入动画
+        this._startMatchAnimation(candidates[randomIndex])
+      })
+  },
+
+  _startMatchAnimation(match) {
     this.setData({
       isMatching: true,
       matchPhase: 'shake',
-      matchAvatar: match.avatar,
-      matchName: match.name,
-      matchBio: match.bio,
-      compatibility: match.compatibility,
-      tags: match.tags,
-      icebreakers: match.icebreakers,
-      matchInsight: match.insight,
+      matchAvatar: match.avatar || '',
+      matchName: match.name || '',
+      matchBio: match.bio || '',
+      compatibility: match.compatibility || 0,
+      tags: match.tags || [],
+      icebreakers: match.icebreakers || [],
+      matchInsight: match.insight || '',
     })
 
     // 阶段1 → 阶段2：光芒发散（900ms）

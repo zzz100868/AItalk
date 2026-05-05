@@ -1,10 +1,12 @@
 const mockData = require('./data/mockData.js')
+const api = require('./utils/api.js')
 
 App({
   onLaunch() {
     console.log('赛博聊机小程序启动')
     this._hasEntered = false
     this._prefetchData()
+    this._tryLogin()
   },
 
   onShow() {
@@ -18,6 +20,49 @@ App({
     if (this._ignoreRelaunch) {
       this._ignoreRelaunch = false
     }
+  },
+
+  /** 微信静默登录 -> 拿 JWT + 用户信息 */
+  _tryLogin() {
+    const existingToken = api.getToken()
+    if (existingToken && wx.getStorageSync('userProfile')) {
+      // 已有 token 和缓存，跳过重新登录
+      return
+    }
+
+    wx.login({
+      success: (res) => {
+        if (!res.code) {
+          console.warn('[auth] wx.login failed:', res.errMsg)
+          return
+        }
+        api.post('/auth/wx-login', { code: res.code }, { noAuth: true })
+          .then((data) => {
+            api.setToken(data.token)
+            // 写 storage + globalData
+            const profile = {
+              id: data.user.id,
+              nickName: data.user.nickname,
+              avatar: data.user.avatar,
+              bio: data.user.bio,
+            }
+            wx.setStorageSync('userProfile', profile)
+            this.globalData.userInfo.nickName = data.user.nickname
+            this.globalData.userInfo.avatarUrl = data.user.avatar
+            this.globalData.userInfo.id = data.user.id
+            if (this.globalData._cache) {
+              this.globalData._cache.profile = profile
+            }
+            console.log('[auth] login ok, user:', data.user.id)
+          })
+          .catch((err) => {
+            console.warn('[auth] wx-login api failed:', err.message || err)
+          })
+      },
+      fail: (err) => {
+        console.warn('[auth] wx.login error:', err.errMsg)
+      },
+    })
   },
 
   _prefetchData() {

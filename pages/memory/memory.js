@@ -1,4 +1,5 @@
 const common = require('../../utils/common.js')
+const api = require('../../utils/api.js')
 const mockData = require('../../data/mockData.js')
 const tabPage = require('../../behaviors/tabPage.js')
 const storage = common.storage
@@ -12,18 +13,18 @@ Page({
     this.setData({ userName: info.name, userAvatar: info.avatar })
     const app = getApp()
     const targetTab = app.globalData.memoryTargetTab
-    console.log('[memory] onShow, targetTab:', targetTab, 'current activeTab:', this.data.activeTab)
     if (targetTab) {
       app.globalData.memoryTargetTab = null
       const tabMap = { chat: 0, memory: 100, archive: 200 }
-      console.log('[memory] switching to tab:', targetTab, 'sliderX:', tabMap[targetTab])
       this.setData({
         activeTab: targetTab,
         tabSliderX: tabMap[targetTab] || 0
       }, () => {
-        console.log('[memory] setData callback, activeTab:', this.data.activeTab)
         if (targetTab === 'chat') {
           this.scrollChatToBottom()
+        } else if (targetTab === 'archive') {
+          this.loadArchive()
+          this.scrollContentToTop()
         } else {
           this.scrollContentToTop()
         }
@@ -82,10 +83,7 @@ Page({
     }, 200)
   },
 
-  mockReplies: mockData.MEMORY_REPLIES,
-
   onLoad(options) {
-    console.log('[memory] onLoad, options:', options, 'current activeTab:', this.data.activeTab)
     const app = getApp()
     const tab = app.globalData.memoryTargetTab || options.tab
     if (tab) {
@@ -96,7 +94,11 @@ Page({
         tabSliderX: tabMap[tab] || 0
       }, () => {
         if (tab === 'chat') {
+          this.loadChatHistory()
           this.scrollChatToBottom()
+        } else if (tab === 'archive') {
+          this.loadArchive()
+          this.scrollContentToTop()
         } else {
           this.scrollContentToTop()
         }
@@ -137,8 +139,6 @@ Page({
     const sysInfo = common.getSystemInfo()
     const rpxRatio = 750 / sysInfo.windowWidth
     const safeRpx = (sysInfo.safeAreaInsets?.bottom || 0) * rpxRatio
-    // Reserve just enough room for the fixed input footer so the latest
-    // message sits close to the composer without being covered.
     const padding = Math.ceil(188 + safeRpx)
     if (this.data.chatPaddingBottom !== padding) {
       this.setData({ chatPaddingBottom: padding }, () => {
@@ -149,28 +149,76 @@ Page({
     }
   },
 
-  loadInsights() {
-    const stored = storage.get('memoryInsights', null)
-    if (stored && stored.length > 0) {
-      this.setData({ insights: stored }, () => {
-        this.filterInsights()
+  /** 从 API 加载聊天历史 */
+  loadChatHistory() {
+    api.get('/memory/chat', { limit: 50 })
+      .then((res) => {
+        this.setData({
+          messages: res.data.length > 0 ? res.data : memoryData.messages,
+          chatDays: res.meta.chatDays,
+          chatMood: res.meta.chatMood,
+          chatTopics: res.meta.chatTopics,
+        })
       })
-    } else {
-      storage.set('memoryInsights', this.data.insights)
-      this.filterInsights()
-    }
+      .catch(() => {
+        // 回落 mock
+        this.setData({ messages: memoryData.messages })
+      })
+  },
+
+  /** 从 API 加载洞察列表 */
+  loadInsights() {
+    api.get('/memory/insights')
+      .then((res) => {
+        this.setData({ insights: res.data }, () => {
+          this.filterInsights()
+          storage.set('memoryInsights', res.data)
+        })
+      })
+      .catch(() => {
+        // 回落本地缓存
+        const stored = storage.get('memoryInsights', null)
+        if (stored && stored.length > 0) {
+          this.setData({ insights: stored }, () => this.filterInsights())
+        } else {
+          storage.set('memoryInsights', this.data.insights)
+          this.filterInsights()
+        }
+      })
+  },
+
+  /** 从 API 加载人格档案 */
+  loadArchive() {
+    api.get('/memory/archive')
+      .then((res) => {
+        this.setData({
+          aboutMe: res.aboutMe || memoryData.aboutMe,
+          personalities: res.personalities || memoryData.personalities,
+          traits: res.traits || memoryData.traits,
+        })
+      })
+      .catch(() => {
+        this.setData({
+          aboutMe: memoryData.aboutMe,
+          personalities: memoryData.personalities,
+          traits: memoryData.traits,
+        })
+      })
   },
 
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
     const tabMap = { chat: 0, memory: 100, archive: 200 }
-    console.log('[memory] manual switchTab to:', tab)
     this.setData({
       activeTab: tab,
       tabSliderX: tabMap[tab]
     }, () => {
       if (tab === 'chat') {
+        this.loadChatHistory()
         setTimeout(() => this.scrollChatToBottom(), 100)
+      } else if (tab === 'archive') {
+        this.loadArchive()
+        this.scrollContentToTop()
       } else {
         this.scrollContentToTop()
       }
@@ -239,37 +287,66 @@ Page({
       isSending: true
     }, () => this.scrollChatToBottom())
 
-    const delay = 600 + Math.random() * 600
-    this._typeTimer = setTimeout(() => {
-      const reply = this.mockReplies[Math.floor(Math.random() * this.mockReplies.length)]
-      const aiMsg = {
-        id: this._nextMsgId(),
-        sender: 'ai',
-        content: ''
-      }
-      const newMessages = [...messages, aiMsg]
-      this.setData({
-        messages: newMessages
-      }, () => this.scrollChatToBottom())
-
-      let i = 0
-      const batchSize = 3
-      const typeNext = () => {
-        if (i >= reply.length) {
-          this.setData({ isSending: false })
-          return
+    // 调 API 获取 AI 回复
+    api.post('/memory/chat', { content })
+      .then((res) => {
+        const replyText = res.reply.content
+        const aiMsg = {
+          id: this._nextMsgId(),
+          sender: 'ai',
+          content: ''
         }
-        const chunk = reply.slice(i, i + batchSize)
-        aiMsg.content += chunk
-        i += chunk.length
-        this.setData({
-          [`messages[${newMessages.length - 1}].content`]: aiMsg.content
-        })
-        this._scrollThrottle()
-        this._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
-      }
-      typeNext()
-    }, delay)
+        const newMessages = [...messages, aiMsg]
+        this.setData({ messages: newMessages }, () => this.scrollChatToBottom())
+
+        // 保持逐字打字效果
+        let i = 0
+        const batchSize = 3
+        const typeNext = () => {
+          if (i >= replyText.length) {
+            this.setData({ isSending: false })
+            return
+          }
+          const chunk = replyText.slice(i, i + batchSize)
+          aiMsg.content += chunk
+          i += chunk.length
+          this.setData({
+            [`messages[${newMessages.length - 1}].content`]: aiMsg.content
+          })
+          this._scrollThrottle()
+          this._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
+        }
+        typeNext()
+      })
+      .catch(() => {
+        // API 失败，回退 mock 回复
+        const reply = mockData.MEMORY_REPLIES[Math.floor(Math.random() * mockData.MEMORY_REPLIES.length)]
+        const aiMsg = {
+          id: this._nextMsgId(),
+          sender: 'ai',
+          content: ''
+        }
+        const newMessages = [...messages, aiMsg]
+        this.setData({ messages: newMessages }, () => this.scrollChatToBottom())
+
+        let i = 0
+        const batchSize = 3
+        const typeNext = () => {
+          if (i >= reply.length) {
+            this.setData({ isSending: false })
+            return
+          }
+          const chunk = reply.slice(i, i + batchSize)
+          aiMsg.content += chunk
+          i += chunk.length
+          this.setData({
+            [`messages[${newMessages.length - 1}].content`]: aiMsg.content
+          })
+          this._scrollThrottle()
+          this._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
+        }
+        typeNext()
+      })
   },
 
   onInsightLongPress(e) {
@@ -293,12 +370,24 @@ Page({
       confirmColor: '#c4715a',
       success: (res) => {
         if (res.confirm) {
-          const insights = this.data.insights.filter(i => i.id !== id)
-          this.setData({ insights }, () => {
-            this.filterInsights()
-          })
-          storage.set('memoryInsights', insights)
-          wx.showToast({ title: '已删除', icon: 'none' })
+          api.del('/memory/insights/' + id)
+            .then(() => {
+              const insights = this.data.insights.filter(i => i.id !== id)
+              this.setData({ insights }, () => {
+                this.filterInsights()
+              })
+              storage.set('memoryInsights', insights)
+              wx.showToast({ title: '已删除', icon: 'none' })
+            })
+            .catch(() => {
+              // 本地删除
+              const insights = this.data.insights.filter(i => i.id !== id)
+              this.setData({ insights }, () => {
+                this.filterInsights()
+              })
+              storage.set('memoryInsights', insights)
+              wx.showToast({ title: '已删除', icon: 'none' })
+            })
         }
       }
     })
@@ -333,15 +422,30 @@ Page({
       wx.showToast({ title: '标题和内容不能为空', icon: 'none' })
       return
     }
-    const idx = insights.findIndex(i => i.id === editId)
-    if (idx === -1) return
-    insights[idx].title = editTitle.trim()
-    insights[idx].content = editContent.trim()
-    this.setData({ insights, showEditModal: false, editId: null }, () => {
-      this.filterInsights()
-    })
-    storage.set('memoryInsights', insights)
-    wx.showToast({ title: '已保存', icon: 'none' })
+    api.put('/memory/insights/' + editId, { title: editTitle.trim(), content: editContent.trim() })
+      .then((updated) => {
+        const idx = insights.findIndex(i => i.id === editId)
+        if (idx > -1) {
+          insights[idx] = { ...insights[idx], ...updated }
+        }
+        this.setData({ insights, showEditModal: false, editId: null }, () => {
+          this.filterInsights()
+        })
+        storage.set('memoryInsights', insights)
+        wx.showToast({ title: '已保存', icon: 'none' })
+      })
+      .catch(() => {
+        // 本地保存
+        const idx = insights.findIndex(i => i.id === editId)
+        if (idx === -1) return
+        insights[idx].title = editTitle.trim()
+        insights[idx].content = editContent.trim()
+        this.setData({ insights, showEditModal: false, editId: null }, () => {
+          this.filterInsights()
+        })
+        storage.set('memoryInsights', insights)
+        wx.showToast({ title: '已保存', icon: 'none' })
+      })
   },
 
   goToUserHome(e) {
