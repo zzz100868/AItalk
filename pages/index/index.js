@@ -13,16 +13,46 @@ Page({
     userName: mockData.DEFAULT_USER.nickName,
     aiName: mockData.AI_USERS.xiaoya.name,
     aiAvatar: mockData.AI_USERS.xiaoya.avatar,
-    userAvatar: mockData.DEFAULT_USER.avatarSmall
+    userAvatar: mockData.DEFAULT_USER.avatarSmall,
+    // Form fields
+    ageRange: Array.from({ length: 63 }, (_, i) => i + 18),
+    ageIndex: -1,
+    genderOptions: ['男', '女', '其他'],
+    gender: '',
+    orientationOptions: ['异性恋', '同性恋', '双性恋', '其他'],
+    orientation: '',
+    identityOptions: ['学生', '上班族', '自由职业', '创业者', '其他'],
+    identityIndex: -1,
+    mbtiOptions: ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'],
+    mbtiIndex: -1,
+    recentStatus: '',
+    canStart: false
   },
 
   onLoad(options) {
     if (options.mode === 'call') {
       this.setData({ viewMode: 'call' })
     }
+    const saved = common.storage.get('basicInfo', null)
+    if (saved) {
+      const ageIndex = this.data.ageRange.indexOf(saved.age)
+      const identityIndex = this.data.identityOptions.indexOf(saved.identity)
+      const mbtiIndex = this.data.mbtiOptions.indexOf(saved.mbti)
+      this.setData({
+        ageIndex: ageIndex >= 0 ? ageIndex : -1,
+        gender: saved.gender || '',
+        orientation: saved.orientation || '',
+        identityIndex: identityIndex >= 0 ? identityIndex : -1,
+        mbtiIndex: mbtiIndex >= 0 ? mbtiIndex : -1,
+        recentStatus: saved.recentStatus || ''
+      }, () => this._checkCanStart())
+    }
   },
 
   onShow() {
+    if (this.data.isTransitioning) {
+      this.setData({ isTransitioning: false })
+    }
     const info = common.loadUserInfo()
     this.setData({ userName: info.name, userAvatar: info.avatar })
     if (this.data.isCalling && this.callStartedAt) {
@@ -43,8 +73,54 @@ Page({
     if (this.data.isTransitioning) return
     this.setData({ isTransitioning: true })
     setTimeout(() => {
-      this.setData({ viewMode: 'call', isCalling: false, isTransitioning: false })
+      this.setData({ viewMode: 'form', isTransitioning: false })
     }, 650)
+  },
+
+  _checkCanStart() {
+    const { ageIndex, gender, orientation, identityIndex, mbtiIndex, recentStatus } = this.data
+    const canStart = ageIndex !== -1 && gender && orientation && identityIndex !== -1 && mbtiIndex !== -1 && recentStatus.trim().length > 0
+    if (canStart !== this.data.canStart) {
+      this.setData({ canStart })
+    }
+  },
+
+  onIdentityChange(e) {
+    this.setData({ identityIndex: parseInt(e.detail.value) }, () => this._checkCanStart())
+  },
+
+  onMbtiChange(e) {
+    this.setData({ mbtiIndex: parseInt(e.detail.value) }, () => this._checkCanStart())
+  },
+
+  onStatusInput(e) {
+    this.setData({ recentStatus: e.detail.value }, () => this._checkCanStart())
+  },
+
+  onAgeChange(e) {
+    this.setData({ ageIndex: parseInt(e.detail.value) }, () => this._checkCanStart())
+  },
+
+  selectGender(e) {
+    this.setData({ gender: e.currentTarget.dataset.value }, () => this._checkCanStart())
+  },
+
+  selectOrientation(e) {
+    this.setData({ orientation: e.currentTarget.dataset.value }, () => this._checkCanStart())
+  },
+
+  submitForm() {
+    if (!this.data.canStart) return
+    const { ageRange, ageIndex, gender, orientation, identityOptions, identityIndex, mbtiOptions, mbtiIndex, recentStatus } = this.data
+    common.storage.set('basicInfo', {
+      age: ageRange[ageIndex],
+      gender,
+      orientation,
+      identity: identityOptions[identityIndex],
+      mbti: mbtiOptions[mbtiIndex],
+      recentStatus: recentStatus.trim()
+    })
+    this.setData({ viewMode: 'call', isCalling: false })
   },
 
   startCall() {
