@@ -182,6 +182,36 @@
   flex-shrink: 0;
 }
 
+.load-more-hint {
+  text-align: center;
+  padding: 20rpx 0;
+}
+
+.load-more-text {
+  font-size: 22rpx;
+  color: #a8a29e;
+  letter-spacing: 0.04em;
+}
+
+.load-more-spinner-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 24rpx 0;
+}
+
+.load-more-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 3rpx solid rgba(196, 113, 90, 0.2);
+  border-top-color: var(--accent, #c4715a);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .msg-row {
   display: flex;
   width: 100%;

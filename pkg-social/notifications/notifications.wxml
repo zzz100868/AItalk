@@ -49,16 +49,7 @@
       </view>
 
       <!-- Skeleton Screen -->
-      <view wx:if="{{isLoading}}" class="skeleton-wrap">
-        <view class="skeleton-notification" wx:for="{{[1,2,3,4]}}" wx:key="*this">
-          <view class="skeleton-avatar"></view>
-          <view class="skeleton-body">
-            <view class="skeleton-line skeleton-line-short"></view>
-            <view class="skeleton-line skeleton-line-shorter"></view>
-            <view class="skeleton-line skeleton-line-medium"></view>
-          </view>
-        </view>
-      </view>
+      <skeleton variant="list" rows="4" active="{{isLoading}}" />
 
       <!-- Error State -->
       <view wx:if="{{!isLoading && loadError}}" class="error-state anim-fade-in-up">
@@ -85,7 +76,7 @@
         >
           <view class="notification-main" bindtap="handleNotificationTap" data-index="{{index}}">
             <view class="notification-avatar-wrap">
-              <image class="notification-avatar" src="{{item.avatar}}" mode="aspectFill"/>
+              <image class="notification-avatar" src="{{item.avatar}}" mode="aspectFill" lazy-load/>
               <view class="notification-type-icon type-{{item.type}}"></view>
             </view>
             <view class="notification-body">

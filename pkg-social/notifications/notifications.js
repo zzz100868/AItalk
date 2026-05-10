@@ -77,7 +77,7 @@ Page({
 
     if (item.type === 'follow') {
       wx.navigateTo({
-        url: `/pages/userHome/userHome?author=${encodeURIComponent(item.author)}`
+        url: `/pkg-social/userHome/userHome?author=${encodeURIComponent(item.author)}`
       })
     }
   },

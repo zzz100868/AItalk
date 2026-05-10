@@ -15,7 +15,7 @@
           <view class="avatar-ring-outer"></view>
           <view class="avatar-ring-mid"></view>
           <view class="avatar-frame">
-            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
           </view>
         </view>
       </view>
@@ -199,7 +199,7 @@
         <block wx:if="{{!isCalling}}">
           <view class="avatar-zone call-avatar-enter">
             <view class="avatar-frame-static">
-              <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+              <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
               <view class="avatar-overlay"></view>
             </view>
             <view class="avatar-offline-ring"></view>
@@ -230,7 +230,7 @@
             <view class="avatar-ring-mid"></view>
             <view class="avatar-float">
               <view class="avatar-frame">
-                <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+                <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
                 <view class="avatar-overlay"></view>
               </view>
             </view>

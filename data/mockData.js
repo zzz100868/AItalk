@@ -1,3 +1,5 @@
+const FALLBACK_AVATAR = '/images/avatar_fallback.png'
+
 const DEFAULT_USER = {
   name: '林夕',
   nickName: '林夕',
@@ -235,6 +237,7 @@ function cloneData(data) {
 module.exports = {
   DEFAULT_USER,
   AI_USERS,
+  FALLBACK_AVATAR,
   MEMORY_REPLIES,
   getMatchCandidates: () => cloneData(MATCH_CANDIDATES),
   getMemoryData: () => cloneData(MEMORY_DATA)

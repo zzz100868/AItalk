@@ -39,6 +39,9 @@ Component({
       if (this.data.showAvatar) {
         this.triggerEvent('avatartap', { author: this.data.author })
       }
+    },
+    onAvatarError() {
+      this.setData({ avatar: '/images/avatar_fallback.png' })
     }
   }
 })

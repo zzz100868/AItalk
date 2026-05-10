@@ -1,13 +1,20 @@
-const common = require('../../utils/common.js')
-const mockData = require('../../data/mockData.js')
-const tabPage = require('../../behaviors/tabPage.js')
+var common = require('../../utils/common.js')
+var mockData = require('../../data/mockData.js')
+var tabPage = require('../../behaviors/tabPage.js')
+var connectPage = require('../../stores/connect.js').connectPage
 
 Page({
-  behaviors: [tabPage(0)],
+  behaviors: [
+    tabPage(0),
+    connectPage('user', function (state) {
+      return {
+        myName: state.nickName || mockData.DEFAULT_USER.nickName,
+        userAvatar: state.avatar || mockData.DEFAULT_USER.avatarSmall
+      }
+    })
+  ],
 
   onShow() {
-    const info = common.loadUserInfo()
-    this.setData({ myName: info.name, userAvatar: info.avatar })
     this.checkMatchStatus()
   },
 
@@ -16,22 +23,13 @@ Page({
   },
 
   checkMatchStatus() {
-    // 先清理已有定时器，避免重复创建
     if (this.countdownTimer) {
       clearInterval(this.countdownTimer)
       this.countdownTimer = null
     }
 
-    // 测试版开关：设为 true 则始终开放匹配，设为 false 则走正式逻辑（每周二开放）
-    const TEST_MODE = true
-
-    let isOpen
-    if (TEST_MODE) {
-      isOpen = true
-    } else {
-      const now = new Date()
-      isOpen = now.getDay() === 2 // 每周二开放
-    }
+    var TEST_MODE = true
+    var isOpen = TEST_MODE ? true : new Date().getDay() === 2
 
     this.setData({ isMatchOpen: isOpen })
 
@@ -50,21 +48,21 @@ Page({
   },
 
   updateCountdown() {
-    const now = new Date()
-    const nextTuesday = new Date(now)
-    const daysUntilTuesday = (2 - now.getDay() + 7) % 7
+    var now = new Date()
+    var nextTuesday = new Date(now)
+    var daysUntilTuesday = (2 - now.getDay() + 7) % 7
     nextTuesday.setDate(now.getDate() + daysUntilTuesday)
     nextTuesday.setHours(0, 0, 0, 0)
 
-    const diff = nextTuesday - now
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+    var diff = nextTuesday - now
+    var days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    var seconds = Math.floor((diff % (1000 * 60)) / 1000)
 
-    let text = ''
-    if (days > 0) text += `${days}天 `
-    text += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    var text = ''
+    if (days > 0) text += days + '天 '
+    text += hours.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0')
 
     this.setData({ countdownText: text })
   },
@@ -78,7 +76,6 @@ Page({
     myName: mockData.DEFAULT_USER.nickName,
     userAvatar: mockData.DEFAULT_USER.avatarSmall,
 
-    // 当前匹配对象（由 doMatch 填充）
     matchAvatar: '',
     matchName: '',
     matchBio: '',
@@ -86,30 +83,27 @@ Page({
     tags: [],
     icebreakers: [],
     matchInsight: '',
-    showPayModal: false,
-
-    candidates: mockData.getMatchCandidates(),
-
+    showPayModal: false
   },
+
+  _candidates: mockData.getMatchCandidates(),
 
   doMatch() {
     if (this._matching) return
     this._matching = true
-    const candidates = this.data.candidates
+    var candidates = this._candidates
     if (candidates.length === 0) {
       this._matching = false
       wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
       return
     }
-    let randomIndex
-    // 避免连续两次匹配到同一个人
+    var randomIndex
     do {
       randomIndex = Math.floor(Math.random() * candidates.length)
     } while (candidates.length > 1 && candidates[randomIndex].name === this.data.matchName)
 
-    const match = candidates[randomIndex]
+    var match = candidates[randomIndex]
 
-    // 先准备好匹配数据并进入动画
     this.setData({
       isMatching: true,
       matchPhase: 'shake',
@@ -119,20 +113,17 @@ Page({
       compatibility: match.compatibility,
       tags: match.tags,
       icebreakers: match.icebreakers,
-      matchInsight: match.insight,
+      matchInsight: match.insight
     })
 
-    // 阶段1 → 阶段2：光芒发散（900ms）
     this._animTimer1 = setTimeout(() => {
       this.setData({ matchPhase: 'glow' })
     }, 900)
 
-    // 阶段2 → 阶段3：卡片翻转揭示（1700ms）
     this._animTimer2 = setTimeout(() => {
       this.setData({ matchPhase: 'reveal' })
     }, 1700)
 
-    // 动画结束，显示完整结果页（3000ms）
     this._animTimer3 = setTimeout(() => {
       this._matching = false
       this.setData({ isMatching: false, isMatched: true, matchPhase: '' })
@@ -155,7 +146,7 @@ Page({
   },
 
   copyIcebreaker(e) {
-    const text = e.currentTarget.dataset.text
+    var text = e.currentTarget.dataset.text
     common.safeSetClipboardData(text)
   },
 
@@ -176,5 +167,9 @@ Page({
 
   goToUserHome(e) {
     common.goToUserHome(e.detail?.author || e.currentTarget.dataset.author)
+  },
+
+  onAvatarError() {
+    this.setData({ matchAvatar: '/images/avatar_fallback.png' })
   }
 })

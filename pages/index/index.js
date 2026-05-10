@@ -1,7 +1,18 @@
-const common = require('../../utils/common.js')
-const mockData = require('../../data/mockData.js')
+var common = require('../../utils/common.js')
+var mockData = require('../../data/mockData.js')
+var connectPage = require('../../stores/connect.js').connectPage
+var appStore = require('../../stores/appStore.js')
 
 Page({
+  behaviors: [
+    connectPage('user', function (state) {
+      return {
+        userName: state.nickName || mockData.DEFAULT_USER.nickName,
+        userAvatar: state.avatar || mockData.DEFAULT_USER.avatarSmall
+      }
+    })
+  ],
+
   data: {
     viewMode: 'landing',
     isTransitioning: false,
@@ -14,8 +25,7 @@ Page({
     aiName: mockData.AI_USERS.xiaoya.name,
     aiAvatar: mockData.AI_USERS.xiaoya.avatar,
     userAvatar: mockData.DEFAULT_USER.avatarSmall,
-    // Form fields
-    ageRange: Array.from({ length: 63 }, (_, i) => i + 18),
+    ageRange: Array.from({ length: 63 }, function (_, i) { return i + 18 }),
     ageIndex: -1,
     genderOptions: ['男', '女', '其他'],
     gender: '',
@@ -33,11 +43,11 @@ Page({
     if (options.mode === 'call') {
       this.setData({ viewMode: 'call' })
     }
-    const saved = common.storage.get('basicInfo', null)
+    var saved = common.storage.get('basicInfo', null)
     if (saved) {
-      const ageIndex = this.data.ageRange.indexOf(saved.age)
-      const identityIndex = this.data.identityOptions.indexOf(saved.identity)
-      const mbtiIndex = this.data.mbtiOptions.indexOf(saved.mbti)
+      var ageIndex = this.data.ageRange.indexOf(saved.age)
+      var identityIndex = this.data.identityOptions.indexOf(saved.identity)
+      var mbtiIndex = this.data.mbtiOptions.indexOf(saved.mbti)
       this.setData({
         ageIndex: ageIndex >= 0 ? ageIndex : -1,
         gender: saved.gender || '',
@@ -53,8 +63,6 @@ Page({
     if (this.data.isTransitioning) {
       this.setData({ isTransitioning: false })
     }
-    const info = common.loadUserInfo()
-    this.setData({ userName: info.name, userAvatar: info.avatar })
     if (this.data.isCalling && this.callStartedAt) {
       this._syncCallDuration()
       this.startCallTimer()
@@ -78,10 +86,10 @@ Page({
   },
 
   _checkCanStart() {
-    const { ageIndex, gender, orientation, identityIndex, mbtiIndex, recentStatus } = this.data
-    const canStart = ageIndex !== -1 && gender && orientation && identityIndex !== -1 && mbtiIndex !== -1 && recentStatus.trim().length > 0
-    if (canStart !== this.data.canStart) {
-      this.setData({ canStart })
+    var d = this.data
+    var canStart = d.ageIndex !== -1 && d.gender && d.orientation && d.identityIndex !== -1 && d.mbtiIndex !== -1 && d.recentStatus.trim().length > 0
+    if (canStart !== d.canStart) {
+      this.setData({ canStart: canStart })
     }
   },
 
@@ -111,14 +119,14 @@ Page({
 
   submitForm() {
     if (!this.data.canStart) return
-    const { ageRange, ageIndex, gender, orientation, identityOptions, identityIndex, mbtiOptions, mbtiIndex, recentStatus } = this.data
+    var d = this.data
     common.storage.set('basicInfo', {
-      age: ageRange[ageIndex],
-      gender,
-      orientation,
-      identity: identityOptions[identityIndex],
-      mbti: mbtiOptions[mbtiIndex],
-      recentStatus: recentStatus.trim()
+      age: d.ageRange[d.ageIndex],
+      gender: d.gender,
+      orientation: d.orientation,
+      identity: d.identityOptions[d.identityIndex],
+      mbti: d.mbtiOptions[d.mbtiIndex],
+      recentStatus: d.recentStatus.trim()
     })
     this.setData({ viewMode: 'call', isCalling: false })
   },
@@ -147,28 +155,27 @@ Page({
 
   _syncCallDuration() {
     if (!this.callStartedAt) return
-    const seconds = Math.floor((Date.now() - this.callStartedAt) / 1000)
-    const mins = Math.floor(seconds / 60).toString().padStart(2, '0')
-    const secs = (seconds % 60).toString().padStart(2, '0')
-    this.setData({ callDuration: `${mins}:${secs}` })
+    var seconds = Math.floor((Date.now() - this.callStartedAt) / 1000)
+    var mins = Math.floor(seconds / 60).toString().padStart(2, '0')
+    var secs = (seconds % 60).toString().padStart(2, '0')
+    this.setData({ callDuration: mins + ':' + secs })
   },
 
   endCall() {
     this._syncCallDuration()
     this._clearCallTimer()
     this.callStartedAt = null
-    const now = new Date()
-    const hours = now.getHours().toString().padStart(2, '0')
-    const minutes = now.getMinutes().toString().padStart(2, '0')
-    getApp().globalData.memoryTargetTab = 'archive'
+    var now = new Date()
+    var hours = now.getHours().toString().padStart(2, '0')
+    var minutes = now.getMinutes().toString().padStart(2, '0')
     this.setData({
       viewMode: 'landing',
       isCalling: false,
-      callDate: `今天 ${hours}:${minutes}`,
+      callDate: '今天 ' + hours + ':' + minutes,
       isMuted: false,
       isSpeakerOn: false
-    }, () => {
-      wx.switchTab({ url: '/pages/memory/memory' })
+    }, function () {
+      wx.switchTab({ url: '/pages/match/match' })
     })
   },
 
@@ -184,5 +191,9 @@ Page({
 
   goToUserHome(e) {
     common.goToUserHome(e.detail?.author || e.currentTarget.dataset.author)
+  },
+
+  onAvatarError() {
+    this.setData({ aiAvatar: '/images/avatar_fallback.png' })
   }
 })

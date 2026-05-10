@@ -3,13 +3,37 @@
     "pages/index/index",
     "pages/match/match",
     "pages/memory/memory",
-    "pages/profile/profile",
-    "pages/settings/settings",
-    "pages/editProfile/editProfile",
-    "pages/userHome/userHome",
-    "pages/accountSecurity/accountSecurity",
-    "pages/notifications/notifications"
+    "pages/profile/profile"
   ],
+  "subPackages": [
+    {
+      "root": "pkg-settings",
+      "name": "settings-pkg",
+      "pages": [
+        "settings/settings",
+        "editProfile/editProfile",
+        "accountSecurity/accountSecurity"
+      ]
+    },
+    {
+      "root": "pkg-social",
+      "name": "social-pkg",
+      "pages": [
+        "userHome/userHome",
+        "notifications/notifications"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/profile/profile": {
+      "network": "all",
+      "packages": ["settings-pkg"]
+    },
+    "pages/match/match": {
+      "network": "wifi",
+      "packages": ["social-pkg"]
+    }
+  },
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#faf9f7",
@@ -20,7 +44,8 @@
   },
   "usingComponents": {
     "page-header": "/components/page-header/page-header",
-    "edit-modal": "/components/edit-modal/edit-modal"
+    "edit-modal": "/components/edit-modal/edit-modal",
+    "skeleton": "/components/skeleton/skeleton"
   },
   "tabBar": {
     "custom": true,

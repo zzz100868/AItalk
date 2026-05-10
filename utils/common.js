@@ -31,15 +31,15 @@ const storage = {
 
 function goToUserHome(author) {
   if (!author) return
-  wx.navigateTo({ url: `/pages/userHome/userHome?author=${encodeURIComponent(author)}` })
+  wx.navigateTo({ url: `/pkg-social/userHome/userHome?author=${encodeURIComponent(author)}` })
 }
 
 function loadUserInfo() {
-  const saved = storage.get('userProfile', {})
-  const app = getApp()
+  var userStore = require('../stores/userStore.js')
+  var state = userStore.getState()
   return {
-    name: saved?.nickName || app.globalData?.userInfo?.nickName || mockData.DEFAULT_USER.nickName,
-    avatar: saved?.avatar || app.globalData?.userInfo?.avatarUrl || mockData.DEFAULT_USER.avatarSmall
+    name: state.nickName || mockData.DEFAULT_USER.nickName,
+    avatar: state.avatar || mockData.DEFAULT_USER.avatarSmall
   }
 }
 

@@ -1,7 +1,16 @@
-const userStore = require('../../stores/userStore.js')
-const mockData = require('../../data/mockData.js')
+var mockData = require('../../data/mockData.js')
+var connectPage = require('../../stores/connect.js').connectPage
 
 Page({
+  behaviors: [
+    connectPage('user', function (state) {
+      return {
+        'userInfo.nickName': state.nickName || mockData.DEFAULT_USER.nickName,
+        'userInfo.avatar': state.avatar || mockData.DEFAULT_USER.avatar
+      }
+    })
+  ],
+
   data: {
     userInfo: {
       nickName: mockData.DEFAULT_USER.nickName,
@@ -23,14 +32,6 @@ Page({
       { date: '2024-01-10', time: '08:45', location: '上海', device: 'iPhone 15 Pro', type: '修改密码' },
       { date: '2024-01-08', time: '19:20', location: '北京', device: 'iPhone 15 Pro', type: '登录' }
     ]
-  },
-
-  onShow() {
-    const profile = userStore.getProfile()
-    this.setData({
-      'userInfo.nickName': profile.nickName,
-      'userInfo.avatar': profile.avatar
-    })
   },
 
   changePhone() {

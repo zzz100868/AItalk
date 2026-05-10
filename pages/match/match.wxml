@@ -73,7 +73,7 @@
         <!-- Hero -->
         <view class="result-hero anim-scale-in">
           <view class="hero-avatar-wrap">
-            <image class="hero-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}"/>
+            <image class="hero-avatar" src="{{matchAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="{{matchName}}" binderror="onAvatarError"/>
             <view class="hero-avatar-ring"></view>
           </view>
           <text class="hero-name">{{matchName}}</text>
@@ -193,7 +193,7 @@
             </view>
           </view>
           <view class="flip-side flip-side-back">
-            <image class="reveal-avatar" src="{{matchAvatar}}" mode="aspectFill"/>
+            <image class="reveal-avatar" src="{{matchAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
             <view class="reveal-ring"></view>
           </view>
         </view>
