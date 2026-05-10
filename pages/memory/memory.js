@@ -336,7 +336,8 @@ Page({
         self._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
       }
       typeNext()
-    }).catch(function () {
+    }).catch(function (err) {
+      console.error('[Chat] sendMessage error:', err)
       self.setData({ isSending: false })
       wx.showToast({ title: '发送失败，请重试', icon: 'none' })
     })

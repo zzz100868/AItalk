@@ -162,21 +162,9 @@ Page({
   },
 
   endCall() {
-    this._syncCallDuration()
     this._clearCallTimer()
     this.callStartedAt = null
-    var now = new Date()
-    var hours = now.getHours().toString().padStart(2, '0')
-    var minutes = now.getMinutes().toString().padStart(2, '0')
-    this.setData({
-      viewMode: 'landing',
-      isCalling: false,
-      callDate: '今天 ' + hours + ':' + minutes,
-      isMuted: false,
-      isSpeakerOn: false
-    }, function () {
-      wx.switchTab({ url: '/pages/match/match' })
-    })
+    wx.switchTab({ url: '/pages/match/match' })
   },
 
   toggleMute() {
