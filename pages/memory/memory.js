@@ -23,6 +23,7 @@ Page({
   ],
 
   onShow() {
+    this._setupKeyboardListener()
     var targetTab = appStore.getState().memoryTargetTab
     if (targetTab) {
       appStore.setState({ memoryTargetTab: null })
@@ -402,11 +403,15 @@ Page({
       wx.showToast({ title: '标题和内容不能为空', icon: 'none' })
       return
     }
-    var insights = data.insights
-    var idx = insights.findIndex(i => i.id === data.editId)
-    if (idx === -1) return
-    insights[idx].title = data.editTitle.trim()
-    insights[idx].content = data.editContent.trim()
+    var insights = data.insights.map(function (item) {
+      if (item.id === data.editId) {
+        return Object.assign({}, item, {
+          title: data.editTitle.trim(),
+          content: data.editContent.trim()
+        })
+      }
+      return item
+    })
     this.setData({ insights: insights, showEditModal: false, editId: null }, () => {
       this.filterInsights()
     })

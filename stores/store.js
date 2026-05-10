@@ -110,12 +110,16 @@ class Store {
 
   _notify() {
     this._subscribers.forEach(function (sub) {
-      if (!sub.ctx) return
-      var mapped = sub.mapState(this.state)
-      var patch = diffMapped(sub.lastMapped, mapped)
-      if (patch) {
-        sub.lastMapped = mapped
-        sub.ctx.setData(patch)
+      try {
+        if (!sub.ctx) return
+        var mapped = sub.mapState(this.state)
+        var patch = diffMapped(sub.lastMapped, mapped)
+        if (patch) {
+          sub.lastMapped = mapped
+          sub.ctx.setData(patch)
+        }
+      } catch (e) {
+        console.error('[Store] notify error:', e)
       }
     }.bind(this))
     this._dirtyKeys.clear()

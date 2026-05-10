@@ -94,7 +94,7 @@ function create(baseConfig) {
     if (!res._config || !res._config.silent) {
       wx.showToast({ title: msg, icon: 'none' })
     }
-    return Promise.reject({ statusCode: res.statusCode, message: msg, data: res.data })
+    return Promise.reject({ statusCode: res.statusCode, message: msg, data: res.data, _loadingHandled: true })
   })
 
   function request(options) {
@@ -128,7 +128,7 @@ function create(baseConfig) {
             return _doRequest(config, attempt + 1)
           })
         }
-        if (!config.silent) {
+        if (!config.silent && !(err && err._loadingHandled)) {
           _hideLoading()
           wx.showToast({ title: '网络请求失败', icon: 'none' })
         }
