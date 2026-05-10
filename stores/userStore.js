@@ -12,12 +12,20 @@ var userStore = new Store('user', {
   persist: ['avatar', 'nickName', 'bio', 'photos']
 })
 
+function _isValidAvatar(url) {
+  if (!url || typeof url !== 'string') return false
+  if (url.indexOf('http') === 0) return true
+  if (url.indexOf('wxfile://') === 0) return true
+  if (url.indexOf('/images/') === 0) return true
+  return false
+}
+
 // 兼容旧版 storage key 迁移：userProfile / profilePhotos
 ;(function migrate() {
   var oldProfile = storage.get('userProfile', null)
   if (oldProfile && typeof oldProfile === 'object') {
     var patch = {}
-    if (oldProfile.avatar && typeof oldProfile.avatar === 'string' && oldProfile.avatar.indexOf('http') === 0) {
+    if (oldProfile.avatar && _isValidAvatar(oldProfile.avatar)) {
       patch.avatar = oldProfile.avatar
     }
     if (oldProfile.nickName) patch.nickName = oldProfile.nickName
@@ -37,7 +45,7 @@ var userStore = new Store('user', {
 ;(function sanitize() {
   var state = userStore.getState()
   var patch = {}
-  if (!state.avatar || typeof state.avatar !== 'string' || state.avatar.indexOf('http') !== 0) {
+  if (!_isValidAvatar(state.avatar)) {
     patch.avatar = mockData.DEFAULT_USER.avatar
   }
   if (!state.nickName) {

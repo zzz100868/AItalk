@@ -47,13 +47,16 @@ Page({
   },
 
   chooseAvatar() {
+    var self = this
     common.safeChooseMedia({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       success: (res) => {
         var tempPath = res.tempFiles[0].tempFilePath
-        this.setData({ avatar: tempPath }, () => this._checkCanSave())
+        common.saveTempFiles([tempPath], function (err, savedPaths) {
+          self.setData({ avatar: savedPaths[0] || tempPath }, () => self._checkCanSave())
+        })
       }
     })
   },

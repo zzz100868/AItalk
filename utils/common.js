@@ -99,11 +99,76 @@ function safeSetClipboardData(data, successTitle) {
 }
 
 let _systemInfoCache = null
-function getSystemInfo() {
-  if (!_systemInfoCache) {
+
+function _normalizeSafeArea(info) {
+  if (!info.safeAreaInsets && info.safeArea) {
+    info.safeAreaInsets = {
+      top: Math.max(0, info.safeArea.top),
+      right: Math.max(0, info.screenWidth - info.safeArea.right),
+      bottom: Math.max(0, info.screenHeight - info.safeArea.bottom),
+      left: Math.max(0, info.safeArea.left)
+    }
+  }
+  return info
+}
+
+function getSystemInfo(forceRefresh) {
+  if (!_systemInfoCache || forceRefresh) {
     _systemInfoCache = wx.getSystemInfoSync()
+    _normalizeSafeArea(_systemInfoCache)
   }
   return _systemInfoCache
+}
+
+function refreshSystemInfoOnRotate() {
+  wx.onWindowResize && wx.onWindowResize(function () {
+    _systemInfoCache = null
+  })
+}
+
+refreshSystemInfoOnRotate()
+
+// iOS 临时文件重启后会被清理，需要复制到本地目录
+function saveTempFiles(tempPaths, callback) {
+  if (!tempPaths || tempPaths.length === 0) {
+    if (callback) callback(null, [])
+    return
+  }
+  var fs = wx.getFileSystemManager()
+  var results = []
+  var pending = tempPaths.length
+  var hasError = false
+  tempPaths.forEach(function (tempPath) {
+    var fileName = 'file_' + Date.now() + '_' + Math.floor(Math.random() * 10000) + '.jpg'
+    var destPath = wx.env.USER_DATA_PATH + '/' + fileName
+    fs.copyFile({
+      srcPath: tempPath,
+      destPath: destPath,
+      success: function () {
+        results.push(destPath)
+      },
+      fail: function () {
+        results.push(tempPath)
+        hasError = true
+      },
+      complete: function () {
+        pending--
+        if (pending === 0 && callback) {
+          callback(hasError ? new Error('部分文件保存失败') : null, results)
+        }
+      }
+    })
+  })
+}
+
+function removeSavedFile(filePath) {
+  if (!filePath) return
+  try {
+    var userPath = wx.env.USER_DATA_PATH
+    if (filePath.indexOf(userPath) === 0) {
+      wx.getFileSystemManager().unlink({ filePath: filePath })
+    }
+  } catch (e) {}
 }
 
 module.exports = {
@@ -115,5 +180,7 @@ module.exports = {
   safePreviewImage,
   safeChooseMedia,
   safeSetClipboardData,
-  getSystemInfo
+  getSystemInfo,
+  saveTempFiles,
+  removeSavedFile
 }

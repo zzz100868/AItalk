@@ -11,6 +11,7 @@
   backdrop-filter: saturate(200%) blur(48rpx);
   -webkit-backdrop-filter: saturate(200%) blur(48rpx);
   border-top: 1rpx solid rgba(28, 25, 23, 0.04);
+  padding-bottom: constant(safe-area-inset-bottom);
   padding-bottom: env(safe-area-inset-bottom);
 }
 

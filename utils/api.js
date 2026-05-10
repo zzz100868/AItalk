@@ -54,10 +54,26 @@ function getChatHistory(page, size) {
   return http.get('/api/chat/history', { page: page, size: size }, { silent: true })
 }
 
+function _pickMockReply(content) {
+  try {
+    var category = mockData.selectReplyCategory(content)
+    var replies = mockData.CHAT_REPLIES[category] || mockData.CHAT_REPLIES.default
+    if (!replies || replies.length === 0) {
+      replies = mockData.MEMORY_REPLIES
+    }
+    var reply = replies[Math.floor(Math.random() * replies.length)]
+    if (!reply) {
+      reply = '我在听，你继续说。'
+    }
+    return reply
+  } catch (e) {
+    return '我在听，你继续说。'
+  }
+}
+
 function sendChatMessage(content) {
   if (USE_MOCK) {
-    var replies = mockData.MEMORY_REPLIES
-    var reply = replies[Math.floor(Math.random() * replies.length)]
+    var reply = _pickMockReply(content)
     return mockDelay({
       reply: reply,
       id: Date.now() + '_ai'

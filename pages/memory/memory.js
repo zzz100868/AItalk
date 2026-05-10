@@ -191,7 +191,13 @@ Page({
   _calcChatPadding() {
     var sysInfo = common.getSystemInfo()
     var rpxRatio = 750 / sysInfo.windowWidth
-    var safeRpx = (sysInfo.safeAreaInsets?.bottom || 0) * rpxRatio
+    var safeBottom = 0
+    if (sysInfo.safeAreaInsets && typeof sysInfo.safeAreaInsets.bottom === 'number') {
+      safeBottom = sysInfo.safeAreaInsets.bottom
+    } else if (sysInfo.safeArea && typeof sysInfo.safeArea.bottom === 'number') {
+      safeBottom = Math.max(0, sysInfo.screenHeight - sysInfo.safeArea.bottom)
+    }
+    var safeRpx = safeBottom * rpxRatio
     var padding = Math.ceil(188 + safeRpx)
     if (this.data.chatPaddingBottom !== padding) {
       this.setData({ chatPaddingBottom: padding }, () => {
@@ -248,11 +254,15 @@ Page({
 
   onInputFocus() {
     this.setData({ inputFocused: true })
-    setTimeout(() => this.scrollChatToBottom(), 200)
+    setTimeout(() => {
+      this._calcChatPadding()
+      this.scrollChatToBottom()
+    }, 300)
   },
 
   onInputBlur() {
     this.setData({ inputFocused: false })
+    setTimeout(() => this._calcChatPadding(), 150)
   },
 
   onInputChange(e) {
@@ -312,30 +322,45 @@ Page({
         vis = vis.slice(vis.length - WINDOW_SIZE)
       }
 
+      var reply = res.reply
+      if (!reply || typeof reply !== 'string') {
+        reply = '我在听，你继续说。'
+      }
+
       self.setData({
         visibleMessages: vis,
         hasMoreHistory: self._allMessages.length > vis.length
-      }, () => self.scrollChatToBottom())
-
-      var reply = res.reply
-      var i = 0
-      var batchSize = 8
-      var visIdx = self.data.visibleMessages.length - 1
-      var typeNext = function () {
-        if (i >= reply.length) {
+      }, () => {
+        self.scrollChatToBottom()
+        var visIdx = self.data.visibleMessages.length - 1
+        if (visIdx < 0 || visIdx >= self.data.visibleMessages.length) {
           self.setData({ isSending: false })
           return
         }
-        var chunk = reply.slice(i, i + batchSize)
-        aiMsg.content += chunk
-        i += chunk.length
-        self._batcher({
-          ['visibleMessages[' + visIdx + '].content']: aiMsg.content
-        })
-        self._scrollThrottle()
-        self._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
-      }
-      typeNext()
+        var i = 0
+        var typeNext = function () {
+          if (i >= reply.length) {
+            self.setData({ isSending: false })
+            return
+          }
+          var ch = reply[i]
+          aiMsg.content += ch
+          i++
+          var update = {}
+          update['visibleMessages[' + visIdx + '].content'] = aiMsg.content
+          self.setData(update)
+          self._scrollThrottle()
+          var delay = 25 + Math.random() * 40
+          if (/[，。！？；：、]/.test(ch)) {
+            delay += 180 + Math.random() * 120
+          }
+          if (/[.!?;:]/.test(ch)) {
+            delay += 150 + Math.random() * 80
+          }
+          self._typeTimer = setTimeout(typeNext, delay)
+        }
+        typeNext()
+      })
     }).catch(function (err) {
       console.error('[Chat] sendMessage error:', err)
       self.setData({ isSending: false })

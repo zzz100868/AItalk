@@ -33,14 +33,17 @@ Page({
       wx.showToast({ title: '最多上传8张', icon: 'none' })
       return
     }
+    var self = this
     common.safeChooseMedia({
       count: remain,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       success: (res) => {
         var newPaths = res.tempFiles.map(f => f.tempFilePath)
-        var photos = [...this.data.photos, ...newPaths].slice(0, 8)
-        userStore.setState({ photos: photos })
+        common.saveTempFiles(newPaths, function (err, savedPaths) {
+          var photos = [...self.data.photos, ...(savedPaths || newPaths)].slice(0, 8)
+          userStore.setState({ photos: photos })
+        })
       }
     })
   },
@@ -58,8 +61,10 @@ Page({
       confirmColor: '#c4715a',
       success: (res) => {
         if (res.confirm) {
+          var deletedPath = this.data.photos[index]
           var photos = this.data.photos.filter((_, i) => i !== index)
           userStore.setState({ photos: photos })
+          common.removeSavedFile(deletedPath)
         }
       }
     })
