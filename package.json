@@ -1,0 +1,24 @@
+{
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "name": "miniprogram",
+  "version": "1.0.0",
+  "description": "一个以「安静社交」为理念的小程序，主打 AI 陪伴、灵魂匹配和情绪广场。在喧嚣的社交网络中，为喜欢独处、深度思考和情绪敏感的人，提供一个低压力的数字空间。",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzz100868/AItalk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/zzz100868/AItalk/issues"
+  },
+  "homepage": "https://github.com/zzz100868/AItalk#readme"
+}

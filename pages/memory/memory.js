@@ -88,6 +88,28 @@ Page({
     this._syncVisibleMessages()
   },
 
+  _restoreMessages() {
+    var stored = storage.get('chatMessages', null)
+    var storedCounter = storage.get('chatMsgCounter', 0)
+    if (stored && Array.isArray(stored) && stored.length > 0) {
+      this._allMessages = stored
+      this._msgCounter = typeof storedCounter === 'number' ? storedCounter : 0
+      this._syncVisibleMessages()
+    } else {
+      this._initMessages()
+    }
+  },
+
+  _saveMessages() {
+    var MAX_STORED = 500
+    var toStore = this._allMessages
+    if (toStore.length > MAX_STORED) {
+      toStore = toStore.slice(toStore.length - MAX_STORED)
+    }
+    storage.set('chatMessages', toStore)
+    storage.set('chatMsgCounter', this._msgCounter)
+  },
+
   _syncVisibleMessages() {
     var all = this._allMessages
     var start = Math.max(0, all.length - WINDOW_SIZE)
@@ -119,7 +141,7 @@ Page({
       })
     }
     this._batcher = createBatcher(this)
-    this._initMessages()
+    this._restoreMessages()
     this.loadInsights()
     this._setupKeyboardListener()
     if (this.data.activeTab === 'chat') {
@@ -133,6 +155,7 @@ Page({
       clearTimeout(this._typeTimer)
       this._typeTimer = null
     }
+    this._saveMessages()
   },
 
   onScrollToTop() {
@@ -307,6 +330,7 @@ Page({
       inputValue: '',
       isSending: true
     }, () => this.scrollChatToBottom())
+    this._saveMessages()
 
     var self = this
     api.sendChatMessage(content).then(function (res) {
@@ -341,6 +365,7 @@ Page({
         var typeNext = function () {
           if (i >= reply.length) {
             self.setData({ isSending: false })
+            self._saveMessages()
             return
           }
           var ch = reply[i]
