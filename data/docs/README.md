@@ -39,7 +39,7 @@ docs/
 
 ### decisions/
 - [ADR-0001 单体架构](decisions/0001-单体架构.md) — MVP 单体 + 独立语音网关
-- [ADR-0002 真人认证选型](decisions/0002-真人认证选型.md) — 建议腾讯云人脸核身
+- [ADR-0002 真人认证选型](decisions/0002-真人认证选型.md) — 采用微信实名认证
 - [ADR-0003 语音链路选型](decisions/0003-语音链路选型.md) — ASR/TTS/LLM 统一火山引擎
 - [ADR-0004 数据库选型](decisions/0004-数据库选型.md) — PostgreSQL + pgvector 一库承载
 - [ADR-0005 后端技术栈](decisions/0005-后端技术栈.md) — NestJS + TypeScript + Prisma + Bull

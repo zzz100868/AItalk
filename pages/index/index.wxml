@@ -106,8 +106,11 @@
           <view class="call-info">
             <text class="ai-name display-md">{{aiName}}</text>
             <view class="call-status-row">
-              <view class="status-dot status-dot-live"></view>
-              <text class="call-status caption">实时语音 · {{callDuration}}</text>
+              <view class="status-dot {{aiSpeaking ? 'status-dot-speak' : 'status-dot-live'}}"></view>
+              <text class="call-status caption">{{aiSpeaking ? '正在说话...' : '实时语音'}} · {{callDuration}}</text>
+            </view>
+            <view wx:if="{{aiText}}" class="call-bubble">
+              <text class="call-bubble-text">{{aiText}}</text>
             </view>
           </view>
 

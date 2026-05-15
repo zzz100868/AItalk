@@ -28,7 +28,7 @@ docs/
 
 ### api/
 - [API 总览](api/README.md) — 鉴权、错误码、分页、时间格式、文件上传等通用约定
-- [Auth](api/auth.md) — 微信登录（P0）+ 真人认证（P1）
+- [Auth](api/auth.md) — 微信登录（P0）+ 实名认证（微信实名）
 - [Profile](api/profile.md) — 用户资料、照片墙、他人主页（P0）+ 设置/帐号安全（P1）
 - [Voice](api/voice.md) — 实时语音 WebSocket 协议（P0）+ 会话历史（P1）
 - [Memory](api/memory.md) — 文字聊天、记忆洞察、人格档案（P0）
@@ -38,7 +38,7 @@ docs/
 
 ### decisions/
 - [ADR-0001 单体架构](decisions/0001-单体架构.md) — MVP 单体 + 独立语音网关
-- [ADR-0002 真人认证选型](decisions/0002-真人认证选型.md) — 建议腾讯云人脸核身
+- [ADR-0002 真人认证选型](decisions/0002-真人认证选型.md) — 采用微信实名认证
 - [ADR-0003 语音链路选型](decisions/0003-语音链路选型.md) — ASR/TTS/LLM 统一火山引擎
 - [ADR-0004 数据库选型](decisions/0004-数据库选型.md) — PostgreSQL + pgvector 一库承载
 - [ADR-0005 后端技术栈](decisions/0005-后端技术栈.md) — NestJS + TypeScript + Prisma + Bull

@@ -2,8 +2,6 @@
 
 一个以「安静社交」为理念的微信小程序，主打 AI 陪伴和灵魂匹配。为喜欢独处、深度思考和情绪敏感的人提供一个低压力的数字空间。
 
-**当前阶段**：纯前端 Mock 实现，无后端服务接入。
-
 ---
 
 ## 页面结构
@@ -70,9 +68,58 @@
 
 ## 本地运行
 
-1. 克隆仓库
-2. 使用 **微信开发者工具** 导入项目根目录
-3. 填写 `appid`（测试号亦可），即可预览
+### 环境要求
+
+- Node.js 18+
+- PostgreSQL 14+（需要 pgvector 扩展）
+- 微信开发者工具（预览前端）
+
+### 1. 后端服务
+
+```bash
+cd server
+npm install
+cp .env.example .env          # 编辑 .env 填入数据库地址和火山引擎密钥
+npx prisma generate            # 生成 Prisma 客户端
+npx prisma migrate dev         # 创建数据库表（需要 PostgreSQL 已启动）
+npm run start:dev              # 启动 API 服务 → http://localhost:3000
+```
+
+### 2. 语音网关（WebSocket 服务）
+
+语音通话依赖独立的 WebSocket 服务（ASR/TTS/LLM 实时通信）：
+
+```bash
+cd server
+npm run start:voice            # 启动语音网关 → ws://localhost:3001
+```
+
+启动前确认 `.env` 中已配置以下字段：
+
+| 变量 | 用途 |
+|---|---|
+| `VOLC_SPEECH_AUTH_MODE` | `"old"` 旧版控制台 / `"new"` 新版 API Key |
+| `VOLC_ASR_APPID` / `VOLC_ASR_TOKEN` / `VOLC_ASR_RESOURCE_ID` / `VOLC_ASR_WS_URL` | 火山引擎 ASR |
+| `VOLC_TTS_APPID` / `VOLC_TTS_TOKEN` / `VOLC_TTS_RESOURCE_ID` / `VOLC_TTS_VOICE_TYPE` | 火山引擎 TTS |
+| `VOLC_API_KEY` / `VOLC_LLM_ENDPOINT` / `VOLC_LLM_MODEL` | 豆包 LLM（对话生成） |
+
+### 3. 微信小程序
+
+1. 使用 **微信开发者工具** 导入项目根目录
+2. 在 `utils/api.js` 确认 `BASE_URL` 和 `WS_VOICE_URL` 指向本地服务
+3. 填写 `project.config.json` 中的 `appid`
+4. 编译预览
+
+### 开发常用命令
+
+| 命令 | 位置 | 作用 |
+|---|---|---|
+| `npm run start:dev` | `server/` | API 服务热重载 |
+| `npm run start:voice` | `server/` | 语音网关热重载 |
+| `npm run build` | `server/` | 编译 API 服务 |
+| `npm run build:voice` | `server/` | 编译语音网关 |
+| `npx prisma studio` | `server/` | 数据库可视化 |
+| `npx prisma migrate dev --name <name>` | `server/` | 创建迁移 |
 
 ---
 

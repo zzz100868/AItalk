@@ -12,6 +12,7 @@
 
 const TOKEN_KEY = 'aitalk_token'
 const BASE_URL = 'http://localhost:3000/api'
+const WS_VOICE_URL = 'ws://localhost:3001/ws/voice'
 
 let _tokenCache = null
 
@@ -108,6 +109,15 @@ function post(path, data, opts)    { return request('POST', path, data, opts) }
 function put(path, data, opts)     { return request('PUT', path, data, opts) }
 function del(path, opts)           { return request('DELETE', path, null, opts) }
 
+/**
+ * 获取语音网关 WebSocket URL（不含 token，token 通过 header 传递）
+ */
+function getVoiceWsUrl() {
+  const token = getToken()
+  if (!token) return null
+  return WS_VOICE_URL
+}
+
 module.exports = {
   getToken,
   setToken,
@@ -116,5 +126,7 @@ module.exports = {
   post,
   put,
   del,
+  getVoiceWsUrl,
   BASE_URL,
+  WS_VOICE_URL,
 }

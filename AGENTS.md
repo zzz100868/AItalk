@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -46,7 +46,7 @@ User edits → userStore.updateProfile() → writes storage + updates globalData
 
 `data/mockData.js` must be treated as a protected compatibility layer.
 
-Claude must not modify mock data schemas, field names, default users, AI users, match candidates, memory data, or reply structures unless the user explicitly asks for it.
+Codex must not modify mock data schemas, field names, default users, AI users, match candidates, memory data, or reply structures unless the user explicitly asks for it.
 
 When adding backend integration, keep mockData as fallback data. Do not remove it during MVP development.
 

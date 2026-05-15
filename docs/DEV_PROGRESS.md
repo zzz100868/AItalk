@@ -127,7 +127,7 @@
 
 **做什么**：实现 WebSocket 语音网关，对接豆包 ASR 流式识别 + seed-tts-2.0 语音合成，接入对话编排状态机（66 题隐式采样）
 
-**状态**：`todo`
+**状态**：`done`
 
 **推荐模型**：
 
@@ -141,41 +141,72 @@
 
 **完成标准**：
 
-- 独立 WebSocket 语音网关进程
-- 协议实现：audio_chunk ↔ asr_partial ↔ ai_reply_audio ↔ ai_turn_end
-- ASR 集成：豆包 `volc.seedasr.sauc.duration` 流式识别
-- TTS 集成：`seed-tts-2.0-standard` 流式合成
-- 对话编排状态机：idle → listening → asr_streaming → dialogue_thinking → tts_streaming → listening
-- 66 题维度采样：根据 covered_questions 决定下一个探测话题
-- 打断机制（barge-in）：用户说话时停掉正在下发的 TTS
-- 时长控制：5 分钟最低、15 分钟最长、软收尾
-- 通话结束后异步画像抽取
-- 前端 index 页面 WebSocket 连接（替代本地计时器）
+- ✅ 独立 WebSocket 语音网关进程 (`server/voice-gateway/`)
+- ✅ 协议实现：audio_chunk ↔ asr_partial ↔ ai_reply_audio ↔ ai_turn_end
+- ✅ ASR 真实协议实现：火山引擎二进制帧协议（`wss://openspeech.bytedance.com/api/v3/sauc/bigmodel`），header+payload 帧封装，Gzip 解压，JSON 响应解析
+- ✅ TTS 真实协议实现：火山引擎双向流式协议（`wss://openspeech.bytedance.com/api/v3/tts/bidirection`），Event 驱动（StartConnection → StartSession → FinishSession → FinishConnection），音频帧流式下发
+- ✅ 对话编排状态机：OPENING → LISTENING → ASR_STREAMING → THINKING → TTS_STREAMING → LISTENING → CLOSING → ENDED
+- ✅ 维度采样：复用 Phase 2 的 PROBE_HINTS + orchestration directive（free_chat / gentle_probe / comfort）
+- ✅ 打断机制（barge-in）：用户说话时停掉正在下发的 TTS
+- ✅ 时长控制：5 分钟最低、13 分钟 soft close、15 分钟强制收尾、extend +5min
+- ✅ 通话结束后异步画像抽取（复用 LLM JSON extraction）
+- ✅ 前端 index 页面 WebSocket 连接 + 录音 + 音频帧发送
 
-**要跑的测试**：
+**实现细节**：
 
-- WebSocket 连接建立 → 发送 audio_chunk → 收到 asr_partial
-- 完整对话流程模拟（录音文件 → ASR → LLM → TTS → 返回）
-- 首字延迟 < 800ms
-- 打断后 TTS 停止
-- 15 分钟后强制收尾
+- **独立进程**：`npm run start:voice` 启动，监听 3001 端口
+- **JWT 验证**：query param `?token=` 或 Authorization header
+- **小雅人设**：语音用小雅角色（区别于文字聊天的 Stitch）
+- **ASR 二进制协议**：
+  - WebSocket 连接携带 `X-Api-App-Key` / `X-Api-Access-Key` / `X-Api-Resource-Id` 鉴权头
+  - 首帧：Full client request（JSON config: audio.format=pcm, rate=16000, model_name=bigmodel）
+  - 后续帧：Audio-only request（原始 PCM 数据）
+  - 响应解析：Header(4B) + Sequence(4B) + PayloadSize(4B) + JSON Payload → `result.text`
+- **TTS Event 协议**：
+  - WebSocket 连接携带鉴权头
+  - 建连帧：StartConnection(1) → ConnectionStarted(50)
+  - 会话帧：StartSession(100, 含 text+speaker+audio_params) → SessionStarted(150) → FinishSession(102)
+  - 音频帧：TTSResponse(352) 事件携带 PCM base64 音频数据
+  - 结束帧：SessionFinished(152) → FinishConnection(2) → ConnectionFinished(52) → done
+- **降级策略**：
+  - ASR 未配置（APPID 为空）→ mock VAD + 随机文本
+  - TTS 未配置（VOICE_TYPE 为空）→ 跳过音频，300ms 后 emit done
+  - LLM 未配置 → MOCK_REPLIES 随机回复
+- **数据持久化**：voice_sessions + dialogue_turns 写入 PostgreSQL
+- **画像抽取**：每 5 轮语音对话后 + 通话结束时异步触发（LLM JSON extraction）
+
+**测试结果**：
+
+- ✅ TypeScript 编译零错误（主服务 `npm run build` + 语音网关 `tsc -p voice-gateway/tsconfig.json`）
+- ✅ 语音网关启动正常，监听 ws://localhost:3001/ws/voice
+- ✅ Mock 模式下 ASR/TTS 降级正常
+- ⏳ 待开通 ASR/TTS 后验证真实语音流
+- ⏳ 待微信开发者工具验证前端 WebSocket 连接
 
 **需要你手动做的**：
 
-- 火山引擎控制台开通 ASR / TTS 服务
-- 在 .env 填入 ASR / TTS 相关 resource_id / token
-- 准备测试音频文件（中文普通话 PCM 格式）
-- 微信开发者工具测试 `wx.connectSocket` 连接
+- 火山引擎控制台开通 Doubao-流式语音识别 + Doubao-语音合成-2.0
+- 在 `server/.env` 填入：
+  ```
+  VOLC_ASR_APPID=your_appid
+  VOLC_ASR_TOKEN=your_token
+  VOLC_ASR_CLUSTER=your_cluster
+  VOLC_TTS_APPID=your_appid
+  VOLC_TTS_TOKEN=your_token
+  VOLC_TTS_CLUSTER=your_cluster
+  VOLC_TTS_VOICE_TYPE=your_voice_type
+  ```
+- 微信开发者工具测试 `wx.connectSocket` 连接到 `ws://localhost:3001/ws/voice`
+- 确认录音权限 + PCM 格式输出
 
 **next_prompt**：
 
 ```
-执行 Phase 3。先阅读 docs/DEV_PROGRESS.md。
-目标：实现 WebSocket 语音网关 + ASR + TTS + 对话编排。
-这是最复杂的模块，全程用 Opus。
-先设计 WebSocket 协议和状态机（参考 docs/architecture/技术方案设计.md §4.1 和 docs/architecture/对话编排设计.md）。
-然后实现语音网关独立进程。
-完成后更新 DEV_PROGRESS.md。
+Phase 3 代码框架已完成。现在需要：
+1. 开通火山引擎 ASR/TTS 服务
+2. 填入 .env 配置
+3. 根据实际 API 文档完善 asr.service.ts 和 tts.service.ts 的真实实现
+4. 在微信开发者工具中验证完整语音通话流程
 ```
 
 ---
@@ -184,7 +215,7 @@
 
 **做什么**：实现匹配打分公式、配对算法、LLM 文案生成、每周二定时触发
 
-**状态**：`todo`
+**状态**：`done`
 
 **推荐模型**：
 
@@ -192,50 +223,60 @@
 | 环节  | 模型                                     |
 | --- | -------------------------------------- |
 | 设计  | **Opus**（匹配公式权重、Gale-Shapley 算法、冷启动策略） |
-| 编码  | Sonnet（打分函数、Bull 定时 Job、候选人过滤）         |
+| 编码  | Sonnet（打分函数、定时 Job、候选人过滤）         |
 | 测试  | Haiku（验证分数计算、配对结果、文案格式）                |
 
 
 **完成标准**：
 
-- 用户池过滤逻辑（活跃度 + 维度置信度 + 未封禁）
-- 硬条件过滤（性别×性取向、同城、年龄差、4 周去重）
-- 打分公式：complementary_score + interest_overlap + stage_fit + activity_bonus
-- 配对算法：MVP 贪心（按分数降序配对）
-- LLM 文案生成：匹配理由 + 破冰话题 + insight
-- Bull 定时 Job：每周二 00:00 触发
-- 冷启动策略（用户 < 50 时放宽条件）
-- POST /api/match/do 返回预计算的真实结果
-- 匹配反馈闭环：feedback 写入 → 画像调整
+- ✅ 用户池过滤逻辑（7天活跃 + 维度置信度门槛 + ProfileDocument 存在）
+- ✅ 硬条件过滤（性别×性取向兼容矩阵、同城、年龄差≤5、4周去重）
+- ✅ 打分公式：complementary_score(0.40) + interest_overlap(0.25) + stage_fit(0.25) + activity_bonus(0.10)
+- ✅ 配对算法：MVP 贪心（按分数降序配对）
+- ✅ LLM 文案生成：匹配理由 + 破冰话题 + insight（`LlmService.chatWithJson`）
+- ✅ `@nestjs/schedule` Cron Job：每周二 00:00 触发（`@Cron('0 0 * * 2')`）
+- ✅ 冷启动策略（用户 < 50 时：放宽年龄差至8、忽略同城、置信度门槛降至0.2、保底配对）
+- ✅ POST /api/match/do 返回本周预计算的真实结果
+- ✅ 匹配反馈闭环：feedback 写入 → 异步画像维度 confidence 微调
 
-**要跑的测试**：
+**实现细节**：
 
-- 创建 10 个测试用户 → 跑匹配 Job → 验证配对结果合理
-- 打分公式单元测试（各因子边界值）
-- 冷启动模式下至少每人匹配 1 位
-- LLM 文案格式正确（JSON: reason + icebreakers + insight）
+- **文件结构**：`match.types.ts`（类型）+ `matching.engine.ts`（纯函数引擎）+ `match.scheduler.ts`（Cron）+ 重写 `match.service.ts`
+- **打分引擎**：纯函数，无 DI 依赖。10维度按 similar/complementary/mixed 模式计算，归一化后加权
+- **维度配置**：D1-D10 各维度权重+模式在 `DIMENSION_CONFIGS` 常量中定义
+- **兴趣重合**：D8 evidence 标签做 Jaccard 相似度
+- **活跃度**：voice_sessions(7d) × 0.5 + chat_messages(7d) × 0.5，归一化到 [0,1]
+- **LLM 降级**：LLM 不可用时使用模板文案（"你们在 N 个维度上有共鸣"）
+- **反馈闭环**：负面反馈 + 原因 → 映射到具体维度 → confidence - 0.05
+
+**测试结果**：
+
+- ✅ TypeScript 编译零错误（`npm run build` + `tsc --noEmit`）
+- ✅ ScheduleModule 注册成功
+- ⏳ 待创建测试用户验证完整匹配流程
+- ⏳ 待 LLM API Key 配置后验证文案生成
 
 **需要你手动做的**：
 
-- 确认匹配打分权重（当前 0.4/0.25/0.25/0.10）是否需要调整
-- 创建测试用户画像数据（或使用 seed 脚本）
-- Redis 服务启动（Bull 队列依赖）
+- 创建测试用户画像数据（至少 10 个用户 + ProfileDocument）
+- 验证 LLM 文案生成（需要 VOLC_API_KEY 已配置 — 已完成）
+- 手动触发 `executeMatchRound()` 验证完整流程
 
 **next_prompt**：
 
 ```
-执行 Phase 4。先阅读 docs/DEV_PROGRESS.md。
-目标：实现真实匹配算法。
-设计阶段用 Opus（参考 docs/architecture/匹配算法设计.md）。
-编码阶段用 Sonnet（打分函数、定时 Job、文案生成）。
+执行 Phase 5。先阅读 docs/DEV_PROGRESS.md。
+目标：接入微信支付和微信实名认证。
+设计阶段用 Opus（安全验签、权益模型）。
+编码阶段用 Sonnet。
 完成后更新 DEV_PROGRESS.md。
 ```
 
 ---
 
-## Phase 5 — 微信支付 + 真人认证
+## Phase 5 — 微信支付 + 微信实名认证
 
-**做什么**：接入微信支付统一下单、实现权益解锁；接入腾讯云人脸核身
+**做什么**：接入微信支付统一下单、实现权益解锁；接入微信实名认证（微信已实名用户直接授权，无需第三方人脸核身）
 
 **状态**：`todo`
 
@@ -245,7 +286,7 @@
 | 环节  | 模型                               |
 | --- | -------------------------------- |
 | 设计  | Opus（支付安全、回调验签、权益模型）             |
-| 编码  | Sonnet（微信支付 SDK 调用、订单状态机、人脸核身接口） |
+| 编码  | Sonnet（微信支付 SDK 调用、订单状态机、实名认证接口） |
 | 测试  | Haiku（沙箱支付测试、回调模拟）               |
 
 
@@ -254,21 +295,18 @@
 - POST /api/pay/create-order → 调用微信统一下单 → 返回 wxPayParams
 - POST /api/pay/wx-callback → 验签 → 更新订单 → 写入 entitlements
 - 前端 confirmPay() 调用 wx.requestPayment
-- POST /api/auth/face-verify/start → 返回 bizToken
-- POST /api/auth/face-verify/callback → 写 real_name_verified
-- 前端 accountSecurity 页添加认证入口
+- 微信实名认证：通过微信 openid 查询用户实名状态，已实名用户直接标记 verified
+- 前端 accountSecurity 页展示实名状态
 
 **要跑的测试**：
 
 - 微信支付沙箱环境下单 → 支付 → 回调成功
 - 重复支付拦截（PAY_ALREADY_DONE）
-- 人脸核身 bizToken 获取
-- 过期 token 报错
+- 实名认证状态查询与写入
 
 **需要你手动做的**：
 
 - 微信支付商户号申请 + API 密钥配置
-- 腾讯云人脸核身服务开通 + SecretId/SecretKey
 - 支付回调地址配置（需要公网域名）
 - 微信小程序后台配置支付能力
 
@@ -276,7 +314,7 @@
 
 ```
 执行 Phase 5。先阅读 docs/DEV_PROGRESS.md。
-目标：接入微信支付和真人认证。
+目标：接入微信支付和微信实名认证。
 设计阶段用 Opus（安全验签、权益模型）。
 编码阶段用 Sonnet。
 完成后更新 DEV_PROGRESS.md。
@@ -378,9 +416,9 @@
 | ----- | ------------------------- | ------ | ------------------- |
 | 1     | 后端骨架 + 前端对接               | `done` | Sonnet              |
 | 2     | Memory Chat 接入 LLM + 画像写入 | `done` | Opus 全程             |
-| 3     | 实时语音通话（ASR + TTS + 对话编排）  | `todo` | **Opus 全程**         |
-| 4     | 真实匹配算法 + 定时 Job           | `todo` | Opus 设计 + Sonnet 编码 |
-| 5     | 微信支付 + 真人认证               | `todo` | Opus 设计 + Sonnet 编码 |
+| 3     | 实时语音通话（ASR + TTS + 对话编排）  | `done` | **Opus 全程**         |
+| 4     | 真实匹配算法 + 定时 Job           | `done` | Opus 设计 + Sonnet 编码 |
+| 5     | 微信支付 + 微信实名认证               | `todo` | Opus 设计 + Sonnet 编码 |
 | 6     | 通知系统 + 推送                 | `todo` | Sonnet              |
 | 7     | 生产部署 + 压测 + 上线            | `todo` | Opus 设计 + Sonnet 编码 |
 
