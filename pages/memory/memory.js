@@ -1,21 +1,33 @@
-const common = require('../../utils/common.js')
-const api = require('../../utils/api.js')
-const mockData = require('../../data/mockData.js')
-const tabPage = require('../../behaviors/tabPage.js')
-const storage = common.storage
-const memoryData = mockData.getMemoryData()
+var common = require('../../utils/common.js')
+var mockData = require('../../data/mockData.js')
+var tabPage = require('../../behaviors/tabPage.js')
+var connectPage = require('../../stores/connect.js').connectPage
+var appStore = require('../../stores/appStore.js')
+var api = require('../../utils/api.js')
+var createBatcher = require('../../utils/setDataHelper.js').createBatcher
+var storage = common.storage
+var memoryData = mockData.getMemoryData()
+
+var WINDOW_SIZE = 50
+var LOAD_MORE_SIZE = 20
 
 Page({
-  behaviors: [tabPage(1)],
+  behaviors: [
+    tabPage(1),
+    connectPage('user', function (state) {
+      return {
+        userName: state.nickName || mockData.DEFAULT_USER.nickName,
+        userAvatar: state.avatar || mockData.DEFAULT_USER.avatarSmall
+      }
+    })
+  ],
 
   onShow() {
-    const info = common.loadUserInfo()
-    this.setData({ userName: info.name, userAvatar: info.avatar })
-    const app = getApp()
-    const targetTab = app.globalData.memoryTargetTab
+    this._setupKeyboardListener()
+    var targetTab = appStore.getState().memoryTargetTab
     if (targetTab) {
-      app.globalData.memoryTargetTab = null
-      const tabMap = { chat: 0, memory: 100, archive: 200 }
+      appStore.setState({ memoryTargetTab: null })
+      var tabMap = { chat: 0, memory: 100, archive: 200 }
       this.setData({
         activeTab: targetTab,
         tabSliderX: tabMap[targetTab] || 0
@@ -29,10 +41,7 @@ Page({
           this.scrollContentToTop()
         }
       })
-    }
-    this.loadInsights()
-    this._setupKeyboardListener()
-    if (this.data.activeTab === 'chat') {
+    } else if (this.data.activeTab === 'chat') {
       setTimeout(() => this.scrollChatToBottom(), 100)
     }
   },
@@ -50,11 +59,13 @@ Page({
     activeCategory: 'all',
     categories: memoryData.categories,
     insights: memoryData.insights,
-    filteredInsights: [],
+    filteredInsights: memoryData.insights.slice(),
     chatDays: '12天',
     chatMood: '平静',
     chatTopics: 8,
-    messages: memoryData.messages,
+    visibleMessages: [],
+    hasMoreHistory: false,
+    loadingHistory: false,
     aboutMe: memoryData.aboutMe,
     personalities: memoryData.personalities,
     traits: memoryData.traits,
@@ -68,10 +79,48 @@ Page({
     chatPaddingBottom: 188
   },
 
+  _allMessages: [],
   _msgCounter: 0,
 
   _nextMsgId() {
     return Date.now() + '_' + (++this._msgCounter)
+  },
+
+  _initMessages() {
+    this._allMessages = memoryData.messages.slice()
+    this._syncVisibleMessages()
+  },
+
+  _restoreMessages() {
+    var stored = storage.get('chatMessages', null)
+    var storedCounter = storage.get('chatMsgCounter', 0)
+    if (stored && Array.isArray(stored) && stored.length > 0) {
+      this._allMessages = stored
+      this._msgCounter = typeof storedCounter === 'number' ? storedCounter : 0
+      this._syncVisibleMessages()
+    } else {
+      this._initMessages()
+    }
+  },
+
+  _saveMessages() {
+    var MAX_STORED = 500
+    var toStore = this._allMessages
+    if (toStore.length > MAX_STORED) {
+      toStore = toStore.slice(toStore.length - MAX_STORED)
+    }
+    storage.set('chatMessages', toStore)
+    storage.set('chatMsgCounter', this._msgCounter)
+  },
+
+  _syncVisibleMessages() {
+    var all = this._allMessages
+    var start = Math.max(0, all.length - WINDOW_SIZE)
+    var visible = all.slice(start)
+    this.setData({
+      visibleMessages: visible,
+      hasMoreHistory: start > 0
+    })
   },
 
   _scrollThrottle() {
@@ -84,26 +133,16 @@ Page({
   },
 
   onLoad(options) {
-    const app = getApp()
-    const tab = app.globalData.memoryTargetTab || options.tab
-    if (tab) {
-      app.globalData.memoryTargetTab = null
-      const tabMap = { chat: 0, memory: 100, archive: 200 }
+    var targetTab = options.tab
+    if (targetTab) {
+      var tabMap = { chat: 0, memory: 100, archive: 200 }
       this.setData({
-        activeTab: tab,
-        tabSliderX: tabMap[tab] || 0
-      }, () => {
-        if (tab === 'chat') {
-          this.loadChatHistory()
-          this.scrollChatToBottom()
-        } else if (tab === 'archive') {
-          this.loadArchive()
-          this.scrollContentToTop()
-        } else {
-          this.scrollContentToTop()
-        }
+        activeTab: targetTab,
+        tabSliderX: tabMap[targetTab] || 0
       })
     }
+    this._batcher = createBatcher(this)
+    this._restoreMessages()
     this.loadInsights()
     this._setupKeyboardListener()
     if (this.data.activeTab === 'chat') {
@@ -117,6 +156,44 @@ Page({
       clearTimeout(this._typeTimer)
       this._typeTimer = null
     }
+    this._saveMessages()
+  },
+
+  onScrollToTop() {
+    if (this.data.loadingHistory || !this.data.hasMoreHistory) return
+    this.setData({ loadingHistory: true })
+
+    var all = this._allMessages
+    var visible = this.data.visibleMessages
+    var firstVisibleId = visible.length > 0 ? visible[0].id : null
+    var firstIndex = 0
+    if (firstVisibleId) {
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].id === firstVisibleId) { firstIndex = i; break }
+      }
+    }
+
+    var loadStart = Math.max(0, firstIndex - LOAD_MORE_SIZE)
+    var older = all.slice(loadStart, firstIndex)
+    if (older.length === 0) {
+      this.setData({ loadingHistory: false, hasMoreHistory: false })
+      return
+    }
+
+    var newVisible = older.concat(visible)
+    // 保持窗口不无限增长：如果超过 WINDOW_SIZE + LOAD_MORE_SIZE，裁剪底部
+    var maxVisible = WINDOW_SIZE + LOAD_MORE_SIZE
+    if (newVisible.length > maxVisible) {
+      newVisible = newVisible.slice(0, maxVisible)
+    }
+
+    var anchorId = 'msg-' + firstVisibleId
+    this.setData({
+      visibleMessages: newVisible,
+      hasMoreHistory: loadStart > 0,
+      loadingHistory: false,
+      scrollIntoView: anchorId
+    })
   },
 
   _setupKeyboardListener() {
@@ -136,10 +213,16 @@ Page({
   },
 
   _calcChatPadding() {
-    const sysInfo = common.getSystemInfo()
-    const rpxRatio = 750 / sysInfo.windowWidth
-    const safeRpx = (sysInfo.safeAreaInsets?.bottom || 0) * rpxRatio
-    const padding = Math.ceil(188 + safeRpx)
+    var sysInfo = common.getSystemInfo()
+    var rpxRatio = 750 / sysInfo.windowWidth
+    var safeBottom = 0
+    if (sysInfo.safeAreaInsets && typeof sysInfo.safeAreaInsets.bottom === 'number') {
+      safeBottom = sysInfo.safeAreaInsets.bottom
+    } else if (sysInfo.safeArea && typeof sysInfo.safeArea.bottom === 'number') {
+      safeBottom = Math.max(0, sysInfo.screenHeight - sysInfo.safeArea.bottom)
+    }
+    var safeRpx = safeBottom * rpxRatio
+    var padding = Math.ceil(188 + safeRpx)
     if (this.data.chatPaddingBottom !== padding) {
       this.setData({ chatPaddingBottom: padding }, () => {
         if (this.data.activeTab === 'chat') {
@@ -168,47 +251,16 @@ Page({
 
   /** 从 API 加载洞察列表 */
   loadInsights() {
-    api.get('/memory/insights')
-      .then((res) => {
-        this.setData({ insights: res.data }, () => {
-          this.filterInsights()
-          storage.set('memoryInsights', res.data)
-        })
-      })
-      .catch(() => {
-        // 回落本地缓存
-        const stored = storage.get('memoryInsights', null)
-        if (stored && stored.length > 0) {
-          this.setData({ insights: stored }, () => this.filterInsights())
-        } else {
-          storage.set('memoryInsights', this.data.insights)
-          this.filterInsights()
-        }
-      })
-  },
-
-  /** 从 API 加载人格档案 */
-  loadArchive() {
-    api.get('/memory/archive')
-      .then((res) => {
-        this.setData({
-          aboutMe: res.aboutMe || memoryData.aboutMe,
-          personalities: res.personalities || memoryData.personalities,
-          traits: res.traits || memoryData.traits,
-        })
-      })
-      .catch(() => {
-        this.setData({
-          aboutMe: memoryData.aboutMe,
-          personalities: memoryData.personalities,
-          traits: memoryData.traits,
-        })
+    var stored = storage.get('memoryInsights', null)
+    if (stored && stored.length > 0) {
+      this.setData({ insights: stored }, () => {
+        this.filterInsights()
       })
   },
 
   switchTab(e) {
-    const tab = e.currentTarget.dataset.tab
-    const tabMap = { chat: 0, memory: 100, archive: 200 }
+    var tab = e.currentTarget.dataset.tab
+    var tabMap = { chat: 0, memory: 100, archive: 200 }
     this.setData({
       activeTab: tab,
       tabSliderX: tabMap[tab]
@@ -226,29 +278,33 @@ Page({
   },
 
   switchCategory(e) {
-    const category = e.currentTarget.dataset.id
+    var category = e.currentTarget.dataset.id
     this.setData({ activeCategory: category }, () => {
       this.filterInsights()
     })
   },
 
   filterInsights() {
-    const { activeCategory, insights } = this.data
+    var activeCategory = this.data.activeCategory
+    var insights = this.data.insights
     if (activeCategory === 'all') {
       this.setData({ filteredInsights: insights })
     } else {
-      const filtered = insights.filter(item => item.category === activeCategory)
-      this.setData({ filteredInsights: filtered })
+      this.setData({ filteredInsights: insights.filter(item => item.category === activeCategory) })
     }
   },
 
   onInputFocus() {
     this.setData({ inputFocused: true })
-    setTimeout(() => this.scrollChatToBottom(), 200)
+    setTimeout(() => {
+      this._calcChatPadding()
+      this.scrollChatToBottom()
+    }, 300)
   },
 
   onInputBlur() {
     this.setData({ inputFocused: false })
+    setTimeout(() => this._calcChatPadding(), 150)
   },
 
   onInputChange(e) {
@@ -272,85 +328,92 @@ Page({
   },
 
   sendMessage() {
-    const content = this.data.inputValue.trim()
+    var content = this.data.inputValue.trim()
     if (!content || this.data.isSending) return
 
-    const messages = [...this.data.messages, {
+    var userMsg = {
       id: this._nextMsgId(),
       sender: 'user',
       content: content
-    }]
+    }
+
+    this._allMessages.push(userMsg)
+    var visible = this.data.visibleMessages.concat(userMsg)
+    if (visible.length > WINDOW_SIZE) {
+      visible = visible.slice(visible.length - WINDOW_SIZE)
+    }
 
     this.setData({
-      messages,
+      visibleMessages: visible,
+      hasMoreHistory: this._allMessages.length > visible.length,
       inputValue: '',
       isSending: true
     }, () => this.scrollChatToBottom())
+    this._saveMessages()
 
-    // 调 API 获取 AI 回复
-    api.post('/memory/chat', { content })
-      .then((res) => {
-        const replyText = res.reply.content
-        const aiMsg = {
-          id: this._nextMsgId(),
-          sender: 'ai',
-          content: ''
-        }
-        const newMessages = [...messages, aiMsg]
-        this.setData({ messages: newMessages }, () => this.scrollChatToBottom())
+    var self = this
+    api.sendChatMessage(content).then(function (res) {
+      var aiMsg = {
+        id: res.id || self._nextMsgId(),
+        sender: 'ai',
+        content: ''
+      }
 
-        // 保持逐字打字效果
-        let i = 0
-        const batchSize = 3
-        const typeNext = () => {
-          if (i >= replyText.length) {
-            this.setData({ isSending: false })
-            return
-          }
-          const chunk = replyText.slice(i, i + batchSize)
-          aiMsg.content += chunk
-          i += chunk.length
-          this.setData({
-            [`messages[${newMessages.length - 1}].content`]: aiMsg.content
-          })
-          this._scrollThrottle()
-          this._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
-        }
-        typeNext()
-      })
-      .catch(() => {
-        // API 失败，回退 mock 回复
-        const reply = mockData.MEMORY_REPLIES[Math.floor(Math.random() * mockData.MEMORY_REPLIES.length)]
-        const aiMsg = {
-          id: this._nextMsgId(),
-          sender: 'ai',
-          content: ''
-        }
-        const newMessages = [...messages, aiMsg]
-        this.setData({ messages: newMessages }, () => this.scrollChatToBottom())
+      self._allMessages.push(aiMsg)
+      var vis = self.data.visibleMessages.concat(aiMsg)
+      if (vis.length > WINDOW_SIZE) {
+        vis = vis.slice(vis.length - WINDOW_SIZE)
+      }
 
-        let i = 0
-        const batchSize = 3
-        const typeNext = () => {
+      var reply = res.reply
+      if (!reply || typeof reply !== 'string') {
+        reply = '我在听，你继续说。'
+      }
+
+      self.setData({
+        visibleMessages: vis,
+        hasMoreHistory: self._allMessages.length > vis.length
+      }, () => {
+        self.scrollChatToBottom()
+        var visIdx = self.data.visibleMessages.length - 1
+        if (visIdx < 0 || visIdx >= self.data.visibleMessages.length) {
+          self.setData({ isSending: false })
+          return
+        }
+        var i = 0
+        var typeNext = function () {
           if (i >= reply.length) {
-            this.setData({ isSending: false })
+            self.setData({ isSending: false })
+            self._saveMessages()
             return
           }
-          const chunk = reply.slice(i, i + batchSize)
-          aiMsg.content += chunk
-          i += chunk.length
-          this.setData({
-            [`messages[${newMessages.length - 1}].content`]: aiMsg.content
-          })
-          this._scrollThrottle()
-          this._typeTimer = setTimeout(typeNext, 80 + Math.random() * 40)
+          var ch = reply[i]
+          aiMsg.content += ch
+          i++
+          var update = {}
+          update['visibleMessages[' + visIdx + '].content'] = aiMsg.content
+          self.setData(update)
+          self._scrollThrottle()
+          var delay = 25 + Math.random() * 40
+          if (/[，。！？；：、]/.test(ch)) {
+            delay += 180 + Math.random() * 120
+          }
+          if (/[.!?;:]/.test(ch)) {
+            delay += 150 + Math.random() * 80
+          }
+          self._typeTimer = setTimeout(typeNext, delay)
         }
         typeNext()
       })
+    }).catch(function (err) {
+      console.error('[Chat] sendMessage error:', err)
+      self.setData({ isSending: false })
+      wx.showToast({ title: '发送失败，请重试', icon: 'none' })
+    })
   },
 
   onInsightLongPress(e) {
-    const id = e.currentTarget.dataset.id
+    var id = e.currentTarget.dataset.id
     wx.showActionSheet({
       itemList: ['编辑', '删除'],
       success: (res) => {
@@ -370,31 +433,19 @@ Page({
       confirmColor: '#c4715a',
       success: (res) => {
         if (res.confirm) {
-          api.del('/memory/insights/' + id)
-            .then(() => {
-              const insights = this.data.insights.filter(i => i.id !== id)
-              this.setData({ insights }, () => {
-                this.filterInsights()
-              })
-              storage.set('memoryInsights', insights)
-              wx.showToast({ title: '已删除', icon: 'none' })
-            })
-            .catch(() => {
-              // 本地删除
-              const insights = this.data.insights.filter(i => i.id !== id)
-              this.setData({ insights }, () => {
-                this.filterInsights()
-              })
-              storage.set('memoryInsights', insights)
-              wx.showToast({ title: '已删除', icon: 'none' })
-            })
+          var insights = this.data.insights.filter(i => i.id !== id)
+          this.setData({ insights: insights }, () => {
+            this.filterInsights()
+          })
+          storage.set('memoryInsights', insights)
+          wx.showToast({ title: '已删除', icon: 'none' })
         }
       }
     })
   },
 
   openEditModal(id) {
-    const item = this.data.insights.find(i => i.id === id)
+    var item = this.data.insights.find(i => i.id === id)
     if (!item) return
     this.setData({
       showEditModal: true,
@@ -417,38 +468,32 @@ Page({
   },
 
   saveEdit() {
-    const { editId, editTitle, editContent, insights } = this.data
-    if (!editTitle.trim() || !editContent.trim()) {
+    var data = this.data
+    if (!data.editTitle.trim() || !data.editContent.trim()) {
       wx.showToast({ title: '标题和内容不能为空', icon: 'none' })
       return
     }
-    api.put('/memory/insights/' + editId, { title: editTitle.trim(), content: editContent.trim() })
-      .then((updated) => {
-        const idx = insights.findIndex(i => i.id === editId)
-        if (idx > -1) {
-          insights[idx] = { ...insights[idx], ...updated }
-        }
-        this.setData({ insights, showEditModal: false, editId: null }, () => {
-          this.filterInsights()
+    var insights = data.insights.map(function (item) {
+      if (item.id === data.editId) {
+        return Object.assign({}, item, {
+          title: data.editTitle.trim(),
+          content: data.editContent.trim()
         })
-        storage.set('memoryInsights', insights)
-        wx.showToast({ title: '已保存', icon: 'none' })
-      })
-      .catch(() => {
-        // 本地保存
-        const idx = insights.findIndex(i => i.id === editId)
-        if (idx === -1) return
-        insights[idx].title = editTitle.trim()
-        insights[idx].content = editContent.trim()
-        this.setData({ insights, showEditModal: false, editId: null }, () => {
-          this.filterInsights()
-        })
-        storage.set('memoryInsights', insights)
-        wx.showToast({ title: '已保存', icon: 'none' })
-      })
+      }
+      return item
+    })
+    this.setData({ insights: insights, showEditModal: false, editId: null }, () => {
+      this.filterInsights()
+    })
+    storage.set('memoryInsights', insights)
+    wx.showToast({ title: '已保存', icon: 'none' })
   },
 
   goToUserHome(e) {
     common.goToUserHome(e.detail?.author || e.currentTarget.dataset.author)
+  },
+
+  onAvatarError() {
+    this.setData({ aiAvatar: '/images/avatar_fallback.png' })
   }
 })

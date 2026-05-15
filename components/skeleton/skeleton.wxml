@@ -1,0 +1,45 @@
+<view class="skeleton-wrap {{active ? 'shimmer' : ''}}" wx:if="{{active}}">
+
+  <!-- list: 圆形头像 + 文字行 -->
+  <block wx:if="{{variant === 'list'}}">
+    <view class="skeleton-row" wx:for="{{rowArray}}" wx:key="*this"
+          style="animation-delay: {{item * 0.08}}s">
+      <view class="skeleton-circle"></view>
+      <view class="skeleton-lines">
+        <view class="skeleton-line skeleton-line--short"></view>
+        <view class="skeleton-line skeleton-line--long"></view>
+      </view>
+    </view>
+  </block>
+
+  <!-- card: 矩形卡片 -->
+  <block wx:if="{{variant === 'card'}}">
+    <view class="skeleton-card" wx:for="{{rowArray}}" wx:key="*this"
+          style="animation-delay: {{item * 0.1}}s">
+      <view class="skeleton-line skeleton-line--title"></view>
+      <view class="skeleton-line skeleton-line--long"></view>
+      <view class="skeleton-line skeleton-line--medium"></view>
+    </view>
+  </block>
+
+  <!-- chat: 左右交替气泡 -->
+  <block wx:if="{{variant === 'chat'}}">
+    <view class="skeleton-bubble {{item % 2 === 0 ? 'skeleton-bubble--left' : 'skeleton-bubble--right'}}"
+          wx:for="{{rowArray}}" wx:key="*this"
+          style="animation-delay: {{item * 0.1}}s">
+      <view class="skeleton-circle skeleton-circle--small" wx:if="{{item % 2 === 0}}"></view>
+      <view class="skeleton-line skeleton-line--bubble"></view>
+      <view class="skeleton-circle skeleton-circle--small" wx:if="{{item % 2 !== 0}}"></view>
+    </view>
+  </block>
+
+  <!-- profile: 居中大头像 + 文字 -->
+  <block wx:if="{{variant === 'profile'}}">
+    <view class="skeleton-profile">
+      <view class="skeleton-circle skeleton-circle--large"></view>
+      <view class="skeleton-line skeleton-line--center skeleton-line--short"></view>
+      <view class="skeleton-line skeleton-line--center skeleton-line--medium"></view>
+    </view>
+  </block>
+
+</view>

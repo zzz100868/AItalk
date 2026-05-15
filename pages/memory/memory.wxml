@@ -14,9 +14,9 @@
     bind:avatartap="goToUserHome"
   />
 
-  <scroll-view scroll-y class="content {{activeTab === 'chat' ? 'content-chat' : ''}}" enable-back-to-top scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
+  <scroll-view scroll-y class="content {{activeTab === 'chat' ? 'content-chat' : ''}}" enable-back-to-top scroll-into-view="{{scrollIntoView}}" scroll-with-animation bindscrolltoupper="onScrollToTop" upper-threshold="100">
     <view id="memory-scroll-top"></view>
-    <view class="content-inner {{activeTab === 'chat' ? 'content-inner-chat' : ''}}" style="padding-bottom: {{activeTab === 'chat' ? 32 : 140}}rpx;">
+    <view class="content-inner {{activeTab === 'chat' ? 'content-inner-chat' : ''}}" style="{{activeTab === 'chat' ? 'padding-bottom: 32rpx;' : ''}}">
       <!-- Tab Switcher -->
       <view class="tab-switcher anim-fade-in">
         <view class="tab-slider" style="transform: translateX({{tabSliderX}}%);"></view>
@@ -53,13 +53,20 @@
 
         <!-- Messages -->
         <view class="messages">
+          <view wx:if="{{loadingHistory}}" class="load-more-spinner-wrap">
+            <view class="load-more-spinner"></view>
+          </view>
+          <view wx:elif="{{hasMoreHistory}}" class="load-more-hint">
+            <text class="load-more-text">上滑加载更多</text>
+          </view>
           <view
-            wx:for="{{messages}}"
+            wx:for="{{visibleMessages}}"
             wx:key="id"
+            id="msg-{{item.id}}"
             class="msg-row {{item.sender === 'user' ? 'msg-user' : 'msg-ai'}}"
             style="animation-delay: {{index * 0.08}}s"
           >
-            <image wx:if="{{item.sender === 'ai'}}" class="ai-avatar-small" src="{{aiAvatar}}" mode="aspectFill" bindtap="goToUserHome" data-author="Stitch AI"/>
+            <image wx:if="{{item.sender === 'ai'}}" class="ai-avatar-small" src="{{aiAvatar}}" mode="aspectFill" lazy-load bindtap="goToUserHome" data-author="Stitch AI" binderror="onAvatarError"/>
             <view class="msg-bubble {{item.sender === 'user' ? 'msg-bubble-user' : 'msg-bubble-ai'}}">
               <text class="msg-text">{{item.content}}</text>
             </view>
@@ -72,6 +79,7 @@
 
       <!-- Memory View -->
       <view wx:if="{{activeTab === 'memory'}}" class="memory-view">
+        <skeleton variant="card" rows="3" active="{{!filteredInsights.length && !insights.length}}" />
         <!-- Categories -->
         <scroll-view scroll-x class="category-bar anim-fade-in" show-scrollbar="false">
           <view class="category-list">

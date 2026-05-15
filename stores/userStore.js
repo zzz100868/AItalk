@@ -1,80 +1,59 @@
-const common = require('../utils/common.js')
-const api = require('../utils/api.js')
-const mockData = require('../data/mockData.js')
+var Store = require('./store.js')
+var mockData = require('../data/mockData.js')
+var storage = require('../utils/common.js').storage
 
-const storage = common.storage
+var userStore = new Store('user', {
+  avatar: mockData.DEFAULT_USER.avatar,
+  nickName: mockData.DEFAULT_USER.nickName,
+  bio: mockData.DEFAULT_USER.bio,
+  id: mockData.DEFAULT_USER.id,
+  photos: []
+}, {
+  persist: ['avatar', 'nickName', 'bio', 'photos']
+})
 
-/** 从 API 拉取用户资料，写入缓存 */
-let _fetching = false
-function fetchProfile() {
-  if (_fetching) return Promise.reject('already fetching')
-  _fetching = true
-  return api.get('/me')
-    .then((data) => {
-      const profile = {
-        id: data.id,
-        nickName: data.nickname,
-        avatar: data.avatar,
-        bio: data.bio,
-      }
-      storage.set('userProfile', profile)
-      const app = getApp()
-      app.globalData.userInfo.avatarUrl = profile.avatar
-      app.globalData.userInfo.nickName = profile.nickName
-      if (app.globalData._cache) {
-        app.globalData._cache.profile = profile
-      }
-      return profile
-    })
-    .catch(() => {
-      // 网络失败时静默回落本地
-      return getProfile()
-    })
-    .finally(() => { _fetching = false })
+function _isValidAvatar(url) {
+  if (!url || typeof url !== 'string') return false
+  if (url.indexOf('http') === 0) return true
+  if (url.indexOf('wxfile://') === 0) return true
+  if (url.indexOf('/images/') === 0) return true
+  return false
 }
 
-function getProfile() {
-  const app = getApp()
-  const saved = storage.get('userProfile', {})
-  return {
-    id: saved.id || app.globalData.userInfo.id || mockData.DEFAULT_USER.id,
-    avatar: saved.avatar || app.globalData.userInfo.avatarUrl || mockData.DEFAULT_USER.avatar,
-    nickName: saved.nickName || app.globalData.userInfo.nickName || mockData.DEFAULT_USER.nickName,
-    bio: saved.bio || mockData.DEFAULT_USER.bio
-  }
-}
-
-function updateProfile(nextProfile) {
-  const profile = {
-    avatar: nextProfile.avatar || mockData.DEFAULT_USER.avatar,
-    nickName: (nextProfile.nickName || '').trim() || mockData.DEFAULT_USER.nickName,
-    bio: (nextProfile.bio || '').trim()
+// 兼容旧版 storage key 迁移：userProfile / profilePhotos
+;(function migrate() {
+  var oldProfile = storage.get('userProfile', null)
+  if (oldProfile && typeof oldProfile === 'object') {
+    var patch = {}
+    if (oldProfile.avatar && _isValidAvatar(oldProfile.avatar)) {
+      patch.avatar = oldProfile.avatar
+    }
+    if (oldProfile.nickName) patch.nickName = oldProfile.nickName
+    if (oldProfile.bio !== undefined) patch.bio = oldProfile.bio
+    if (Object.keys(patch).length) userStore.setState(patch)
+    storage.remove('userProfile')
   }
 
-  // 本地先写入，保证 UI 即时响应
-  storage.set('userProfile', profile)
-
-  const app = getApp()
-  app.globalData.userInfo.avatarUrl = profile.avatar
-  app.globalData.userInfo.nickName = profile.nickName
-  if (app.globalData._cache) {
-    app.globalData._cache.profile = profile
+  var oldPhotos = storage.get('profilePhotos', null)
+  if (Array.isArray(oldPhotos) && oldPhotos.length) {
+    userStore.setState({ photos: oldPhotos })
+    storage.remove('profilePhotos')
   }
+})()
 
-  // 异步同步到后端
-  api.put('/me', {
-    avatar: profile.avatar,
-    nickname: profile.nickName,
-    bio: profile.bio,
-  }).catch(() => {
-    // 静默失败，下次 fetch 会同步
-  })
+// 清理无效的持久化头像
+;(function sanitize() {
+  var state = userStore.getState()
+  var patch = {}
+  if (!_isValidAvatar(state.avatar)) {
+    patch.avatar = mockData.DEFAULT_USER.avatar
+  }
+  if (!state.nickName) {
+    patch.nickName = mockData.DEFAULT_USER.nickName
+  }
+  if (Object.keys(patch).length) {
+    userStore.setState(patch)
+  }
+})()
 
-  return profile
-}
-
-module.exports = {
-  getProfile,
-  updateProfile,
-  fetchProfile,
-}
+module.exports = userStore

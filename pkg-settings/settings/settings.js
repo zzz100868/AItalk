@@ -1,9 +1,18 @@
-const common = require('../../utils/common.js')
-const storage = common.storage
-const userStore = require('../../stores/userStore.js')
-const mockData = require('../../data/mockData.js')
+var common = require('../../utils/common.js')
+var storage = common.storage
+var mockData = require('../../data/mockData.js')
+var connectPage = require('../../stores/connect.js').connectPage
 
 Page({
+  behaviors: [
+    connectPage('user', function (state) {
+      return {
+        'userInfo.avatar': state.avatar || mockData.DEFAULT_USER.avatar,
+        'userInfo.nickName': state.nickName || mockData.DEFAULT_USER.nickName
+      }
+    })
+  ],
+
   data: {
     userInfo: {
       nickName: mockData.DEFAULT_USER.nickName,
@@ -18,19 +27,11 @@ Page({
     this.calcCacheSize()
   },
 
-  onShow() {
-    const profile = userStore.getProfile()
-    this.setData({
-      'userInfo.avatar': profile.avatar,
-      'userInfo.nickName': profile.nickName
-    })
-  },
-
   calcCacheSize() {
     try {
-      const info = wx.getStorageInfoSync()
-      const kb = info.currentSize
-      const size = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB'
+      var info = wx.getStorageInfoSync()
+      var kb = info.currentSize
+      var size = kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB'
       this.setData({ cacheSize: size })
     } catch (e) {
       this.setData({ cacheSize: '0 KB' })
@@ -38,11 +39,11 @@ Page({
   },
 
   goToEditProfile() {
-    wx.navigateTo({ url: '/pages/editProfile/editProfile' })
+    wx.navigateTo({ url: '/pkg-settings/editProfile/editProfile' })
   },
 
   goToAccountSecurity() {
-    wx.navigateTo({ url: '/pages/accountSecurity/accountSecurity' })
+    wx.navigateTo({ url: '/pkg-settings/accountSecurity/accountSecurity' })
   },
 
   clearCache() {
@@ -53,8 +54,9 @@ Page({
       success: (res) => {
         if (res.confirm) {
           try {
-            const info = wx.getStorageInfoSync()
-            const keysToKeep = ['userProfile', 'userSettings', 'memoryInsights', 'profilePhotos']
+            var info = wx.getStorageInfoSync()
+            var keysToKeep = ['userProfile', 'userSettings', 'memoryInsights', 'profilePhotos',
+              '_store_user_avatar', '_store_user_nickName', '_store_user_bio', '_store_user_photos']
             info.keys.forEach(key => {
               if (!keysToKeep.includes(key)) {
                 storage.remove(key)

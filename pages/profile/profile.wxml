@@ -9,7 +9,7 @@
       <view class="profile-hero anim-fade-in-up">
         <view class="avatar-wrapper">
           <view class="avatar-frame anim-scale-in">
-            <image class="profile-avatar" src="{{userInfo.avatar}}" mode="aspectFill"/>
+            <image class="profile-avatar" src="{{userInfo.avatar}}" mode="aspectFill" binderror="onAvatarError"/>
             <view class="avatar-ring"></view>
             <view class="avatar-ring-outer"></view>
           </view>
@@ -47,7 +47,7 @@
                 bindlongpress="deletePhoto"
                 data-del-index="{{index}}"
               >
-                <image class="photo-img" src="{{item}}" mode="aspectFill"/>
+                <image class="photo-img" src="{{item}}" mode="aspectFill" lazy-load/>
                 <view class="photo-delete" catchtap="deletePhoto" data-del-index="{{index}}">
                   <view class="photo-delete-icon"></view>
                 </view>

@@ -15,7 +15,7 @@
           <view class="avatar-ring-outer"></view>
           <view class="avatar-ring-mid"></view>
           <view class="avatar-frame">
-            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+            <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
           </view>
         </view>
       </view>
@@ -44,6 +44,142 @@
     </view>
   </view>
 
+  <!-- ========== Form View ========== -->
+  <view class="view-layer form-view {{viewMode === 'form' ? 'view-active' : 'view-inactive'}}">
+    <scroll-view scroll-y class="form-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="form-content">
+        <!-- Title -->
+        <view class="form-title-section">
+          <view class="form-title-deco">
+            <view class="form-deco-line"></view>
+            <text class="form-deco-text">PROFILE</text>
+            <view class="form-deco-line"></view>
+          </view>
+          <text class="form-title">完善你的资料</text>
+          <text class="form-subtitle">帮助我们为你匹配更契合的对话体验</text>
+        </view>
+
+        <!-- Form Card -->
+        <view class="form-card">
+          <!-- Age -->
+          <view class="form-row anim-fade-in-up" style="animation-delay: 0.12s">
+            <view class="form-row-hd">
+              <view class="form-row-icon form-icon-age"></view>
+              <text class="form-row-label">年龄</text>
+            </view>
+            <picker mode="selector" range="{{ageRange}}" value="{{ageIndex}}" bindchange="onAgeChange">
+              <view class="form-row-value {{ageIndex === -1 ? 'form-row-placeholder' : ''}}">
+                <text>{{ageIndex === -1 ? '点击选择' : ageRange[ageIndex] + ' 岁'}}</text>
+                <view class="form-chevron"></view>
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row-divider anim-fade-in-up" style="animation-delay: 0.16s"></view>
+
+          <!-- Gender -->
+          <view class="form-row form-row-stack anim-fade-in-up" style="animation-delay: 0.20s">
+            <view class="form-row-hd">
+              <view class="form-row-icon form-icon-gender"></view>
+              <text class="form-row-label">性别</text>
+            </view>
+            <view class="form-row-tags">
+              <view
+                class="form-row-tag {{gender === item ? 'form-row-tag-active' : ''}}"
+                wx:for="{{genderOptions}}"
+                wx:key="item"
+                bindtap="selectGender"
+                data-value="{{item}}"
+              >{{item}}</view>
+            </view>
+          </view>
+
+          <view class="form-row-divider anim-fade-in-up" style="animation-delay: 0.24s"></view>
+
+          <!-- Orientation -->
+          <view class="form-row form-row-stack anim-fade-in-up" style="animation-delay: 0.28s">
+            <view class="form-row-hd">
+              <view class="form-row-icon form-icon-heart"></view>
+              <text class="form-row-label">性取向</text>
+            </view>
+            <view class="form-row-tags">
+              <view
+                class="form-row-tag {{orientation === item ? 'form-row-tag-active' : ''}}"
+                wx:for="{{orientationOptions}}"
+                wx:key="item"
+                bindtap="selectOrientation"
+                data-value="{{item}}"
+              >{{item}}</view>
+            </view>
+          </view>
+
+          <view class="form-row-divider anim-fade-in-up" style="animation-delay: 0.32s"></view>
+
+          <!-- Identity -->
+          <view class="form-row anim-fade-in-up" style="animation-delay: 0.36s">
+            <view class="form-row-hd">
+              <view class="form-row-icon form-icon-briefcase"></view>
+              <text class="form-row-label">身份</text>
+            </view>
+            <picker mode="selector" range="{{identityOptions}}" value="{{identityIndex}}" bindchange="onIdentityChange">
+              <view class="form-row-value {{identityIndex === -1 ? 'form-row-placeholder' : ''}}">
+                <text>{{identityIndex === -1 ? '点击选择' : identityOptions[identityIndex]}}</text>
+                <view class="form-chevron"></view>
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row-divider anim-fade-in-up" style="animation-delay: 0.40s"></view>
+
+          <!-- MBTI -->
+          <view class="form-row anim-fade-in-up" style="animation-delay: 0.44s">
+            <view class="form-row-hd">
+              <view class="form-row-icon form-icon-mbti"></view>
+              <text class="form-row-label">MBTI</text>
+            </view>
+            <picker mode="selector" range="{{mbtiOptions}}" value="{{mbtiIndex}}" bindchange="onMbtiChange">
+              <view class="form-row-value {{mbtiIndex === -1 ? 'form-row-placeholder' : ''}}">
+                <text>{{mbtiIndex === -1 ? '点击选择' : mbtiOptions[mbtiIndex]}}</text>
+                <view class="form-chevron"></view>
+              </view>
+            </picker>
+          </view>
+
+          <view class="form-row-divider anim-fade-in-up" style="animation-delay: 0.48s"></view>
+
+          <!-- Recent Status -->
+          <view class="form-row form-row-stack anim-fade-in-up" style="animation-delay: 0.52s">
+            <view class="form-row-hd">
+              <view class="form-row-icon form-icon-status"></view>
+              <text class="form-row-label">最近的状态</text>
+            </view>
+            <textarea
+              class="form-textarea {{!recentStatus ? 'form-textarea-placeholder' : ''}}"
+              value="{{recentStatus}}"
+              placeholder="比如：刚离职在gap、备考中、分手了想找人聊聊…"
+              placeholder-class="form-textarea-placeholder"
+              maxlength="60"
+              bindinput="onStatusInput"
+            />
+          </view>
+        </view>
+
+        <!-- Action -->
+        <view class="action-area form-action anim-fade-in-up" style="animation-delay: 0.36s">
+          <view class="btn-start {{canStart ? 'btn-start-ready' : ''}}" bindtap="submitForm">
+            <text>{{canStart ? '开始通话' : '请完善信息'}}</text>
+            <view class="btn-arrow"></view>
+          </view>
+        </view>
+
+        <!-- Footer hint -->
+        <view class="form-footer anim-fade-in-up" style="animation-delay: 0.44s">
+          <text>信息仅用于个性化对话 · 严格保护隐私</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
   <!-- ========== Call View ========== -->
   <view class="view-layer call-view {{viewMode === 'call' ? 'view-active' : 'view-inactive'}}">
     <page-header
@@ -63,7 +199,7 @@
         <block wx:if="{{!isCalling}}">
           <view class="avatar-zone call-avatar-enter">
             <view class="avatar-frame-static">
-              <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+              <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
               <view class="avatar-overlay"></view>
             </view>
             <view class="avatar-offline-ring"></view>
@@ -94,7 +230,7 @@
             <view class="avatar-ring-mid"></view>
             <view class="avatar-float">
               <view class="avatar-frame">
-                <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill"/>
+                <image class="ai-avatar" src="{{aiAvatar}}" mode="aspectFill" binderror="onAvatarError"/>
                 <view class="avatar-overlay"></view>
               </view>
             </view>

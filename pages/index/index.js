@@ -1,8 +1,18 @@
-const common = require('../../utils/common.js')
-const mockData = require('../../data/mockData.js')
-const api = require('../../utils/api.js')
+var common = require('../../utils/common.js')
+var mockData = require('../../data/mockData.js')
+var connectPage = require('../../stores/connect.js').connectPage
+var appStore = require('../../stores/appStore.js')
 
 Page({
+  behaviors: [
+    connectPage('user', function (state) {
+      return {
+        userName: state.nickName || mockData.DEFAULT_USER.nickName,
+        userAvatar: state.avatar || mockData.DEFAULT_USER.avatarSmall
+      }
+    })
+  ],
+
   data: {
     viewMode: 'landing',
     isTransitioning: false,
@@ -15,10 +25,18 @@ Page({
     aiName: mockData.AI_USERS.xiaoya.name,
     aiAvatar: mockData.AI_USERS.xiaoya.avatar,
     userAvatar: mockData.DEFAULT_USER.avatarSmall,
-    // Voice state
-    aiSpeaking: false,
-    asrText: '',
-    aiText: '',
+    ageRange: Array.from({ length: 63 }, function (_, i) { return i + 18 }),
+    ageIndex: -1,
+    genderOptions: ['男', '女', '其他'],
+    gender: '',
+    orientationOptions: ['异性恋', '同性恋', '双性恋', '其他'],
+    orientation: '',
+    identityOptions: ['学生', '上班族', '自由职业', '创业者', '其他'],
+    identityIndex: -1,
+    mbtiOptions: ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'],
+    mbtiIndex: -1,
+    recentStatus: '',
+    canStart: false
   },
 
   socketTask: null,
@@ -32,11 +50,26 @@ Page({
     if (options.mode === 'call') {
       this.setData({ viewMode: 'call' })
     }
+    var saved = common.storage.get('basicInfo', null)
+    if (saved) {
+      var ageIndex = this.data.ageRange.indexOf(saved.age)
+      var identityIndex = this.data.identityOptions.indexOf(saved.identity)
+      var mbtiIndex = this.data.mbtiOptions.indexOf(saved.mbti)
+      this.setData({
+        ageIndex: ageIndex >= 0 ? ageIndex : -1,
+        gender: saved.gender || '',
+        orientation: saved.orientation || '',
+        identityIndex: identityIndex >= 0 ? identityIndex : -1,
+        mbtiIndex: mbtiIndex >= 0 ? mbtiIndex : -1,
+        recentStatus: saved.recentStatus || ''
+      }, () => this._checkCanStart())
+    }
   },
 
   onShow() {
-    const info = common.loadUserInfo()
-    this.setData({ userName: info.name, userAvatar: info.avatar })
+    if (this.data.isTransitioning) {
+      this.setData({ isTransitioning: false })
+    }
     if (this.data.isCalling && this.callStartedAt) {
       this._syncCallDuration()
       this.startCallTimer()
@@ -57,8 +90,54 @@ Page({
     if (this.data.isTransitioning) return
     this.setData({ isTransitioning: true })
     setTimeout(() => {
-      this.setData({ viewMode: 'call', isCalling: false, isTransitioning: false })
+      this.setData({ viewMode: 'form', isTransitioning: false })
     }, 650)
+  },
+
+  _checkCanStart() {
+    var d = this.data
+    var canStart = d.ageIndex !== -1 && d.gender && d.orientation && d.identityIndex !== -1 && d.mbtiIndex !== -1 && d.recentStatus.trim().length > 0
+    if (canStart !== d.canStart) {
+      this.setData({ canStart: canStart })
+    }
+  },
+
+  onIdentityChange(e) {
+    this.setData({ identityIndex: parseInt(e.detail.value) }, () => this._checkCanStart())
+  },
+
+  onMbtiChange(e) {
+    this.setData({ mbtiIndex: parseInt(e.detail.value) }, () => this._checkCanStart())
+  },
+
+  onStatusInput(e) {
+    this.setData({ recentStatus: e.detail.value }, () => this._checkCanStart())
+  },
+
+  onAgeChange(e) {
+    this.setData({ ageIndex: parseInt(e.detail.value) }, () => this._checkCanStart())
+  },
+
+  selectGender(e) {
+    this.setData({ gender: e.currentTarget.dataset.value }, () => this._checkCanStart())
+  },
+
+  selectOrientation(e) {
+    this.setData({ orientation: e.currentTarget.dataset.value }, () => this._checkCanStart())
+  },
+
+  submitForm() {
+    if (!this.data.canStart) return
+    var d = this.data
+    common.storage.set('basicInfo', {
+      age: d.ageRange[d.ageIndex],
+      gender: d.gender,
+      orientation: d.orientation,
+      identity: d.identityOptions[d.identityIndex],
+      mbti: d.mbtiOptions[d.mbtiIndex],
+      recentStatus: d.recentStatus.trim()
+    })
+    this.setData({ viewMode: 'call', isCalling: false })
   },
 
   startCall() {
@@ -94,14 +173,13 @@ Page({
 
   _syncCallDuration() {
     if (!this.callStartedAt) return
-    const seconds = Math.floor((Date.now() - this.callStartedAt) / 1000)
-    const mins = Math.floor(seconds / 60).toString().padStart(2, '0')
-    const secs = (seconds % 60).toString().padStart(2, '0')
-    this.setData({ callDuration: `${mins}:${secs}` })
+    var seconds = Math.floor((Date.now() - this.callStartedAt) / 1000)
+    var mins = Math.floor(seconds / 60).toString().padStart(2, '0')
+    var secs = (seconds % 60).toString().padStart(2, '0')
+    this.setData({ callDuration: mins + ':' + secs })
   },
 
   endCall() {
-    this._syncCallDuration()
     this._clearCallTimer()
     this._stopRecording()
     this._stopAudio()
@@ -115,22 +193,7 @@ Page({
 
     if (this._mockInterval) { clearInterval(this._mockInterval); this._mockInterval = null }
     this.callStartedAt = null
-    const now = new Date()
-    const hours = now.getHours().toString().padStart(2, '0')
-    const minutes = now.getMinutes().toString().padStart(2, '0')
-    getApp().globalData.memoryTargetTab = 'archive'
-    this.setData({
-      viewMode: 'landing',
-      isCalling: false,
-      callDate: `今天 ${hours}:${minutes}`,
-      isMuted: false,
-      isSpeakerOn: false,
-      aiSpeaking: false,
-      asrText: '',
-      aiText: '',
-    }, () => {
-      wx.switchTab({ url: '/pages/memory/memory' })
-    })
+    wx.switchTab({ url: '/pages/match/match' })
   },
 
   toggleMute() {
@@ -152,256 +215,7 @@ Page({
     common.goToUserHome(e.detail?.author || e.currentTarget.dataset.author)
   },
 
-  // ============ WebSocket ============
-
-  _connectWebSocket(url) {
-    const token = api.getToken()
-    const wsUrl = token ? `${url}?token=${token}` : url
-    console.log('[Voice] Connecting to:', wsUrl.slice(0, 80) + '...')
-    this.socketTask = wx.connectSocket({
-      url: wsUrl,
-      success: () => {
-        console.log('[Voice] WebSocket connecting...')
-      },
-      fail: (err) => {
-        console.error('[Voice] WebSocket connect failed:', err)
-        this._fallbackToMock()
-      },
-    })
-
-    this.socketTask.onOpen(() => {
-      console.log('[Voice] WebSocket connected')
-      this._sendWs({ type: 'start' })
-    })
-
-    this.socketTask.onMessage((res) => {
-      this._handleWsMessage(res.data)
-    })
-
-    this.socketTask.onClose(() => {
-      console.log('[Voice] WebSocket closed')
-      this.socketTask = null
-    })
-
-    this.socketTask.onError((err) => {
-      console.error('[Voice] WebSocket error:', err)
-      this._fallbackToMock()
-    })
-  },
-
-  _handleWsMessage(raw) {
-    let msg
-    try {
-      msg = JSON.parse(raw)
-    } catch (e) {
-      console.error('[Voice] Invalid message:', raw)
-      return
-    }
-
-    switch (msg.type) {
-      case 'connected':
-        console.log('[Voice] Session started:', msg.sessionId)
-        break
-
-      case 'asr_partial':
-        this.setData({ asrText: msg.text })
-        break
-
-      case 'asr_final':
-        this.setData({ asrText: msg.text })
-        break
-
-      case 'ai_reply_audio':
-        this.setData({ aiSpeaking: true, aiText: msg.text || this.data.aiText })
-        if (msg.pcmBase64) {
-          this._pcmChunks.push(msg.pcmBase64)
-        }
-        break
-
-      case 'ai_turn_end':
-        this.setData({ aiSpeaking: false })
-        this._playBufferedAudio()
-        if (!this.data.isMuted) {
-          this._startRecording()
-        }
-        break
-
-      case 'session_soft_close':
-        wx.showToast({ title: msg.reason, icon: 'none', duration: 3000 })
-        break
-
-      case 'session_end':
-        console.log('[Voice] Session ended, duration:', msg.duration)
-        break
-
-      case 'error':
-        console.error('[Voice] Server error:', msg.code, msg.message)
-        if (msg.code === 'AUTH_FAILED') {
-          wx.showToast({ title: '认证失败，请重新登录', icon: 'none' })
-        }
-        break
-    }
-  },
-
-  _sendWs(data) {
-    if (this.socketTask) {
-      this.socketTask.send({
-        data: JSON.stringify(data),
-        fail: (err) => { console.error('[Voice] Send failed:', err) },
-      })
-    }
-  },
-
-  _closeSocket() {
-    if (this.socketTask) {
-      this.socketTask.close()
-      this.socketTask = null
-    }
-  },
-
-  // ============ Recording ============
-
-  _startRecording() {
-    if (!this.recorderManager) {
-      this.recorderManager = wx.getRecorderManager()
-      this.recorderManager.onFrameRecorded((res) => {
-        if (res.frameBuffer && this.socketTask && !this.data.isMuted) {
-          const base64 = wx.arrayBufferToBase64(res.frameBuffer)
-          this._sendWs({ type: 'audio_chunk', seq: Date.now(), pcmBase64: base64 })
-        }
-      })
-      this.recorderManager.onStop(() => {
-        console.log('[Voice] Recording stopped')
-      })
-      this.recorderManager.onError((err) => {
-        console.error('[Voice] Recording error:', err)
-      })
-    }
-
-    this.recorderManager.start({
-      format: 'PCM',
-      sampleRate: 16000,
-      numberOfChannels: 1,
-      encodeBitRate: 96000,
-      frameSize: 1, // ~40ms frames at 16kHz
-    })
-  },
-
-  _stopRecording() {
-    if (this.recorderManager) {
-      this.recorderManager.stop()
-    }
-  },
-
-  // ============ Audio Playback ============
-
-  _playBufferedAudio() {
-    if (this._pcmChunks.length === 0) return
-
-    const allBase64 = this._pcmChunks.join('')
-    this._pcmChunks = []
-
-    const pcmBuffer = wx.base64ToArrayBuffer(allBase64)
-    const wavBuffer = this._pcmToWav(pcmBuffer, 24000, 1, 16)
-
-    const fs = wx.getFileSystemManager()
-    const tempPath = `${wx.env.USER_DATA_PATH}/tts_${Date.now()}.wav`
-    try {
-      fs.writeFileSync(tempPath, wavBuffer)
-    } catch (e) {
-      console.error('[Voice] Failed to write temp audio file:', e)
-      return
-    }
-
-    this._stopAudio()
-    this.innerAudioContext = wx.createInnerAudioContext()
-    this.innerAudioContext.src = tempPath
-    this.innerAudioContext.autoplay = true
-    if (this.data.isSpeakerOn) {
-      this.innerAudioContext.obeyMuteSwitch = false
-    }
-    this.innerAudioContext.onEnded(() => {
-      try { fs.unlinkSync(tempPath) } catch { /* ignore */ }
-    })
-    this.innerAudioContext.onError((err) => {
-      console.error('[Voice] Audio playback error:', err)
-      try { fs.unlinkSync(tempPath) } catch { /* ignore */ }
-    })
-  },
-
-  _stopAudio() {
-    if (this.innerAudioContext) {
-      this.innerAudioContext.destroy()
-      this.innerAudioContext = null
-    }
-  },
-
-  _pcmToWav(pcmBuffer, sampleRate, numChannels, bitsPerSample) {
-    const byteRate = sampleRate * numChannels * bitsPerSample / 8
-    const blockAlign = numChannels * bitsPerSample / 8
-    const dataSize = pcmBuffer.byteLength
-    const headerSize = 44
-
-    const buffer = new ArrayBuffer(headerSize + dataSize)
-    const view = new DataView(buffer)
-
-    const writeStr = (offset, str) => {
-      for (let i = 0; i < str.length; i++) {
-        view.setUint8(offset + i, str.charCodeAt(i))
-      }
-    }
-
-    writeStr(0, 'RIFF')
-    view.setUint32(4, 36 + dataSize, true)
-    writeStr(8, 'WAVE')
-    writeStr(12, 'fmt ')
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, numChannels, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, byteRate, true)
-    view.setUint16(32, blockAlign, true)
-    view.setUint16(34, bitsPerSample, true)
-    writeStr(36, 'data')
-    view.setUint32(40, dataSize, true)
-
-    const wavView = new Uint8Array(buffer)
-    wavView.set(new Uint8Array(pcmBuffer), 44)
-
-    return buffer
-  },
-
-  // ============ Fallback ============
-
-  _fallbackToMock() {
-    console.log('[Voice] Falling back to mock mode')
-    this.setData({ isCalling: true })
-
-    const MOCK_REPLIES = [
-      '你好呀～最近怎么样？',
-      '今天天气不错，适合出去走走呢。',
-      '我最近读了一本很有趣的书，想不想听听？',
-      '有时候安静地待着也挺好的。',
-      '你有什么想聊的话题吗？',
-    ]
-
-    // Simulate AI greeting after 1s
-    setTimeout(() => {
-      const opening = '嘿，又来找我聊天啦！今天有什么新鲜事吗？'
-      this.setData({ aiText: opening, aiSpeaking: true })
-      setTimeout(() => {
-        this.setData({ aiSpeaking: false })
-      }, 2000)
-    }, 1000)
-
-    // Simulate sporadic mock replies
-    this._mockInterval = setInterval(() => {
-      if (!this.data.isCalling) return
-      const reply = MOCK_REPLIES[Math.floor(Math.random() * MOCK_REPLIES.length)]
-      this.setData({ aiText: reply, aiSpeaking: true })
-      setTimeout(() => {
-        this.setData({ aiSpeaking: false })
-      }, 2000)
-    }, 8000)
-  },
+  onAvatarError() {
+    this.setData({ aiAvatar: '/images/avatar_fallback.png' })
+  }
 })
