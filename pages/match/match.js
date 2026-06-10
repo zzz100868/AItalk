@@ -1,5 +1,6 @@
 var common = require('../../utils/common.js')
 var mockData = require('../../data/mockData.js')
+var api = require('../../utils/api.js')
 var tabPage = require('../../behaviors/tabPage.js')
 var connectPage = require('../../stores/connect.js').connectPage
 
@@ -28,15 +29,34 @@ Page({
       this.countdownTimer = null
     }
 
-    var TEST_MODE = true
-    var isOpen = TEST_MODE ? true : new Date().getDay() === 2
-
-    this.setData({ isMatchOpen: isOpen })
-
-    if (!isOpen) {
-      this.updateCountdown()
-      this.countdownTimer = setInterval(() => this.updateCountdown(), 1000)
-    }
+    var self = this
+    api.getMatchCurrent().then(function (res) {
+      if (!res) throw new Error('no response')
+      self.setData({ isMatchOpen: res.isOpen })
+      if (res.hasResult && res.match) {
+        self.setData({
+          isMatched: true,
+          matchAvatar: res.match.avatar,
+          matchName: res.match.name,
+          matchBio: res.match.bio,
+          compatibility: res.match.compatibility,
+          tags: res.match.tags || [],
+          icebreakers: res.match.icebreakers || [],
+          matchInsight: res.match.insight || ''
+        })
+      } else if (!res.isOpen) {
+        self.updateCountdown()
+        self.countdownTimer = setInterval(function () { self.updateCountdown() }, 1000)
+      }
+    }).catch(function () {
+      var TEST_MODE = true
+      var isOpen = TEST_MODE ? true : new Date().getDay() === 2
+      self.setData({ isMatchOpen: isOpen })
+      if (!isOpen) {
+        self.updateCountdown()
+        self.countdownTimer = setInterval(function () { self.updateCountdown() }, 1000)
+      }
+    })
   },
 
   onHide() {
@@ -86,48 +106,46 @@ Page({
     showPayModal: false
   },
 
-  _candidates: mockData.getMatchCandidates(),
 
   doMatch() {
     if (this._matching) return
     this._matching = true
-    var candidates = this._candidates
-    if (candidates.length === 0) {
-      this._matching = false
-      wx.showToast({ title: '暂无可匹配用户', icon: 'none' })
-      return
-    }
-    var randomIndex
-    do {
-      randomIndex = Math.floor(Math.random() * candidates.length)
-    } while (candidates.length > 1 && candidates[randomIndex].name === this.data.matchName)
+    var self = this
 
-    var match = candidates[randomIndex]
+    this.setData({ isMatching: true, matchPhase: 'shake' })
 
-    this.setData({
-      isMatching: true,
-      matchPhase: 'shake',
-      matchAvatar: match.avatar,
-      matchName: match.name,
-      matchBio: match.bio,
-      compatibility: match.compatibility,
-      tags: match.tags,
-      icebreakers: match.icebreakers,
-      matchInsight: match.insight
+    api.doMatch().then(function (res) {
+      var match = res && res.match
+      if (!match) {
+        self._matching = false
+        self.setData({ isMatching: false, matchPhase: '' })
+        wx.showToast({ title: res && res.message || '暂无可匹配用户', icon: 'none' })
+        return
+      }
+      self.setData({
+        matchAvatar: match.avatar,
+        matchName: match.name,
+        matchBio: match.bio,
+        compatibility: match.compatibility,
+        tags: match.tags || [],
+        icebreakers: match.icebreakers || [],
+        matchInsight: match.insight || ''
+      })
+      self._animTimer1 = setTimeout(function () {
+        self.setData({ matchPhase: 'glow' })
+      }, 900)
+      self._animTimer2 = setTimeout(function () {
+        self.setData({ matchPhase: 'reveal' })
+      }, 1700)
+      self._animTimer3 = setTimeout(function () {
+        self._matching = false
+        self.setData({ isMatching: false, isMatched: true, matchPhase: '' })
+      }, 3000)
+    }).catch(function () {
+      self._matching = false
+      self.setData({ isMatching: false, matchPhase: '' })
+      wx.showToast({ title: '匹配失败，请重试', icon: 'none' })
     })
-
-    this._animTimer1 = setTimeout(() => {
-      this.setData({ matchPhase: 'glow' })
-    }, 900)
-
-    this._animTimer2 = setTimeout(() => {
-      this.setData({ matchPhase: 'reveal' })
-    }, 1700)
-
-    this._animTimer3 = setTimeout(() => {
-      this._matching = false
-      this.setData({ isMatching: false, isMatched: true, matchPhase: '' })
-    }, 3000)
   },
 
   _clearAnimTimers() {

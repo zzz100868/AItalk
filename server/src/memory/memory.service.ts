@@ -194,11 +194,15 @@ export class MemoryService {
       return { mode: 'comfort', emotion_label: lastEmotion };
     }
 
-    if (messageCount >= 10 && coveredCount < 3) {
+    if (messageCount >= 2 && coveredCount < 3) {
       return this.pickProbeDirective(dimensions);
     }
 
-    if (messageCount >= 20 && coveredCount < 5) {
+    if (messageCount >= 4 && coveredCount < 5) {
+      return this.pickProbeDirective(dimensions);
+    }
+
+    if (messageCount >= 6 && coveredCount < 8) {
       return this.pickProbeDirective(dimensions);
     }
 

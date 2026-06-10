@@ -11,7 +11,10 @@
       "disablePlugins": [],
       "outputPath": ""
     },
-    "useCompilerPlugins": ["typescript"],
+    "urlCheck": false,
+    "useCompilerPlugins": [
+      "typescript"
+    ],
     "minifyWXML": true,
     "compileWorklet": false,
     "uploadWithSourceMap": true,
@@ -26,7 +29,44 @@
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "server"
+      },
+      {
+        "type": "folder",
+        "value": "docs"
+      },
+      {
+        "type": "folder",
+        "value": "output"
+      },
+      {
+        "type": "folder",
+        "value": ".claude"
+      },
+      {
+        "type": "folder",
+        "value": ".git"
+      },
+      {
+        "type": "folder",
+        "value": "project-control"
+      },
+      {
+        "type": "file",
+        "value": "AGENTS.md"
+      },
+      {
+        "type": "file",
+        "value": "CLAUDE.md"
+      },
+      {
+        "type": "file",
+        "value": "README.md"
+      }
+    ],
     "include": []
   },
   "appid": "wx8c9f4a3c672e6323",

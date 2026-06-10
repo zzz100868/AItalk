@@ -29,6 +29,8 @@ export const CONFIG = {
   volcTtsToken: process.env.VOLC_TTS_TOKEN || '',
   volcTtsResourceId: process.env.VOLC_TTS_RESOURCE_ID || 'seed-tts-2.0',
   volcTtsVoiceType: process.env.VOLC_TTS_VOICE_TYPE || '',
+  volcTtsAudioFormat: process.env.VOLC_TTS_AUDIO_FORMAT || 'pcm',
+  volcTtsSampleRate: parseInt(process.env.VOLC_TTS_SAMPLE_RATE || '24000', 10),
   volcTtsUrl: 'wss://openspeech.bytedance.com/api/v3/tts/bidirection',
 
   // Session limits

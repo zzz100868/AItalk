@@ -21,6 +21,8 @@ enum TtsEvent {
   TTS_RESPONSE = 352,
 }
 
+type TtsAudioFormat = 'pcm' | 'mp3' | 'ogg_opus' | 'wav' | 'unknown';
+
 /**
  * 构建 TTS 帧：Header(4) + Event(int32 BE) + [SubFieldSize(uint32) + SubFieldData]...
  * Full-client request (0b0001) + with event flag (0b0100), JSON, no compression
@@ -53,10 +55,21 @@ function uuid(): string {
   });
 }
 
+function detectAudioFormat(data: Buffer): TtsAudioFormat {
+  if (data.length >= 4 && data.subarray(0, 4).toString('ascii') === 'RIFF') return 'wav';
+  if (data.length >= 4 && data.subarray(0, 4).toString('ascii') === 'OggS') return 'ogg_opus';
+  if (data.length >= 3 && data.subarray(0, 3).toString('ascii') === 'ID3') return 'mp3';
+  if (data.length >= 2 && data[0] === 0xff && (data[1] & 0xe0) === 0xe0) return 'mp3';
+  if (data.length > 0 && data.subarray(0, Math.min(data.length, 16)).toString('utf-8').trimStart().startsWith('{')) return 'unknown';
+  return 'pcm';
+}
+
 export class TtsService extends EventEmitter {
   private ws: WebSocket | null = null;
   private sessionId: string = '';
   private replyResolve: (() => void) | null = null;
+  private audioSeq = 0;
+  private audioFormat: TtsAudioFormat = 'pcm';
 
   async synthesize(text: string): Promise<void> {
     if (isTtsConfigured()) {
@@ -68,22 +81,30 @@ export class TtsService extends EventEmitter {
   }
 
   cancel(): void {
+    const resolve = this.replyResolve;
     this.replyResolve = null;
-    if (this.ws) {
-      try { this.ws.close(1000); } catch { /* ignore */ }
-      this.ws = null;
+    resolve?.();
+
+    const ws = this.ws;
+    this.ws = null;
+    if (ws) {
+      try { ws.close(1000); } catch { /* ignore */ }
     }
   }
 
   private synthesizeReal(text: string): Promise<void> {
+    this.cancel();
     return new Promise((resolve) => {
       this.replyResolve = resolve;
-      this.sessionId = uuid();
-      this.connectAndSynthesize(text);
+      const sessionId = uuid();
+      this.sessionId = sessionId;
+      this.audioSeq = 0;
+      this.audioFormat = 'pcm';
+      this.connectAndSynthesize(text, sessionId);
     });
   }
 
-  private connectAndSynthesize(text: string): void {
+  private connectAndSynthesize(text: string, sessionId: string): void {
     try {
       const headers: Record<string, string> = {
         'X-Api-Resource-Id': CONFIG.volcTtsResourceId,
@@ -99,32 +120,42 @@ export class TtsService extends EventEmitter {
 
       console.log('[TTS] Connecting with auth mode:', CONFIG.volcSpeechAuthMode);
 
-      this.ws = new WebSocket(CONFIG.volcTtsUrl, { headers });
+      const ws = new WebSocket(CONFIG.volcTtsUrl, { headers });
+      this.ws = ws;
 
-      this.ws.on('open', () => {
+      ws.on('open', () => {
+        if (this.ws !== ws) {
+          try { ws.close(1000); } catch { /* ignore */ }
+          return;
+        }
         console.log('[TTS] Connected');
-        this.ws!.send(buildFrame(TtsEvent.START_CONNECTION, [
+        ws.send(buildFrame(TtsEvent.START_CONNECTION, [
           { data: Buffer.from('{}', 'utf-8') },
         ]));
       });
 
-      this.ws.on('message', (d: Buffer) => this.onMessage(d, text));
-      this.ws.on('error', (e) => {
+      ws.on('message', (d: Buffer) => {
+        if (this.ws !== ws) return;
+        this.onMessage(ws, d, text, sessionId);
+      });
+      ws.on('error', (e) => {
+        if (this.ws !== ws) return;
         console.error(`[TTS] Error: ${e.message}`);
         this.emit('error', e);
-        this.finish();
+        this.finish(ws);
       });
-      this.ws.on('close', () => {
+      ws.on('close', () => {
         console.log('[TTS] Disconnected');
-        this.ws = null;
+        if (this.ws === ws) this.ws = null;
       });
-      this.ws.on('unexpected-response', (req, res) => {
+      ws.on('unexpected-response', (req, res) => {
         let body = '';
         res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
         res.on('end', () => {
+          if (this.ws !== ws) return;
           console.error(`[TTS] HTTP ${res.statusCode}: ${body.slice(0, 500)}`);
           this.emit('error', new Error(`TTS server returned ${res.statusCode}: ${body.slice(0, 200)}`));
-          this.finish();
+          this.finish(ws);
         });
       });
     } catch (e: any) {
@@ -133,7 +164,7 @@ export class TtsService extends EventEmitter {
     }
   }
 
-  private onMessage(data: Buffer, originalText: string): void {
+  private onMessage(ws: WebSocket, data: Buffer, originalText: string, sessionId: string): void {
     if (data.length < 4) return;
 
     const mt = (data[1] >> 4) & 0x0f;
@@ -145,13 +176,13 @@ export class TtsService extends EventEmitter {
       const es = data.readUInt32BE(8);
       const em = data.subarray(12, 12 + es).toString();
       console.error(`[TTS] Error ${ec}: ${em}`);
-      this.finish();
+      this.finish(ws);
       return;
     }
 
     // Full-server response with event (0b1001 + event flag)
     if (mt === 0b1001 && (flags & 0b0100)) {
-      this.handleServerEvent(data, originalText);
+      this.handleServerEvent(ws, data, originalText, sessionId);
     }
 
     // Audio-only response with event (0b1011 + event flag)
@@ -160,7 +191,7 @@ export class TtsService extends EventEmitter {
     }
   }
 
-  private handleServerEvent(data: Buffer, originalText: string): void {
+  private handleServerEvent(ws: WebSocket, data: Buffer, originalText: string, sessionId: string): void {
     const event = data.readInt32BE(4);
     let off = 8;
 
@@ -179,20 +210,20 @@ export class TtsService extends EventEmitter {
         const cid = readField();
         console.log(`[TTS] Connection started: ${cid?.toString() || 'no-id'}`);
 
-        // Step 2: StartSession with text + speaker + params
+        // Step 2: StartSession with speaker + audio params.
         const meta = JSON.stringify({
+          event: TtsEvent.START_SESSION,
           user: { uid: 'voice-gateway' },
           req_params: {
-            text: originalText,
             speaker: CONFIG.volcTtsVoiceType,
             audio_params: {
-              format: 'pcm',
-              sample_rate: 24000,
+              format: CONFIG.volcTtsAudioFormat,
+              sample_rate: CONFIG.volcTtsSampleRate,
             },
           },
         });
-        this.ws?.send(buildFrame(TtsEvent.START_SESSION, [
-          { data: Buffer.from(this.sessionId, 'utf-8') },
+        if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.START_SESSION, [
+          { data: Buffer.from(sessionId, 'utf-8') },
           { data: Buffer.from(meta, 'utf-8') },
         ]));
         break;
@@ -201,10 +232,21 @@ export class TtsService extends EventEmitter {
       case TtsEvent.SESSION_STARTED: {
         console.log('[TTS] Session started');
 
-        // Step 3: Immediately send FinishSession (no streaming text)
-        this.ws?.send(buildFrame(TtsEvent.FINISH_SESSION, [
-          { data: Buffer.from(this.sessionId, 'utf-8') },
-          { data: Buffer.from('{}', 'utf-8') },
+        const task = JSON.stringify({
+          event: TtsEvent.TASK_REQUEST,
+          req_params: {
+            text: originalText,
+          },
+        });
+        if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.TASK_REQUEST, [
+          { data: Buffer.from(sessionId, 'utf-8') },
+          { data: Buffer.from(task, 'utf-8') },
+        ]));
+
+        // Step 3: End the non-streaming text input after sending one task.
+        if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.FINISH_SESSION, [
+          { data: Buffer.from(sessionId, 'utf-8') },
+          { data: Buffer.from(JSON.stringify({ event: TtsEvent.FINISH_SESSION }), 'utf-8') },
         ]));
         break;
       }
@@ -214,15 +256,15 @@ export class TtsService extends EventEmitter {
         console.log('[TTS] Session finished');
 
         // Step 5: FinishConnection
-        this.ws?.send(buildFrame(TtsEvent.FINISH_CONNECTION, [
-          { data: Buffer.from('{}', 'utf-8') },
+        if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.FINISH_CONNECTION, [
+          { data: Buffer.from(JSON.stringify({ event: TtsEvent.FINISH_CONNECTION }), 'utf-8') },
         ]));
         break;
       }
 
       case TtsEvent.CONNECTION_FINISHED: {
         console.log('[TTS] Connection finished');
-        this.finish();
+        this.finish(ws);
         break;
       }
 
@@ -241,7 +283,7 @@ export class TtsService extends EventEmitter {
       case TtsEvent.SESSION_CANCELED: {
         const meta = readField();
         console.error(`[TTS] Failed: ${meta?.toString() || 'unknown'}`);
-        this.finish();
+        this.finish(ws);
         break;
       }
     }
@@ -266,17 +308,31 @@ export class TtsService extends EventEmitter {
     const audioData = data.subarray(off, off + audioLen);
 
     if (audioLen > 0) {
-      const seq = this.listeners('audio').length;
-      this.emit('audio', audioData.toString('base64'), seq);
+      if (this.audioSeq === 0) {
+        this.audioFormat = detectAudioFormat(audioData);
+        const firstBytes = audioData.subarray(0, Math.min(audioData.length, 8)).toString('hex');
+        console.log(`[TTS] First audio chunk: format=${this.audioFormat}, bytes=${audioLen}, head=${firstBytes}`);
+        if (CONFIG.volcTtsAudioFormat === 'pcm' && this.audioFormat !== 'pcm') {
+          console.warn(`[TTS] Expected pcm but received ${this.audioFormat}; forwarding detected format to client`);
+        }
+      }
+      const seq = this.audioSeq++;
+      this.emit('audio', audioData.toString('base64'), seq, this.audioFormat, CONFIG.volcTtsSampleRate);
     }
   }
 
-  private finish(): void {
+  private finish(ws?: WebSocket): void {
+    if (ws && this.ws !== ws) return;
+
     this.emit('done');
     this.replyResolve?.();
     this.replyResolve = null;
-    if (this.ws) {
-      try { this.ws.close(); } catch { /* ignore */ }
+
+    const socket = ws || this.ws;
+    if (socket && socket.readyState !== WebSocket.CLOSING && socket.readyState !== WebSocket.CLOSED) {
+      try { socket.close(); } catch { /* ignore */ }
+    }
+    if (!ws || this.ws === ws) {
       this.ws = null;
     }
   }

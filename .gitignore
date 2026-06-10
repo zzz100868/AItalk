@@ -40,6 +40,10 @@ config.local.ts
 *.pfx
 keystore.jks
 
+# 构建产物与临时文件
+server/dist-voice/
+server/tmp/
+
 # 服务账户凭证
 serviceAccount.json
 .aws/credentials

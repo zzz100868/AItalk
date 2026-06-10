@@ -20,7 +20,11 @@ export interface EndMessage {
   type: 'end';
 }
 
-export type ClientMessage = StartMessage | AudioChunkMessage | ExtendMessage | EndMessage;
+export interface ListenReadyMessage {
+  type: 'listen_ready';
+}
+
+export type ClientMessage = StartMessage | AudioChunkMessage | ExtendMessage | EndMessage | ListenReadyMessage;
 
 // Server → Client
 export interface ConnectedMessage {
@@ -38,11 +42,17 @@ export interface AsrFinalMessage {
   text: string;
 }
 
+export interface AsrReadyMessage {
+  type: 'asr_ready';
+}
+
 export interface AiReplyAudioMessage {
   type: 'ai_reply_audio';
   seq: number;
   pcmBase64: string;
   text: string;
+  audioFormat?: string;
+  sampleRate?: number;
 }
 
 export interface AiTurnEndMessage {
@@ -70,6 +80,7 @@ export type ServerMessage =
   | ConnectedMessage
   | AsrPartialMessage
   | AsrFinalMessage
+  | AsrReadyMessage
   | AiReplyAudioMessage
   | AiTurnEndMessage
   | SessionSoftCloseMessage
@@ -81,6 +92,8 @@ export type ServerMessage =
 export enum SessionState {
   OPENING = 'opening',
   LISTENING = 'listening',
+  WAITING_TO_LISTEN = 'waiting_to_listen',
+  ASR_CONNECTING = 'asr_connecting',
   ASR_STREAMING = 'asr_streaming',
   THINKING = 'thinking',
   TTS_STREAMING = 'tts_streaming',

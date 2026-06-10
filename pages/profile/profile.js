@@ -1,5 +1,6 @@
 var common = require('../../utils/common.js')
 var userStore = require('../../stores/userStore.js')
+var api = require('../../utils/api.js')
 var mockData = require('../../data/mockData.js')
 var tabPage = require('../../behaviors/tabPage.js')
 var connectPage = require('../../stores/connect.js').connectPage
@@ -25,6 +26,21 @@ Page({
       bio: mockData.DEFAULT_USER.bio
     },
     photos: []
+  },
+
+  onLoad() {
+    api.getMe().then(function (data) {
+      if (data) {
+        var patch = {}
+        if (data.nickname) patch.nickName = data.nickname
+        if (data.avatar) patch.avatar = data.avatar
+        if (data.bio !== undefined) patch.bio = data.bio
+        if (data.id) patch.id = data.id
+        if (Object.keys(patch).length > 0) {
+          userStore.setState(patch)
+        }
+      }
+    }).catch(function () {})
   },
 
   choosePhoto() {

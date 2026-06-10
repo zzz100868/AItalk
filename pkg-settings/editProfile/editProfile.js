@@ -1,5 +1,6 @@
 var common = require('../../utils/common.js')
 var userStore = require('../../stores/userStore.js')
+var api = require('../../utils/api.js')
 var mockData = require('../../data/mockData.js')
 
 Page({
@@ -64,11 +65,13 @@ Page({
   saveProfile() {
     if (!this.data.canSave) return
     var data = this.data
-    userStore.setState({
-      avatar: data.avatar,
-      nickName: data.nickName.trim() || mockData.DEFAULT_USER.nickName,
-      bio: data.bio.trim()
-    })
+    var nickname = data.nickName.trim() || mockData.DEFAULT_USER.nickName
+    var bio = data.bio.trim()
+    var avatar = data.avatar
+
+    userStore.setState({ avatar: avatar, nickName: nickname, bio: bio })
+
+    api.updateMe({ nickname: nickname, bio: bio, avatar: avatar }).catch(function () {})
 
     wx.showToast({ title: '已保存', icon: 'success' })
     setTimeout(function () {

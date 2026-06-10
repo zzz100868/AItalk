@@ -201,7 +201,7 @@ export class DialogueService {
 
   private getOrchestrationDirective(profileData: any): OrchestrationDirective {
     if (!profileData) {
-      if (this.turnCount >= 5) {
+      if (this.turnCount >= 2) {
         return this.pickProbeDirective({});
       }
       return { mode: 'free_chat' };
@@ -215,11 +215,15 @@ export class DialogueService {
       return { mode: 'comfort', emotion_label: lastEmotion };
     }
 
-    if (this.turnCount >= 5 && coveredCount < 3) {
+    if (this.turnCount >= 2 && coveredCount < 3) {
       return this.pickProbeDirective(dimensions);
     }
 
-    if (this.turnCount >= 10 && coveredCount < 5) {
+    if (this.turnCount >= 4 && coveredCount < 5) {
+      return this.pickProbeDirective(dimensions);
+    }
+
+    if (this.turnCount >= 6 && coveredCount < 8) {
       return this.pickProbeDirective(dimensions);
     }
 

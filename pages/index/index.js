@@ -1,5 +1,6 @@
 var common = require('../../utils/common.js')
 var mockData = require('../../data/mockData.js')
+var api = require('../../utils/api.js')
 var connectPage = require('../../stores/connect.js').connectPage
 var appStore = require('../../stores/appStore.js')
 
@@ -21,6 +22,9 @@ Page({
     callDate: '今天 14:20',
     isMuted: false,
     isSpeakerOn: false,
+    aiSpeaking: false,
+    asrText: '',
+    aiText: '',
     userName: mockData.DEFAULT_USER.nickName,
     aiName: mockData.AI_USERS.xiaoya.name,
     aiAvatar: mockData.AI_USERS.xiaoya.avatar,
@@ -39,14 +43,22 @@ Page({
     canStart: false
   },
 
-  socketTask: null,
-  recorderManager: null,
-  innerAudioContext: null,
-  callStartedAt: null,
-  timer: null,
-  _pcmChunks: [],
-
   onLoad(options) {
+    this.socketTask = null
+    this.recorderManager = null
+    this.innerAudioContext = null
+    this.callStartedAt = null
+    this.timer = null
+    this._pcmChunks = []
+    this._isRecording = false
+    this._isPlayingAiAudio = false
+    this._ttsAudioFormat = 'pcm'
+    this._ttsSampleRate = 24000
+    this._ttsVolume = 0.45
+    this._asrReady = false
+    this._listenReadySent = false
+    this._mockInterval = null
+
     if (options.mode === 'call') {
       this.setData({ viewMode: 'call' })
     }
@@ -143,7 +155,7 @@ Page({
   startCall() {
     this._clearCallTimer()
 
-    const wsUrl = api.getVoiceWsUrl()
+    var wsUrl = api.getVoiceWsUrl()
     if (!wsUrl) {
       wx.showToast({ title: '请先登录', icon: 'none' })
       return
@@ -151,6 +163,13 @@ Page({
 
     this.callStartedAt = Date.now()
     this._pcmChunks = []
+    this._pcmChunks = []
+    this._isPlayingAiAudio = false
+    this._ttsAudioFormat = 'pcm'
+    this._ttsSampleRate = 24000
+    this._ttsVolume = 0.45
+    this._asrReady = false
+    this._listenReadySent = false
     this.setData({ isCalling: true, callDuration: '00:00', asrText: '', aiText: '' })
     this.startCallTimer()
     this._connectWebSocket(wsUrl)
@@ -180,6 +199,10 @@ Page({
   },
 
   endCall() {
+    this.setData({ isCalling: false, aiSpeaking: false })
+    this._asrReady = false
+    this._listenReadySent = false
+    this._isPlayingAiAudio = false
     this._clearCallTimer()
     this._stopRecording()
     this._stopAudio()
@@ -201,7 +224,11 @@ Page({
     if (this.data.isMuted) {
       this._stopRecording()
     } else {
-      this._startRecording()
+      if (this._asrReady) {
+        this._resumeRecordingIfAllowed()
+      } else {
+        this._notifyReadyToListen()
+      }
     }
     wx.showToast({ title: this.data.isMuted ? '已静音' : '取消静音', icon: 'none' })
   },
@@ -217,5 +244,383 @@ Page({
 
   onAvatarError() {
     this.setData({ aiAvatar: '/images/avatar_fallback.png' })
+  },
+
+  // ─── WebSocket 语音通话 ───
+
+  _connectWebSocket(wsUrl) {
+    var self = this
+    this.socketTask = wx.connectSocket({
+      url: wsUrl,
+      header: { 'Authorization': 'Bearer ' + api.getToken() },
+      success: function () {
+        console.log('[Voice] WebSocket connecting...')
+      },
+      fail: function (err) {
+        console.error('[Voice] WebSocket connect failed:', err)
+        wx.showToast({ title: '连接失败', icon: 'none' })
+        self._fallbackToMock()
+      }
+    })
+
+    this.socketTask.onOpen(function () {
+      console.log('[Voice] WebSocket connected')
+      self._sendWs({ type: 'start' })
+    })
+
+    this.socketTask.onMessage(function (res) {
+      var msg
+      try { msg = JSON.parse(res.data) } catch (e) { return }
+      self._handleWsMessage(msg)
+    })
+
+    this.socketTask.onError(function (err) {
+      console.error('[Voice] WebSocket error:', err)
+      self._fallbackToMock()
+    })
+
+    this.socketTask.onClose(function () {
+      console.log('[Voice] WebSocket closed')
+      self.socketTask = null
+    })
+  },
+
+  _handleWsMessage(msg) {
+    switch (msg.type) {
+      case 'connected':
+        console.log('[Voice] Session:', msg.sessionId)
+        break
+      case 'asr_partial':
+        this.setData({ asrText: msg.text || '…', aiSpeaking: false })
+        break
+      case 'asr_final':
+        this._asrReady = false
+        this.setData({ asrText: msg.text || '', aiSpeaking: false })
+        break
+      case 'asr_ready':
+        this._asrReady = true
+        this._listenReadySent = false
+        this._resumeRecordingIfAllowed()
+        break
+      case 'ai_reply_audio':
+        this._pauseRecordingForAi()
+        if (msg.text) {
+          this._asrReady = false
+          this._listenReadySent = false
+          this._pcmChunks = []
+          this._ttsAudioFormat = 'pcm'
+          this._ttsSampleRate = 24000
+        }
+        if (msg.audioFormat) {
+          this._ttsAudioFormat = msg.audioFormat
+        }
+        if (msg.sampleRate) {
+          this._ttsSampleRate = msg.sampleRate
+        }
+        if (msg.pcmBase64) {
+          var seq = typeof msg.seq === 'number' && msg.seq >= 0 ? msg.seq : this._pcmChunks.length
+          this._pcmChunks[seq] = msg.pcmBase64
+        }
+        if (msg.text) {
+          this.setData({ aiText: msg.text, aiSpeaking: true })
+        }
+        break
+      case 'ai_turn_end':
+        this.setData({ aiSpeaking: false })
+        this._playBufferedAudio()
+        break
+      case 'session_soft_close':
+        wx.showToast({ title: '通话即将结束', icon: 'none' })
+        break
+      case 'session_end':
+        this.endCall()
+        break
+    }
+  },
+
+  _sendWs(msg) {
+    if (this.socketTask) {
+      this.socketTask.send({ data: JSON.stringify(msg) })
+    }
+  },
+
+  _closeSocket() {
+    if (this.socketTask) {
+      try { this.socketTask.close() } catch (e) {}
+      this.socketTask = null
+    }
+  },
+
+  // ─── 录音 ───
+
+  _startRecording() {
+    var self = this
+    if (!this.recorderManager) {
+      this.recorderManager = wx.getRecorderManager()
+      this.recorderManager.onFrameRecorded(function (res) {
+        if (!self._asrReady) return
+        if (self.data.aiSpeaking || self._isPlayingAiAudio || self.data.isMuted) return
+        if (res.frameBuffer && self.socketTask) {
+          var base64 = wx.arrayBufferToBase64(res.frameBuffer)
+          self._sendWs({ type: 'audio_chunk', pcmBase64: base64 })
+        }
+      })
+      this.recorderManager.onError(function (err) {
+        console.error('[Voice] Recorder error:', err)
+      })
+    }
+
+    if (this._isRecording) return
+    this._isRecording = true
+    this.recorderManager.start({
+      format: 'PCM',
+      sampleRate: 16000,
+      numberOfChannels: 1,
+      encodeBitRate: 48000,
+      frameSize: 1.28
+    })
+  },
+
+  _stopRecording() {
+    if (this.recorderManager && this._isRecording) {
+      this._isRecording = false
+      try { this.recorderManager.stop() } catch (e) {}
+    }
+  },
+
+  _pauseRecordingForAi() {
+    this._stopRecording()
+  },
+
+  _resumeRecordingIfAllowed() {
+    if (!this._asrReady) return
+    if (!this.data.isCalling || this.data.isMuted || this.data.aiSpeaking || this._isPlayingAiAudio) return
+    this._startRecording()
+  },
+
+  _notifyReadyToListen() {
+    if (!this.data.isCalling || this._listenReadySent) return
+    if (this.data.isMuted || this.data.aiSpeaking || this._isPlayingAiAudio) return
+    this._listenReadySent = true
+    this._asrReady = false
+    this._sendWs({ type: 'listen_ready' })
+  },
+
+  // ─── 音频播放（PCM → WAV） ───
+
+  _stopAudio() {
+    this._isPlayingAiAudio = false
+    if (this.innerAudioContext) {
+      try {
+        this.innerAudioContext.stop()
+        this.innerAudioContext.destroy()
+      } catch (e) {}
+      this.innerAudioContext = null
+    }
+  },
+
+  _playBufferedAudio() {
+    if (this._pcmChunks.length === 0) {
+      this._notifyReadyToListen()
+      return
+    }
+
+    var chunks = this._compactTtsChunks(this._pcmChunks)
+    this._pcmChunks = []
+    if (!chunks) {
+      this._notifyReadyToListen()
+      return
+    }
+
+    var audioBuffer = this._concatBase64PcmChunks(chunks)
+
+    var audioFormat = this._ttsAudioFormat || 'pcm'
+    var sampleRate = this._ttsSampleRate || 24000
+    var playableBuffer = audioBuffer
+    var fileExt = 'wav'
+
+    if (audioFormat === 'pcm') {
+      if (!this._isPcm16Safe(audioBuffer)) {
+        console.error('[Voice] Unsafe PCM payload rejected')
+        this._notifyReadyToListen()
+        return
+      }
+      playableBuffer = this._pcmToWav(this._limitPcm16(audioBuffer, 0.82), sampleRate, 1, 16)
+    } else if (audioFormat === 'wav') {
+      fileExt = 'wav'
+    } else if (audioFormat === 'mp3') {
+      fileExt = 'mp3'
+    } else if (audioFormat === 'ogg_opus') {
+      fileExt = 'ogg'
+    } else {
+      console.error('[Voice] Unsupported TTS audio format:', audioFormat)
+      this._notifyReadyToListen()
+      return
+    }
+
+    var fs = wx.getFileSystemManager()
+    var tempPath = wx.env.USER_DATA_PATH + '/tts_' + Date.now() + '.' + fileExt
+    try {
+      fs.writeFileSync(tempPath, playableBuffer)
+    } catch (e) {
+      console.error('[Voice] Write TTS audio failed:', e)
+      this._notifyReadyToListen()
+      return
+    }
+
+    this._stopAudio()
+    this._isPlayingAiAudio = true
+    this._stopRecording()
+    var self = this
+    this.innerAudioContext = wx.createInnerAudioContext()
+    this.innerAudioContext.src = tempPath
+    this.innerAudioContext.volume = this._ttsVolume || 0.45
+    this.innerAudioContext.autoplay = true
+    this.innerAudioContext.onEnded(function () {
+      self._cleanupTempAudio(tempPath)
+      self._isPlayingAiAudio = false
+      self._notifyReadyToListen()
+    })
+    this.innerAudioContext.onError(function (err) {
+      console.error('[Voice] Audio play error:', err)
+      self._cleanupTempAudio(tempPath)
+      self._isPlayingAiAudio = false
+      self._notifyReadyToListen()
+    })
+  },
+
+  _cleanupTempAudio(path) {
+    try {
+      wx.getFileSystemManager().unlink({ filePath: path })
+    } catch (e) {}
+  },
+
+  _compactTtsChunks(chunks) {
+    var ordered = []
+    for (var i = 0; i < chunks.length; i++) {
+      if (!chunks[i]) {
+        console.error('[Voice] Missing TTS audio chunk:', i)
+        return null
+      }
+      ordered.push(chunks[i])
+    }
+    return ordered
+  },
+
+  _concatBase64PcmChunks(chunks) {
+    var totalLength = 0
+    var buffers = chunks.map(function (chunk) {
+      var buffer = wx.base64ToArrayBuffer(chunk)
+      totalLength += buffer.byteLength
+      return new Uint8Array(buffer)
+    })
+
+    var merged = new Uint8Array(totalLength)
+    var offset = 0
+    buffers.forEach(function (buffer) {
+      merged.set(buffer, offset)
+      offset += buffer.byteLength
+    })
+    return merged.buffer
+  },
+
+  _limitPcm16(pcmBuffer, peakRatio) {
+    var bytes = new Uint8Array(pcmBuffer)
+    var limited = new ArrayBuffer(bytes.byteLength)
+    var input = new DataView(pcmBuffer)
+    var output = new DataView(limited)
+    var max = Math.max(1, Math.min(32767, Math.floor(32767 * (peakRatio || 0.82))))
+    var sampleCount = Math.floor(bytes.byteLength / 2)
+
+    for (var i = 0; i < sampleCount; i++) {
+      var offset = i * 2
+      var sample = input.getInt16(offset, true)
+      if (sample > max) sample = max
+      if (sample < -max) sample = -max
+      output.setInt16(offset, sample, true)
+    }
+
+    if (bytes.byteLength % 2 === 1) {
+      new Uint8Array(limited)[bytes.byteLength - 1] = bytes[bytes.byteLength - 1]
+    }
+
+    return limited
+  },
+
+  _isPcm16Safe(pcmBuffer) {
+    if (!pcmBuffer || pcmBuffer.byteLength < 2 || pcmBuffer.byteLength % 2 !== 0) return false
+
+    var view = new DataView(pcmBuffer)
+    var sampleCount = Math.floor(pcmBuffer.byteLength / 2)
+    var peak = 0
+    var sumSquares = 0
+
+    for (var i = 0; i < sampleCount; i++) {
+      var sample = view.getInt16(i * 2, true)
+      var abs = Math.abs(sample)
+      if (abs > peak) peak = abs
+      sumSquares += sample * sample
+    }
+
+    var rms = Math.sqrt(sumSquares / sampleCount)
+    var peakRatio = peak / 32768
+    var rmsRatio = rms / 32768
+
+    if (peakRatio > 0.98 && rmsRatio > 0.45) {
+      console.error('[Voice] PCM level too hot:', peakRatio, rmsRatio)
+      return false
+    }
+
+    return true
+  },
+
+  _pcmToWav(pcmBuffer, sampleRate, numChannels, bitsPerSample) {
+    var byteRate = sampleRate * numChannels * bitsPerSample / 8
+    var blockAlign = numChannels * bitsPerSample / 8
+    var dataSize = pcmBuffer.byteLength
+    var headerSize = 44
+    var buffer = new ArrayBuffer(headerSize + dataSize)
+    var view = new DataView(buffer)
+
+    // RIFF header
+    view.setUint8(0, 0x52); view.setUint8(1, 0x49); view.setUint8(2, 0x46); view.setUint8(3, 0x46)
+    view.setUint32(4, 36 + dataSize, true)
+    view.setUint8(8, 0x57); view.setUint8(9, 0x41); view.setUint8(10, 0x56); view.setUint8(11, 0x45)
+
+    // fmt sub-chunk
+    view.setUint8(12, 0x66); view.setUint8(13, 0x6D); view.setUint8(14, 0x74); view.setUint8(15, 0x20)
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, numChannels, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, byteRate, true)
+    view.setUint16(32, blockAlign, true)
+    view.setUint16(34, bitsPerSample, true)
+
+    // data sub-chunk
+    view.setUint8(36, 0x64); view.setUint8(37, 0x61); view.setUint8(38, 0x74); view.setUint8(39, 0x61)
+    view.setUint32(40, dataSize, true)
+
+    // PCM data
+    var pcmView = new Uint8Array(pcmBuffer)
+    var wavView = new Uint8Array(buffer)
+    wavView.set(pcmView, headerSize)
+
+    return buffer
+  },
+
+  // ─── Mock 降级 ───
+
+  _fallbackToMock() {
+    var self = this
+    if (this._mockInterval) return
+    console.log('[Voice] Falling back to mock mode')
+    this._mockInterval = setInterval(function () {
+      if (!self.data.isCalling) {
+        clearInterval(self._mockInterval)
+        self._mockInterval = null
+        return
+      }
+    }, 5000)
   }
 })

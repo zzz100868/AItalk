@@ -234,28 +234,53 @@ Page({
 
   /** 从 API 加载聊天历史 */
   loadChatHistory() {
-    api.get('/memory/chat', { limit: 50 })
-      .then((res) => {
-        this.setData({
-          messages: res.data.length > 0 ? res.data : memoryData.messages,
-          chatDays: res.meta.chatDays,
-          chatMood: res.meta.chatMood,
-          chatTopics: res.meta.chatTopics,
+    var self = this
+    api.getChatHistory(null, 50).then(function (res) {
+      if (res && res.data && res.data.length > 0) {
+        self._allMessages = res.data
+        self._syncVisibleMessages()
+      }
+      if (res && res.meta) {
+        self.setData({
+          chatDays: res.meta.chatDays || '1天',
+          chatMood: res.meta.chatMood || '平静',
+          chatTopics: res.meta.chatTopics || 0
         })
-      })
-      .catch(() => {
-        // 回落 mock
-        this.setData({ messages: memoryData.messages })
-      })
+      }
+    }).catch(function () {})
   },
 
   /** 从 API 加载洞察列表 */
   loadInsights() {
+    var self = this
     var stored = storage.get('memoryInsights', null)
     if (stored && stored.length > 0) {
-      this.setData({ insights: stored }, () => {
-        this.filterInsights()
+      this.setData({ insights: stored }, function () {
+        self.filterInsights()
       })
+    }
+    api.getInsights().then(function (data) {
+      if (data && data.length > 0) {
+        self.setData({ insights: data }, function () {
+          self.filterInsights()
+        })
+        storage.set('memoryInsights', data)
+      }
+    }).catch(function () {})
+  },
+
+  /** 从 API 加载档案数据 */
+  loadArchive() {
+    var self = this
+    api.getArchive().then(function (data) {
+      if (data) {
+        self.setData({
+          aboutMe: data.aboutMe || memoryData.aboutMe,
+          personalities: data.personalities || memoryData.personalities,
+          traits: data.traits || memoryData.traits
+        })
+      }
+    }).catch(function () {})
   },
 
   switchTab(e) {

@@ -1,3 +1,26 @@
+var api = require('../../utils/api.js')
+
+var MOCK_NOTIFICATIONS = [
+  {
+    id: 1,
+    type: 'follow',
+    author: '陈默',
+    avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=200&backgroundColor=b6e3f4',
+    content: '关注了你',
+    time: '2小时前',
+    read: false
+  },
+  {
+    id: 4,
+    type: 'follow',
+    author: '周晚',
+    avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Zhouwan&size=200&backgroundColor=e8dff5',
+    content: '关注了你',
+    time: '昨天',
+    read: true
+  }
+]
+
 Page({
   data: {
     activeFilter: 'all',
@@ -5,26 +28,7 @@ Page({
     isLoading: true,
     isRefreshing: false,
     loadError: false,
-    notifications: [
-      {
-        id: 1,
-        type: 'follow',
-        author: '陈默',
-        avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chenmo&size=200&backgroundColor=b6e3f4',
-        content: '关注了你',
-        time: '2小时前',
-        read: false
-      },
-      {
-        id: 4,
-        type: 'follow',
-        author: '周晚',
-        avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Zhouwan&size=200&backgroundColor=e8dff5',
-        content: '关注了你',
-        time: '昨天',
-        read: true
-      }
-    ]
+    notifications: []
   },
 
   onLoad() {
@@ -32,23 +36,40 @@ Page({
   },
 
   onShow() {
+    var self = this
     this.setData({ isLoading: true, loadError: false })
-    setTimeout(() => {
-      const notifications = this.data.notifications.map(n => ({ ...n, read: true }))
-      this.setData({ notifications, isLoading: false })
-      this._updateFilter()
-    }, 600)
+    api.getNotifications().then(function (res) {
+      var list = (res && res.data) || (res && Array.isArray(res) ? res : null)
+      if (list && list.length > 0) {
+        self.setData({ notifications: list, isLoading: false })
+      } else {
+        self.setData({ notifications: MOCK_NOTIFICATIONS, isLoading: false })
+      }
+      self._updateFilter()
+    }).catch(function () {
+      self.setData({ notifications: MOCK_NOTIFICATIONS, isLoading: false })
+      self._updateFilter()
+    })
+    api.markNotificationsRead().catch(function () {})
   },
 
   onPullDownRefresh() {
+    var self = this
     this.setData({ isRefreshing: true })
-    setTimeout(() => {
-      const notifications = this.data.notifications.map(n => ({ ...n, read: true }))
-      this.setData({ notifications, isRefreshing: false })
-      this._updateFilter()
+    api.getNotifications().then(function (res) {
+      var list = (res && res.data) || (res && Array.isArray(res) ? res : null)
+      if (list && list.length > 0) {
+        self.setData({ notifications: list, isRefreshing: false })
+      } else {
+        self.setData({ isRefreshing: false })
+      }
+      self._updateFilter()
       wx.stopPullDownRefresh()
-      wx.showToast({ title: '刷新成功', icon: 'none' })
-    }, 800)
+    }).catch(function () {
+      self.setData({ isRefreshing: false })
+      self._updateFilter()
+      wx.stopPullDownRefresh()
+    })
   },
 
   _updateFilter() {
@@ -83,14 +104,16 @@ Page({
   },
 
   clearAll() {
+    var self = this
     wx.showModal({
       title: '清空通知',
       content: '确定要清空所有通知吗？',
       confirmColor: '#c45a5a',
-      success: (res) => {
+      success: function (res) {
         if (res.confirm) {
-          this.setData({ notifications: [] })
-          this._updateFilter()
+          self.setData({ notifications: [] })
+          self._updateFilter()
+          api.clearNotifications().catch(function () {})
           wx.showToast({ title: '已清空', icon: 'none' })
         }
       }

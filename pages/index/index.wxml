@@ -245,8 +245,13 @@
               <view class="status-dot {{aiSpeaking ? 'status-dot-speak' : 'status-dot-live'}}"></view>
               <text class="call-status caption">{{aiSpeaking ? '正在说话...' : '实时语音'}} · {{callDuration}}</text>
             </view>
-            <view wx:if="{{aiText}}" class="call-bubble">
+            <view wx:if="{{aiText}}" class="call-bubble call-bubble-ai">
+              <text class="call-bubble-label">小雅</text>
               <text class="call-bubble-text">{{aiText}}</text>
+            </view>
+            <view wx:if="{{asrText}}" class="call-bubble call-bubble-user">
+              <text class="call-bubble-label">你</text>
+              <text class="call-bubble-text">{{asrText}}</text>
             </view>
           </view>
 

@@ -43,6 +43,9 @@ docs/
 - [ADR-0004 数据库选型](decisions/0004-数据库选型.md) — PostgreSQL + pgvector 一库承载
 - [ADR-0005 后端技术栈](decisions/0005-后端技术栈.md) — NestJS + TypeScript + Prisma + Bull
 
+### 运维 & 上线
+- [上线申请清单](上线申请清单.md) — 小程序上线需要申请的全部事项（含流程、费用、时间预估）
+
 ## 维护约定
 
 - 同一主题只保留一份权威文档；过期内容删除或文末标注 `已废弃`。

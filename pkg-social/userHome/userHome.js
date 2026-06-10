@@ -1,5 +1,6 @@
 var common = require('../../utils/common.js')
 var mockData = require('../../data/mockData.js')
+var api = require('../../utils/api.js')
 var userStore = require('../../stores/userStore.js')
 
 Page({
@@ -34,6 +35,7 @@ Page({
         }
       })
     } else {
+      var self = this
       this.setData({
         isMe: false,
         userInfo: {
@@ -43,6 +45,16 @@ Page({
           bio: ''
         }
       })
+      api.getUserHome(author).then(function (data) {
+        if (data) {
+          self.setData({
+            'userInfo.name': data.name || author,
+            'userInfo.handle': data.handle || '',
+            'userInfo.avatar': data.avatar || self.data.userInfo.avatar,
+            'userInfo.bio': data.bio || ''
+          })
+        }
+      }).catch(function () {})
     }
   },
 

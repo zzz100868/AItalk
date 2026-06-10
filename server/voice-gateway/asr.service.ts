@@ -63,11 +63,19 @@ export class AsrService extends EventEmitter {
   }
 
   start(): void {
+    if (this.active) {
+      if (!isAsrConfigured() || this.ws?.readyState === WebSocket.OPEN) {
+        this.emit('ready');
+      }
+      return;
+    }
     this.active = true;
     this.mockBuffer = [];
 
     if (isAsrConfigured()) {
       this.connectReal();
+    } else {
+      setImmediate(() => this.emit('ready'));
     }
   }
 
@@ -126,28 +134,34 @@ export class AsrService extends EventEmitter {
         wsUrl: CONFIG.volcAsrUrl,
       }));
 
-      this.ws = new WebSocket(CONFIG.volcAsrUrl, { headers });
+      const ws = new WebSocket(CONFIG.volcAsrUrl, { headers });
+      this.ws = ws;
 
-      this.ws.on('open', () => {
+      ws.on('open', () => {
         console.log('[ASR] Connected to Volcengine ASR');
         this.sendFullClientRequest();
+        this.emit('ready');
       });
 
-      this.ws.on('message', (data: Buffer) => {
+      ws.on('message', (data: Buffer) => {
         this.handleResponse(data);
       });
 
-      this.ws.on('error', (err) => {
+      ws.on('error', (err) => {
         console.error(`[ASR] WebSocket error: ${err.message}`);
+        this.active = false;
         this.emit('error', err);
       });
 
-      this.ws.on('close', (code, reason) => {
+      ws.on('close', (code, reason) => {
         console.log(`[ASR] Connection closed: ${code} ${reason}`);
-        this.ws = null;
+        if (this.ws === ws) {
+          this.ws = null;
+          this.active = false;
+        }
       });
 
-      this.ws.on('unexpected-response', (req, res) => {
+      ws.on('unexpected-response', (req, res) => {
         let body = '';
         res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
         res.on('end', () => {
@@ -225,7 +239,7 @@ export class AsrService extends EventEmitter {
       const json = JSON.parse(payload.toString('utf-8'));
       const text = json?.result?.text || '';
       if (text) {
-        this.emit('final', text);
+        this.emit('partial', text);
       }
     } catch (e) {
       console.error('[ASR] Failed to parse response:', e);

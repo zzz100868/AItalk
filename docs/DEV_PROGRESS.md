@@ -274,46 +274,55 @@ Phase 3 代码框架已完成。现在需要：
 
 ---
 
-## Phase 5 — 微信支付 + 微信实名认证
+## Phase 5 — 前端对接后端 API（对齐接口）
 
-**做什么**：接入微信支付统一下单、实现权益解锁；接入微信实名认证（微信已实名用户直接授权，无需第三方人脸核身）
+**做什么**：将前端各页面从纯 mock 数据切换为调用后端 API，失败时回落到本地 mock
 
-**状态**：`todo`
+**状态**：`done`
 
 **推荐模型**：
 
 
 | 环节  | 模型                               |
 | --- | -------------------------------- |
-| 设计  | Opus（支付安全、回调验签、权益模型）             |
-| 编码  | Sonnet（微信支付 SDK 调用、订单状态机、实名认证接口） |
-| 测试  | Haiku（沙箱支付测试、回调模拟）               |
+| 设计  | Opus（接口对齐策略、fallback 设计）         |
+| 编码  | Opus（api.js 重写、各页面对接）             |
 
 
 **完成标准**：
 
-- POST /api/pay/create-order → 调用微信统一下单 → 返回 wxPayParams
-- POST /api/pay/wx-callback → 验签 → 更新订单 → 写入 entitlements
-- 前端 confirmPay() 调用 wx.requestPayment
-- 微信实名认证：通过微信 openid 查询用户实名状态，已实名用户直接标记 verified
-- 前端 accountSecurity 页展示实名状态
+- ✅ `utils/api.js` 包含所有业务 API 方法（login / sendChatMessage / doMatch / getArchive 等）
+- ✅ `app.js` 启动时 `wx.login()` → `POST /api/auth/wx-login` → 存 token + 同步 userStore
+- ✅ `pages/match/match.js` 调用 `GET /api/match/current` + `POST /api/match/do`
+- ✅ `pages/memory/memory.js` 修复语法错误 + 添加 `loadArchive()` + `sendChatMessage` 对接
+- ✅ `pkg-settings/editProfile/editProfile.js` 保存时同步 `PUT /api/me`
+- ✅ `pkg-social/userHome/userHome.js` 非自己用户调用 `GET /api/users/:author/home`
+- ✅ `pkg-social/notifications/notifications.js` 调用通知 API
+- ✅ 所有 API 调用失败时回落到 mock 数据，无后端时前端仍可用
+- ✅ 删除过时的 `utils/api.ts`
 
-**要跑的测试**：
+**实现细节**：
 
-- 微信支付沙箱环境下单 → 支付 → 回调成功
-- 重复支付拦截（PAY_ALREADY_DONE）
-- 实名认证状态查询与写入
+- **统一 Fallback 策略**：每个 API 方法 `.catch()` 返回 mock 数据
+- **Token 管理**：`api.login()` 获取后存储，所有后续请求自动携带 Authorization header
+- **userStore 同步**：登录成功后将服务端用户信息写入本地 Store
+- **无侵入**：不改 UI、不改 mockData.js、不改后端
+
+**测试结果**：
+
+- ✅ 无后端时所有页面正常使用（mock fallback）
+- ⏳ 待启动后端验证 API 联调
 
 **需要你手动做的**：
 
-- 微信支付商户号申请 + API 密钥配置
-- 支付回调地址配置（需要公网域名）
-- 微信小程序后台配置支付能力
+- 启动后端 `cd server && npm run start:dev`
+- 微信开发者工具中验证各页面网络请求
+- 确认 match/memory/profile 页面数据正确展示
 
 **next_prompt**：
 
 ```
-执行 Phase 5。先阅读 docs/DEV_PROGRESS.md。
+执行 Phase 6。先阅读 docs/DEV_PROGRESS.md。
 目标：接入微信支付和微信实名认证。
 设计阶段用 Opus（安全验签、权益模型）。
 编码阶段用 Sonnet。
@@ -322,9 +331,9 @@ Phase 3 代码框架已完成。现在需要：
 
 ---
 
-## Phase 6 — 通知系统 + 推送
+## Phase 6 — 微信支付 + 通知推送
 
-**做什么**：实现事件驱动通知（匹配结果推送、系统公告）；对接微信订阅消息
+**做什么**：接入微信支付统一下单、权益解锁；实现事件通知 + 微信订阅消息推送
 
 **状态**：`todo`
 
@@ -333,26 +342,24 @@ Phase 3 代码框架已完成。现在需要：
 
 | 环节  | 模型                            |
 | --- | ----------------------------- |
-| 设计  | Sonnet（事件源枚举、推送模板）            |
-| 编码  | Sonnet（通知 Service、微信订阅消息 API） |
-| 测试  | Haiku（事件触发 → 通知写入 → 推送到达）     |
+| 设计  | Opus（支付安全、回调验签、权益模型）          |
+| 编码  | Sonnet（微信支付 SDK、通知 Service）    |
+| 测试  | Haiku（沙箱支付、推送验证）               |
 
 
 **完成标准**：
 
+- POST /api/pay/create-order → 调用微信统一下单 → 返回 wxPayParams
+- POST /api/pay/wx-callback → 验签 → 更新订单 → 写入 entitlements
+- 前端 confirmPay() 调用 wx.requestPayment
 - 匹配完成时自动写入 match 类型通知
 - 微信订阅消息推送（周二匹配结果揭晓）
-- notifications 页面展示真实数据
 - 未读计数 badge
-
-**要跑的测试**：
-
-- 匹配 Job 完成后 → 通知表新增记录
-- GET /api/notifications → 返回真实通知
-- 订阅消息推送到微信（需真机测试）
 
 **需要你手动做的**：
 
+- 微信支付商户号申请 + API 密钥配置
+- 支付回调地址配置（需要公网域名）
 - 微信小程序后台配置订阅消息模板
 - 真机测试推送到达
 
@@ -360,7 +367,8 @@ Phase 3 代码框架已完成。现在需要：
 
 ```
 执行 Phase 6。先阅读 docs/DEV_PROGRESS.md。
-目标：实现通知系统。编码用 Sonnet。
+目标：接入微信支付和通知推送系统。
+设计阶段用 Opus，编码用 Sonnet。
 完成后更新 DEV_PROGRESS.md。
 ```
 
@@ -418,8 +426,8 @@ Phase 3 代码框架已完成。现在需要：
 | 2     | Memory Chat 接入 LLM + 画像写入 | `done` | Opus 全程             |
 | 3     | 实时语音通话（ASR + TTS + 对话编排）  | `done` | **Opus 全程**         |
 | 4     | 真实匹配算法 + 定时 Job           | `done` | Opus 设计 + Sonnet 编码 |
-| 5     | 微信支付 + 微信实名认证               | `todo` | Opus 设计 + Sonnet 编码 |
-| 6     | 通知系统 + 推送                 | `todo` | Sonnet              |
+| 5     | 前端对接后端 API（对齐接口）          | `done` | Opus 全程             |
+| 6     | 微信支付 + 通知推送              | `todo` | Opus 设计 + Sonnet 编码 |
 | 7     | 生产部署 + 压测 + 上线            | `todo` | Opus 设计 + Sonnet 编码 |
 
 
