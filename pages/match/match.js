@@ -4,6 +4,8 @@ var api = require('../../utils/api.js')
 var tabPage = require('../../behaviors/tabPage.js')
 var connectPage = require('../../stores/connect.js').connectPage
 
+var MATCH_RESULT_TMPL_ID = '' // 在微信小程序后台配置后填入
+
 Page({
   behaviors: [
     tabPage(0),
@@ -20,7 +22,7 @@ Page({
   },
 
   resetMatch() {
-    this.setData({ isMatched: false, showChat: false })
+    this.setData({ isMatched: false, showChat: false, matchId: '', unlocked: false })
   },
 
   checkMatchStatus() {
@@ -36,13 +38,15 @@ Page({
       if (res.hasResult && res.match) {
         self.setData({
           isMatched: true,
+          matchId: res.match.id || '',
           matchAvatar: res.match.avatar,
           matchName: res.match.name,
           matchBio: res.match.bio,
           compatibility: res.match.compatibility,
           tags: res.match.tags || [],
           icebreakers: res.match.icebreakers || [],
-          matchInsight: res.match.insight || ''
+          matchInsight: res.match.insight || '',
+          unlocked: res.match.unlocked || false
         })
       } else if (!res.isOpen) {
         self.updateCountdown()
@@ -103,6 +107,8 @@ Page({
     tags: [],
     icebreakers: [],
     matchInsight: '',
+    matchId: '',
+    unlocked: false,
     showPayModal: false
   },
 
@@ -114,6 +120,17 @@ Page({
 
     this.setData({ isMatching: true, matchPhase: 'shake' })
 
+    // request one-time subscribe message authorization
+    if (MATCH_RESULT_TMPL_ID && wx.requestSubscribeMessage) {
+      wx.requestSubscribeMessage({
+        tmplIds: [MATCH_RESULT_TMPL_ID],
+        success: function () {
+          api.subscribeNotifications([MATCH_RESULT_TMPL_ID]).catch(function () {})
+        },
+        fail: function () {}
+      })
+    }
+
     api.doMatch().then(function (res) {
       var match = res && res.match
       if (!match) {
@@ -123,13 +140,15 @@ Page({
         return
       }
       self.setData({
+        matchId: match.id || '',
         matchAvatar: match.avatar,
         matchName: match.name,
         matchBio: match.bio,
         compatibility: match.compatibility,
         tags: match.tags || [],
         icebreakers: match.icebreakers || [],
-        matchInsight: match.insight || ''
+        matchInsight: match.insight || '',
+        unlocked: match.unlocked || false
       })
       self._animTimer1 = setTimeout(function () {
         self.setData({ matchPhase: 'glow' })
@@ -169,6 +188,10 @@ Page({
   },
 
   showPayModal() {
+    if (this.data.unlocked) {
+      wx.showToast({ title: '已解锁，即将开启对话', icon: 'none' })
+      return
+    }
     this.setData({ showPayModal: true })
   },
 
@@ -179,8 +202,54 @@ Page({
   preventBubble() {},
 
   confirmPay() {
-    wx.showToast({ title: '支付功能开发中', icon: 'none' })
-    this.setData({ showPayModal: false })
+    var self = this
+    var matchId = this.data.matchId
+
+    if (!matchId) {
+      // mock fallback — no real match id
+      wx.showToast({ title: '支付功能配置中', icon: 'none' })
+      self.setData({ showPayModal: false, unlocked: true })
+      return
+    }
+
+    wx.showLoading({ title: '下单中...' })
+
+    api.createOrder('unlock_wechat', matchId).then(function (res) {
+      wx.hideLoading()
+
+      if (!res || !res.success) {
+        wx.showToast({ title: (res && res.message) || '下单失败，请重试', icon: 'none' })
+        return
+      }
+
+      // mock mode — no WeChat Pay configured
+      if (!res.wxPayParams) {
+        wx.showToast({ title: '支付功能配置中', icon: 'none' })
+        self.setData({ showPayModal: false, unlocked: true })
+        return
+      }
+
+      // real WeChat Pay flow
+      wx.requestPayment({
+        timeStamp: res.wxPayParams.timeStamp,
+        nonceStr: res.wxPayParams.nonceStr,
+        package: res.wxPayParams.package,
+        signType: res.wxPayParams.signType,
+        paySign: res.wxPayParams.paySign,
+        success: function () {
+          wx.showToast({ title: '解锁成功', icon: 'success' })
+          self.setData({ showPayModal: false, unlocked: true })
+        },
+        fail: function (err) {
+          if (err.errMsg.indexOf('cancel') === -1) {
+            wx.showToast({ title: '支付失败，请重试', icon: 'none' })
+          }
+        }
+      })
+    }).catch(function () {
+      wx.hideLoading()
+      wx.showToast({ title: '网络异常，请重试', icon: 'none' })
+    })
   },
 
   goToUserHome(e) {

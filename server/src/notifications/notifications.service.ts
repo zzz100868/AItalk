@@ -50,6 +50,24 @@ export class NotificationsService {
     await this.prisma.notification.deleteMany({ where: { userId } });
   }
 
+  async create(
+    userId: string,
+    type: string,
+    content: string,
+    authorName?: string,
+    authorAvatar?: string,
+  ) {
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        type,
+        content,
+        authorName: authorName || '赛博聊机',
+        authorAvatar: authorAvatar || '',
+      },
+    });
+  }
+
   private formatRelativeTime(date: Date): string {
     const now = Date.now();
     const diff = now - date.getTime();

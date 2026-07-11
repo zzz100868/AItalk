@@ -237,6 +237,14 @@ function doMatch() {
   })
 }
 
+function createOrder(sku, targetMatchId) {
+  return post('/pay/create-order', { sku: sku || 'unlock_wechat', targetMatchId: targetMatchId }).then(function (res) {
+    return res
+  }).catch(function () {
+    return { success: false, error: 'NETWORK_ERROR', message: '网络异常' }
+  })
+}
+
 function submitMatchFeedback(matchId, data) {
   return post('/match/' + matchId + '/feedback', data).catch(function () {
     return null
@@ -253,6 +261,12 @@ function getNotifications(params) {
 
 function markNotificationsRead() {
   return put('/notifications/read-all').catch(function () {
+    return null
+  })
+}
+
+function subscribeNotifications(tmplIds) {
+  return post('/notifications/subscribe', { tmplIds: tmplIds }).catch(function () {
     return null
   })
 }
@@ -302,9 +316,11 @@ module.exports = {
   // Match
   getMatchCurrent: getMatchCurrent,
   doMatch: doMatch,
+  createOrder: createOrder,
   submitMatchFeedback: submitMatchFeedback,
   // Notifications
   getNotifications: getNotifications,
+  subscribeNotifications: subscribeNotifications,
   markNotificationsRead: markNotificationsRead,
   clearNotifications: clearNotifications,
   // Voice

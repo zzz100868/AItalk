@@ -11,6 +11,7 @@
       >
         <view class="tab-icon-wrap">
           <view class="tab-icon {{item.icon}}"></view>
+          <view wx:if="{{index === 1 && unreadCount > 0}}" class="tab-badge">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
         </view>
         <text class="tab-label">{{item.text}}</text>
         <view class="tab-glow"></view>

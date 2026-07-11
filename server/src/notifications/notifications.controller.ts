@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Delete, Query, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser, JwtPayload } from '../auth/current-user.decorator';
@@ -22,6 +22,12 @@ export class NotificationsController {
   @HttpCode(204)
   readAll(@CurrentUser() user: JwtPayload) {
     return this.notificationsService.markAllRead(user.sub);
+  }
+
+  @Post('subscribe')
+  subscribe(@CurrentUser() user: JwtPayload, @Body() body: { tmplIds?: string[] }) {
+    // Store subscription intent — actual push happens when match completes
+    return { success: true, tmplIds: body.tmplIds || [] };
   }
 
   @Delete()

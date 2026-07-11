@@ -57,6 +57,7 @@ export interface AiReplyAudioMessage {
 
 export interface AiTurnEndMessage {
   type: 'ai_turn_end';
+  interrupted?: boolean;
 }
 
 export interface SessionSoftCloseMessage {

@@ -51,6 +51,7 @@ Page({
       self._updateFilter()
     })
     api.markNotificationsRead().catch(function () {})
+    getApp().globalData.unreadCount = 0
   },
 
   onPullDownRefresh() {

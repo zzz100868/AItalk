@@ -9,6 +9,7 @@ import { ProfileModule } from './profile/profile.module';
 import { MemoryModule } from './memory/memory.module';
 import { MatchModule } from './match/match.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PayModule } from './pay/pay.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MemoryModule,
     MatchModule,
     NotificationsModule,
+    PayModule,
   ],
 })
 export class AppModule {}

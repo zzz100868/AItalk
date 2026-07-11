@@ -19,6 +19,7 @@ export class VoiceSession {
   private maxDuration: number = CONFIG.maxDurationSec * 1000;
   private durationTimer: NodeJS.Timeout | null = null;
   private softCloseTimer: NodeJS.Timeout | null = null;
+  private softCloseNotified = false;
   private ttsCompleted = false;
   private asrReady = false;
   private closeAfterTts = false;
@@ -106,6 +107,7 @@ export class VoiceSession {
     this.send({ type: 'ai_reply_audio', seq: 0, pcmBase64: '', text: opening });
 
     this.ttsCompleted = false;
+    this.startBargeInListening();
     await this.tts.synthesize(opening);
     // tts 'done' event will transition to LISTENING
   }
@@ -113,11 +115,23 @@ export class VoiceSession {
   private handleAudioChunk(pcmBase64: string): void {
     if (this.state === SessionState.ENDED || this.state === SessionState.CLOSING) return;
 
+    const buffer = Buffer.from(pcmBase64, 'base64');
+
+    if (this.state === SessionState.TTS_STREAMING) {
+      if (this.isSpeechFrame(buffer)) {
+        this.handleBargeIn(buffer);
+      }
+      return;
+    }
+
     if (!this.asrReady) return;
     if (this.state !== SessionState.LISTENING && this.state !== SessionState.ASR_STREAMING) return;
 
+    this.acceptUserAudioFrame(buffer);
+  }
+
+  private acceptUserAudioFrame(buffer: Buffer): void {
     this.state = SessionState.ASR_STREAMING;
-    const buffer = Buffer.from(pcmBase64, 'base64');
     if (this.isSpeechFrame(buffer)) {
       this.speechDetected = true;
       this.clearSpeechEndTimer();
@@ -127,6 +141,25 @@ export class VoiceSession {
       }, 1200);
     }
     this.asr.feedAudio(buffer);
+  }
+
+  private handleBargeIn(buffer: Buffer): void {
+    console.log('[Session] Barge-in triggered');
+
+    this.ttsCompleted = true;
+    this.closeAfterTts = false;
+    this.tts.cancel();
+    this.send({ type: 'ai_turn_end', interrupted: true });
+
+    this.state = SessionState.ASR_STREAMING;
+    this.speechDetected = true;
+    this.clearSpeechEndTimer();
+
+    if (this.asrReady) {
+      this.asr.feedAudio(buffer);
+    } else {
+      this.asr.start();
+    }
   }
 
   private handleListenReady(): void {
@@ -171,6 +204,18 @@ export class VoiceSession {
     this.finalizingUserSpeech = false;
   }
 
+  private startBargeInListening(): void {
+    this.asrReady = false;
+    this.resetAsrTurn();
+    this.asr.start();
+  }
+
+  private stopBargeInListening(): void {
+    this.asrReady = false;
+    this.resetAsrTurn();
+    this.asr.stop();
+  }
+
   private async finalizeUserSpeech(textOverride?: string): Promise<void> {
     if (this.finalizingUserSpeech || this.state === SessionState.ENDED || this.state === SessionState.CLOSING) return;
 
@@ -191,12 +236,13 @@ export class VoiceSession {
 
     if (this.shouldSoftClose()) {
       this.closeAfterTts = true;
-      this.send({ type: 'session_soft_close', reason: '閫氳瘽鏃堕棿蹇埌浜嗭紝鎴戜滑鏉ユ敹灏惧惂' });
+      this.notifySoftClose('通话时间快到了，我们来收尾吧');
     }
 
     this.state = SessionState.TTS_STREAMING;
     this.send({ type: 'ai_reply_audio', seq: 0, pcmBase64: '', text: reply });
     this.ttsCompleted = false;
+    this.startBargeInListening();
     await this.tts.synthesize(reply);
   }
 
@@ -238,6 +284,11 @@ export class VoiceSession {
       if (this.state === SessionState.ENDED || this.state === SessionState.CLOSING) return;
 
       this.asrReady = true;
+      if (this.state === SessionState.TTS_STREAMING || this.state === SessionState.ASR_STREAMING) {
+        this.send({ type: 'asr_ready' });
+        return;
+      }
+
       this.state = SessionState.LISTENING;
       this.send({ type: 'asr_ready' });
     });
@@ -249,28 +300,6 @@ export class VoiceSession {
 
     this.asr.on('final', async (text: string) => {
       await this.finalizeUserSpeech(text);
-      return;
-      if (this.state === SessionState.ENDED || this.state === SessionState.CLOSING) return;
-
-      this.asrReady = false;
-      this.asr.stop();
-      this.send({ type: 'asr_final', text });
-      this.state = SessionState.THINKING;
-
-      // Generate AI reply
-      const reply = await this.dialogue.generateReply(text);
-
-      // Check if session should close
-      if (this.shouldSoftClose()) {
-        this.closeAfterTts = true;
-        this.send({ type: 'session_soft_close', reason: '通话时间快到了，我们来收尾吧' });
-      }
-
-      // TTS the reply
-      this.state = SessionState.TTS_STREAMING;
-      this.send({ type: 'ai_reply_audio', seq: 0, pcmBase64: '', text: reply });
-      this.ttsCompleted = false;
-      await this.tts.synthesize(reply);
     });
 
     this.asr.on('error', (err: Error) => {
@@ -291,6 +320,7 @@ export class VoiceSession {
     this.tts.on('done', () => {
       if (this.ttsCompleted) return;
       this.ttsCompleted = true;
+      this.stopBargeInListening();
       this.send({ type: 'ai_turn_end' });
 
       if (this.closeAfterTts || this.state === SessionState.CLOSING) {
@@ -307,6 +337,7 @@ export class VoiceSession {
       console.error(`[Session] TTS error: ${err.message}`);
       if (this.ttsCompleted) return;
       this.ttsCompleted = true;
+      this.stopBargeInListening();
       this.send({ type: 'ai_turn_end' });
       if (this.closeAfterTts || this.state === SessionState.CLOSING) {
         this.closeAfterTts = false;
@@ -335,10 +366,20 @@ export class VoiceSession {
     if (softCloseAt > 0) {
       this.softCloseTimer = setTimeout(() => {
         if (this.state !== SessionState.ENDED && this.state !== SessionState.CLOSING) {
-          this.send({ type: 'session_soft_close', reason: '通话快到 15 分钟了' });
+          this.notifySoftClose('通话快到 15 分钟了');
         }
       }, softCloseAt);
     }
+  }
+
+  private notifySoftClose(reason: string): void {
+    if (this.softCloseNotified) return;
+    this.softCloseNotified = true;
+    if (this.softCloseTimer) {
+      clearTimeout(this.softCloseTimer);
+      this.softCloseTimer = null;
+    }
+    this.send({ type: 'session_soft_close', reason });
   }
 
   private clearTimers(): void {

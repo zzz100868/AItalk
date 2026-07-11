@@ -23,6 +23,8 @@ enum TtsEvent {
 
 type TtsAudioFormat = 'pcm' | 'mp3' | 'ogg_opus' | 'wav' | 'unknown';
 
+const CONNECT_TIMEOUT_MS = 10_000;
+
 /**
  * 构建 TTS 帧：Header(4) + Event(int32 BE) + [SubFieldSize(uint32) + SubFieldData]...
  * Full-client request (0b0001) + with event flag (0b0100), JSON, no compression
@@ -66,7 +68,13 @@ function detectAudioFormat(data: Buffer): TtsAudioFormat {
 
 export class TtsService extends EventEmitter {
   private ws: WebSocket | null = null;
+  private connectionReady = false;
+  private connectTimer: NodeJS.Timeout | null = null;
+  private connectPromise: Promise<WebSocket> | null = null;
+  private connectResolve: ((ws: WebSocket) => void) | null = null;
+  private connectReject: ((err: Error) => void) | null = null;
   private sessionId: string = '';
+  private currentText = '';
   private replyResolve: (() => void) | null = null;
   private audioSeq = 0;
   private audioFormat: TtsAudioFormat = 'pcm';
@@ -83,7 +91,10 @@ export class TtsService extends EventEmitter {
   cancel(): void {
     const resolve = this.replyResolve;
     this.replyResolve = null;
+    this.currentText = '';
     resolve?.();
+    this.failConnect(new Error('TTS canceled'));
+    this.connectionReady = false;
 
     const ws = this.ws;
     this.ws = null;
@@ -93,11 +104,14 @@ export class TtsService extends EventEmitter {
   }
 
   private synthesizeReal(text: string): Promise<void> {
-    this.cancel();
+    if (this.replyResolve) {
+      this.cancel();
+    }
     return new Promise((resolve) => {
       this.replyResolve = resolve;
       const sessionId = uuid();
       this.sessionId = sessionId;
+      this.currentText = text;
       this.audioSeq = 0;
       this.audioFormat = 'pcm';
       this.connectAndSynthesize(text, sessionId);
@@ -105,6 +119,39 @@ export class TtsService extends EventEmitter {
   }
 
   private connectAndSynthesize(text: string, sessionId: string): void {
+    this.ensureConnected()
+      .then((ws) => {
+        if (this.sessionId !== sessionId || !this.replyResolve) return;
+        this.startSession(ws, text, sessionId);
+      })
+      .catch((err: Error) => {
+        if (!this.replyResolve) return;
+        console.error(`[TTS] Connect failed: ${err.message}`);
+        this.emit('error', err);
+        this.finish();
+      });
+  }
+
+  private ensureConnected(): Promise<WebSocket> {
+    if (this.ws?.readyState === WebSocket.OPEN && this.connectionReady) {
+      return Promise.resolve(this.ws);
+    }
+
+    if (this.connectPromise) {
+      return this.connectPromise;
+    }
+
+    this.connectPromise = new Promise((resolve, reject) => {
+      this.connectResolve = resolve;
+      this.connectReject = reject;
+
+      this.openConnection();
+    });
+
+    return this.connectPromise;
+  }
+
+  private openConnection(): void {
     try {
       const headers: Record<string, string> = {
         'X-Api-Resource-Id': CONFIG.volcTtsResourceId,
@@ -122,6 +169,8 @@ export class TtsService extends EventEmitter {
 
       const ws = new WebSocket(CONFIG.volcTtsUrl, { headers });
       this.ws = ws;
+      this.connectionReady = false;
+      this.startConnectTimer(ws);
 
       ws.on('open', () => {
         if (this.ws !== ws) {
@@ -136,35 +185,112 @@ export class TtsService extends EventEmitter {
 
       ws.on('message', (d: Buffer) => {
         if (this.ws !== ws) return;
-        this.onMessage(ws, d, text, sessionId);
+        this.onMessage(ws, d);
       });
       ws.on('error', (e) => {
         if (this.ws !== ws) return;
+        this.failConnect(e);
         console.error(`[TTS] Error: ${e.message}`);
         this.emit('error', e);
         this.finish(ws);
       });
       ws.on('close', () => {
+        this.clearConnectTimer();
         console.log('[TTS] Disconnected');
-        if (this.ws === ws) this.ws = null;
+        if (this.ws === ws) {
+          const hadPendingReply = !!this.replyResolve;
+          this.connectionReady = false;
+          this.ws = null;
+          const err = new Error('TTS connection closed');
+          this.failConnect(err);
+          if (hadPendingReply) {
+            this.emit('error', err);
+            this.finish();
+          }
+        }
       });
       ws.on('unexpected-response', (req, res) => {
+        this.clearConnectTimer();
         let body = '';
         res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
         res.on('end', () => {
           if (this.ws !== ws) return;
+          const err = new Error(`TTS server returned ${res.statusCode}: ${body.slice(0, 200)}`);
           console.error(`[TTS] HTTP ${res.statusCode}: ${body.slice(0, 500)}`);
-          this.emit('error', new Error(`TTS server returned ${res.statusCode}: ${body.slice(0, 200)}`));
+          this.failConnect(err);
+          this.emit('error', err);
           this.finish(ws);
         });
       });
     } catch (e: any) {
-      console.error(`[TTS] Connect failed: ${e.message}`);
-      this.finish();
+      const err = new Error(`TTS connection failed: ${e.message}`);
+      console.error(`[TTS] ${err.message}`);
+      this.failConnect(err);
     }
   }
 
-  private onMessage(ws: WebSocket, data: Buffer, originalText: string, sessionId: string): void {
+  private startConnectTimer(ws: WebSocket): void {
+    this.clearConnectTimer();
+    this.connectTimer = setTimeout(() => {
+      if (this.ws !== ws || this.connectionReady) return;
+
+      const err = new Error('TTS connection timeout');
+      console.error(`[TTS] ${err.message}`);
+      this.failConnect(err);
+      this.emit('error', err);
+      this.finish(ws);
+    }, CONNECT_TIMEOUT_MS);
+  }
+
+  private clearConnectTimer(): void {
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
+  }
+
+  private completeConnect(ws: WebSocket): void {
+    this.clearConnectTimer();
+    this.connectionReady = true;
+
+    const resolve = this.connectResolve;
+    this.connectPromise = null;
+    this.connectResolve = null;
+    this.connectReject = null;
+    resolve?.(ws);
+  }
+
+  private failConnect(err: Error): void {
+    this.clearConnectTimer();
+
+    const reject = this.connectReject;
+    this.connectPromise = null;
+    this.connectResolve = null;
+    this.connectReject = null;
+    reject?.(err);
+  }
+
+  private startSession(ws: WebSocket, text: string, sessionId: string): void {
+    const meta = JSON.stringify({
+      event: TtsEvent.START_SESSION,
+      user: { uid: 'voice-gateway' },
+      req_params: {
+        speaker: CONFIG.volcTtsVoiceType,
+        audio_params: {
+          format: CONFIG.volcTtsAudioFormat,
+          sample_rate: CONFIG.volcTtsSampleRate,
+        },
+      },
+    });
+
+    this.currentText = text;
+    if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.START_SESSION, [
+      { data: Buffer.from(sessionId, 'utf-8') },
+      { data: Buffer.from(meta, 'utf-8') },
+    ]));
+  }
+
+  private onMessage(ws: WebSocket, data: Buffer): void {
     if (data.length < 4) return;
 
     const mt = (data[1] >> 4) & 0x0f;
@@ -182,7 +308,7 @@ export class TtsService extends EventEmitter {
 
     // Full-server response with event (0b1001 + event flag)
     if (mt === 0b1001 && (flags & 0b0100)) {
-      this.handleServerEvent(ws, data, originalText, sessionId);
+      this.handleServerEvent(ws, data);
     }
 
     // Audio-only response with event (0b1011 + event flag)
@@ -191,7 +317,7 @@ export class TtsService extends EventEmitter {
     }
   }
 
-  private handleServerEvent(ws: WebSocket, data: Buffer, originalText: string, sessionId: string): void {
+  private handleServerEvent(ws: WebSocket, data: Buffer): void {
     const event = data.readInt32BE(4);
     let off = 8;
 
@@ -209,23 +335,7 @@ export class TtsService extends EventEmitter {
       case TtsEvent.CONNECTION_STARTED: {
         const cid = readField();
         console.log(`[TTS] Connection started: ${cid?.toString() || 'no-id'}`);
-
-        // Step 2: StartSession with speaker + audio params.
-        const meta = JSON.stringify({
-          event: TtsEvent.START_SESSION,
-          user: { uid: 'voice-gateway' },
-          req_params: {
-            speaker: CONFIG.volcTtsVoiceType,
-            audio_params: {
-              format: CONFIG.volcTtsAudioFormat,
-              sample_rate: CONFIG.volcTtsSampleRate,
-            },
-          },
-        });
-        if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.START_SESSION, [
-          { data: Buffer.from(sessionId, 'utf-8') },
-          { data: Buffer.from(meta, 'utf-8') },
-        ]));
+        this.completeConnect(ws);
         break;
       }
 
@@ -235,17 +345,17 @@ export class TtsService extends EventEmitter {
         const task = JSON.stringify({
           event: TtsEvent.TASK_REQUEST,
           req_params: {
-            text: originalText,
+            text: this.currentText,
           },
         });
         if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.TASK_REQUEST, [
-          { data: Buffer.from(sessionId, 'utf-8') },
+          { data: Buffer.from(this.sessionId, 'utf-8') },
           { data: Buffer.from(task, 'utf-8') },
         ]));
 
         // Step 3: End the non-streaming text input after sending one task.
         if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.FINISH_SESSION, [
-          { data: Buffer.from(sessionId, 'utf-8') },
+          { data: Buffer.from(this.sessionId, 'utf-8') },
           { data: Buffer.from(JSON.stringify({ event: TtsEvent.FINISH_SESSION }), 'utf-8') },
         ]));
         break;
@@ -254,11 +364,7 @@ export class TtsService extends EventEmitter {
       case TtsEvent.SESSION_FINISHED: {
         // All audio done
         console.log('[TTS] Session finished');
-
-        // Step 5: FinishConnection
-        if (ws.readyState === WebSocket.OPEN) ws.send(buildFrame(TtsEvent.FINISH_CONNECTION, [
-          { data: Buffer.from(JSON.stringify({ event: TtsEvent.FINISH_CONNECTION }), 'utf-8') },
-        ]));
+        this.completeSession(ws);
         break;
       }
 
@@ -321,12 +427,25 @@ export class TtsService extends EventEmitter {
     }
   }
 
-  private finish(ws?: WebSocket): void {
-    if (ws && this.ws !== ws) return;
+  private completeSession(ws: WebSocket): void {
+    if (this.ws !== ws) return;
 
     this.emit('done');
     this.replyResolve?.();
     this.replyResolve = null;
+    this.currentText = '';
+  }
+
+  private finish(ws?: WebSocket): void {
+    if (ws && this.ws !== ws) return;
+
+    this.clearConnectTimer();
+    this.connectionReady = false;
+    this.failConnect(new Error('TTS connection finished'));
+    this.emit('done');
+    this.replyResolve?.();
+    this.replyResolve = null;
+    this.currentText = '';
 
     const socket = ws || this.ws;
     if (socket && socket.readyState !== WebSocket.CLOSING && socket.readyState !== WebSocket.CLOSED) {

@@ -35,6 +35,8 @@ model User {
   matchResultsAsA MatchResult[] @relation("MatchUserA")
   matchResultsAsB MatchResult[] @relation("MatchUserB")
   matchFeedbacks  MatchFeedback[]
+  orders          Order[]
+  entitlements    Entitlement[]
 
   @@map("users")
 }
@@ -161,6 +163,8 @@ model MatchResult {
   userA  User          @relation("MatchUserA", fields: [userAId], references: [id])
   userB  User          @relation("MatchUserB", fields: [userBId], references: [id])
   feedbacks MatchFeedback[]
+  orders       Order[]
+  entitlements Entitlement[]
 
   @@map("match_results")
 }
@@ -177,6 +181,42 @@ model MatchFeedback {
   user  User        @relation(fields: [userId], references: [id])
 
   @@map("match_feedback")
+}
+
+// ============ 支付域 ============
+
+model Order {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  sku             String    @default("unlock_wechat") // 目前仅有 unlock_wechat
+  targetMatchId   String    @map("target_match_id")
+  amount          Int       // 金额（分）
+  status          String    @default("pending") // "pending" | "paid" | "failed" | "refunded"
+  wxOutTradeNo    String?   @map("wx_out_trade_no")
+  wxTransactionId String?   @map("wx_transaction_id")
+  paidAt          DateTime? @map("paid_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user        User        @relation(fields: [userId], references: [id])
+  matchResult MatchResult @relation(fields: [targetMatchId], references: [id])
+  entitlement Entitlement?
+
+  @@map("orders")
+}
+
+model Entitlement {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  type          String   @default("unlock_wechat")
+  matchResultId String   @map("match_result_id")
+  orderId       String   @unique @map("order_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User        @relation(fields: [userId], references: [id])
+  matchResult MatchResult @relation(fields: [matchResultId], references: [id])
+  order       Order       @relation(fields: [orderId], references: [id])
+
+  @@map("entitlements")
 }
 
 // ============ 通知域 ============

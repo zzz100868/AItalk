@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { CONFIG, isLlmConfigured } from './config';
+import { prisma } from './prisma';
 import { OrchestrationDirective, DialogueTurnData } from './types';
 
 const MOCK_REPLIES = [
@@ -71,7 +72,7 @@ export class DialogueService {
 
   constructor(userId: string) {
     this.userId = userId;
-    this.prisma = new PrismaClient();
+    this.prisma = prisma;
   }
 
   async init(): Promise<string> {
@@ -140,7 +141,6 @@ export class DialogueService {
 
     // Trigger final profile extraction
     this.triggerProfileExtraction();
-    await this.prisma.$disconnect();
   }
 
   getTurnCount(): number {
@@ -317,41 +317,44 @@ export class DialogueService {
 - 没有明确信息则返回空 evidence 数组
 - confidence: 模糊表达 0.1，明确 0.2，反复强调 0.3`;
 
-    // Fire-and-forget async extraction
-    setTimeout(async () => {
-      try {
-        const res = await fetch(`${CONFIG.volcLlmEndpoint}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${CONFIG.volcApiKey}`,
-          },
-          body: JSON.stringify({
-            model: CONFIG.volcLlmModel,
-            messages: [
-              { role: 'system', content: extractionPrompt },
-              { role: 'user', content: `## 对话片段\n${userTurns}` },
-            ],
-            temperature: 0.3,
-            max_tokens: 1024,
-            response_format: { type: 'json_object' },
-          }),
-        });
+    setImmediate(() => {
+      void this.runProfileExtraction(extractionPrompt, userTurns);
+    });
+  }
 
-        if (!res.ok) return;
+  private async runProfileExtraction(extractionPrompt: string, userTurns: string): Promise<void> {
+    try {
+      const res = await fetch(`${CONFIG.volcLlmEndpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CONFIG.volcApiKey}`,
+        },
+        body: JSON.stringify({
+          model: CONFIG.volcLlmModel,
+          messages: [
+            { role: 'system', content: extractionPrompt },
+            { role: 'user', content: `## 对话片段\n${userTurns}` },
+          ],
+          temperature: 0.3,
+          max_tokens: 1024,
+          response_format: { type: 'json_object' },
+        }),
+      });
 
-        const data: any = await res.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) return;
+      if (!res.ok) return;
 
-        const result = JSON.parse(content);
-        if (result.evidence?.length) {
-          await this.mergeEvidence(result);
-        }
-      } catch (e: any) {
-        console.error(`[Dialogue] Profile extraction failed: ${e.message}`);
+      const data: any = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) return;
+
+      const result = JSON.parse(content);
+      if (result.evidence?.length) {
+        await this.mergeEvidence(result);
       }
-    }, 1000);
+    } catch (e: any) {
+      console.error(`[Dialogue] Profile extraction failed: ${e.message}`);
+    }
   }
 
   private async mergeEvidence(result: any): Promise<void> {

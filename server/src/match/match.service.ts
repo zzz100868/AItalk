@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LlmService } from '../llm/llm.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ChatMessage } from '../llm/llm.types';
 import { MatchCandidate, MatchCopyResult, ProfileData } from './match.types';
 import { greedyPairing, isColdStart } from './matching.engine';
@@ -28,6 +29,7 @@ export class MatchService {
   constructor(
     private prisma: PrismaService,
     private llm: LlmService,
+    private notifications: NotificationsService,
   ) {}
 
   // ============ Public API ============
@@ -168,6 +170,18 @@ export class MatchService {
             insightText: copy.insight,
           },
         });
+
+        // write match notification for both users
+        await this.notifications.create(
+          pair.userA.userId,
+          'match',
+          '你的本周缘分已揭晓，快来看看吧！',
+        );
+        await this.notifications.create(
+          pair.userB.userId,
+          'match',
+          '你的本周缘分已揭晓，快来看看吧！',
+        );
       }
 
       await this.prisma.matchRound.update({ where: { id: round.id }, data: { status: 'published' } });

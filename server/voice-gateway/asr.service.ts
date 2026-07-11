@@ -13,9 +13,11 @@ const MOCK_TEXTS = [
   '嗯，我是那种想清楚再说的人。',
 ];
 
+const CONNECT_TIMEOUT_MS = 10_000;
+
 /**
  * 构建 ASR 二进制帧
- * 帧格式: [4-byte Header] + [Payload size (4B)] + [Payload]
+ * 帧格式: [4-byte Header] + [Optional sequence (4B)] + [Payload size (4B)] + [Payload]
  *
  * Header byte layout:
  *   Byte 0: [Protocol version (4)] [Header size (4)]
@@ -29,6 +31,7 @@ function buildAsrFrame(
   serialization: number,
   compression: number,
   payload: Buffer,
+  sequence?: number,
 ): Buffer {
   const header = Buffer.alloc(4);
   header[0] = (0b0001 << 4) | 0b0001; // version=1, header_size=1 (×4 = 4 bytes)
@@ -36,10 +39,21 @@ function buildAsrFrame(
   header[2] = (serialization << 4) | compression;
   header[3] = 0x00; // reserved
 
+  const parts: Uint8Array[] = [header];
+  if ((flags & 0b0001) === 0b0001) {
+    if (typeof sequence !== 'number') {
+      throw new Error('ASR frame sequence is required by flags');
+    }
+    const sequenceBuffer = Buffer.alloc(4);
+    sequenceBuffer.writeInt32BE(sequence, 0);
+    parts.push(sequenceBuffer);
+  }
+
   const size = Buffer.alloc(4);
   size.writeUInt32BE(payload.length, 0);
+  parts.push(size, payload);
 
-  return Buffer.concat([header, size, payload]);
+  return Buffer.concat(parts);
 }
 
 function uuid(): string {
@@ -70,6 +84,7 @@ export class AsrService extends EventEmitter {
       return;
     }
     this.active = true;
+    this.seq = 0;
     this.mockBuffer = [];
 
     if (isAsrConfigured()) {
@@ -100,8 +115,18 @@ export class AsrService extends EventEmitter {
       this.mockTimer = null;
     }
 
-    if (this.ws) {
-      this.ws.close(1000, 'User stopped');
+    const ws = this.ws;
+    if (ws) {
+      if (ws.readyState === WebSocket.OPEN) {
+        const endFrame = buildAsrFrame(0b0010, 0b0010, 0b0000, 0b0000, Buffer.alloc(0));
+        ws.send(endFrame, () => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close(1000, 'User stopped');
+          }
+        });
+      } else {
+        ws.close(1000, 'User stopped');
+      }
       this.ws = null;
     }
   }
@@ -136,8 +161,18 @@ export class AsrService extends EventEmitter {
 
       const ws = new WebSocket(CONFIG.volcAsrUrl, { headers });
       this.ws = ws;
+      const connectTimer = setTimeout(() => {
+        if (this.ws !== ws || ws.readyState === WebSocket.OPEN) return;
+        const err = new Error('ASR connection timeout');
+        console.error(`[ASR] ${err.message}`);
+        this.active = false;
+        this.emit('error', err);
+        try { ws.close(); } catch { /* ignore */ }
+        if (this.ws === ws) this.ws = null;
+      }, CONNECT_TIMEOUT_MS);
 
       ws.on('open', () => {
+        clearTimeout(connectTimer);
         console.log('[ASR] Connected to Volcengine ASR');
         this.sendFullClientRequest();
         this.emit('ready');
@@ -148,12 +183,14 @@ export class AsrService extends EventEmitter {
       });
 
       ws.on('error', (err) => {
+        clearTimeout(connectTimer);
         console.error(`[ASR] WebSocket error: ${err.message}`);
         this.active = false;
         this.emit('error', err);
       });
 
       ws.on('close', (code, reason) => {
+        clearTimeout(connectTimer);
         console.log(`[ASR] Connection closed: ${code} ${reason}`);
         if (this.ws === ws) {
           this.ws = null;
@@ -162,6 +199,7 @@ export class AsrService extends EventEmitter {
       });
 
       ws.on('unexpected-response', (req, res) => {
+        clearTimeout(connectTimer);
         let body = '';
         res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
         res.on('end', () => {
@@ -193,7 +231,7 @@ export class AsrService extends EventEmitter {
     };
 
     const payload = Buffer.from(JSON.stringify(config), 'utf-8');
-    const frame = buildAsrFrame(0b0001, 0b0000, 0b0001, 0b0000, payload);
+    const frame = buildAsrFrame(0b0001, 0b0001, 0b0001, 0b0000, payload, ++this.seq);
     this.ws?.send(frame);
   }
 
@@ -206,13 +244,18 @@ export class AsrService extends EventEmitter {
   private handleResponse(data: Buffer): void {
     if (data.length < 4) return;
 
+    const headerSize = (data[0] & 0x0f) * 4;
+    if (data.length < headerSize + 4) return;
+
     const msgType = (data[1] >> 4) & 0x0f;
+    const flags = data[1] & 0x0f;
 
     if (msgType === 0b1111) {
       // Error message
-      const errCode = data.readUInt32BE(4);
-      const errSize = data.readUInt32BE(8);
-      const errMsg = data.subarray(12, 12 + errSize).toString('utf-8');
+      if (data.length < headerSize + 8) return;
+      const errCode = data.readUInt32BE(headerSize);
+      const errSize = data.readUInt32BE(headerSize + 4);
+      const errMsg = data.subarray(headerSize + 8, headerSize + 8 + errSize).toString('utf-8');
       console.error(`[ASR] Server error: ${errCode} ${errMsg}`);
       this.emit('error', new Error(`ASR error ${errCode}: ${errMsg}`));
       return;
@@ -220,26 +263,33 @@ export class AsrService extends EventEmitter {
 
     if (msgType !== 0b1001) return; // Not a full server response
 
-    // Parse server response (has sequence)
-    // Header(4) + Sequence(4) + PayloadSize(4) + Payload
-    if (data.length < 12) return;
+    let offset = headerSize;
+    let sequence: number | null = null;
+    if ((flags & 0b0001) === 0b0001) {
+      if (data.length < offset + 4) return;
+      sequence = data.readInt32BE(offset);
+      offset += 4;
+    }
 
-    const payloadSize = data.readUInt32BE(8);
-    if (data.length < 12 + payloadSize) return;
+    if (data.length < offset + 4) return;
+    const payloadSize = data.readUInt32BE(offset);
+    offset += 4;
+    if (data.length < offset + payloadSize) return;
 
     let payload: Buffer;
     const compression = data[2] & 0x0f;
     if (compression === 0b0001) {
-      payload = zlib.gunzipSync(data.subarray(12, 12 + payloadSize));
+      payload = zlib.gunzipSync(data.subarray(offset, offset + payloadSize));
     } else {
-      payload = data.subarray(12, 12 + payloadSize);
+      payload = data.subarray(offset, offset + payloadSize);
     }
 
     try {
       const json = JSON.parse(payload.toString('utf-8'));
       const text = json?.result?.text || '';
       if (text) {
-        this.emit('partial', text);
+        const isFinal = flags === 0b0010 || flags === 0b0011 || (sequence !== null && sequence < 0);
+        this.emit(isFinal ? 'final' : 'partial', text);
       }
     } catch (e) {
       console.error('[ASR] Failed to parse response:', e);

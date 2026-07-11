@@ -4,6 +4,14 @@ var api = require('../../utils/api.js')
 var connectPage = require('../../stores/connect.js').connectPage
 var appStore = require('../../stores/appStore.js')
 
+var MOCK_REPLIES = [
+  '我在呢。刚才网络有点不稳定，我们先用模拟通话继续聊。',
+  '嗯，我听着。你可以继续说说今天最想被理解的那件事。',
+  '这听起来挺重要的。你愿意多讲一点当时的感受吗？',
+  '我会先记下这些线索，等连接恢复后再继续完整通话。',
+  '不用着急，我们慢慢聊。你现在最想从哪里开始？'
+]
+
 Page({
   behaviors: [
     connectPage('user', function (state) {
@@ -49,7 +57,9 @@ Page({
     this.innerAudioContext = null
     this.callStartedAt = null
     this.timer = null
-    this._pcmChunks = []
+    this._ttsQueue = []
+    this._ttsTurnEnded = false
+    this._currentTtsTempPath = ''
     this._isRecording = false
     this._isPlayingAiAudio = false
     this._ttsAudioFormat = 'pcm'
@@ -57,7 +67,9 @@ Page({
     this._ttsVolume = 0.45
     this._asrReady = false
     this._listenReadySent = false
+    this._audioSeq = 0
     this._mockInterval = null
+    this._mockSpeakTimer = null
 
     if (options.mode === 'call') {
       this.setData({ viewMode: 'call' })
@@ -162,8 +174,10 @@ Page({
     }
 
     this.callStartedAt = Date.now()
-    this._pcmChunks = []
-    this._pcmChunks = []
+    this._ttsQueue = []
+    this._ttsTurnEnded = false
+    this._currentTtsTempPath = ''
+    this._audioSeq = 0
     this._isPlayingAiAudio = false
     this._ttsAudioFormat = 'pcm'
     this._ttsSampleRate = 24000
@@ -215,6 +229,9 @@ Page({
     }
 
     if (this._mockInterval) { clearInterval(this._mockInterval); this._mockInterval = null }
+    if (this._mockSpeakTimer) { clearTimeout(this._mockSpeakTimer); this._mockSpeakTimer = null }
+    this._ttsQueue = []
+    this._ttsTurnEnded = false
     this.callStartedAt = null
     wx.switchTab({ url: '/pages/match/match' })
   },
@@ -252,7 +269,6 @@ Page({
     var self = this
     this.socketTask = wx.connectSocket({
       url: wsUrl,
-      header: { 'Authorization': 'Bearer ' + api.getToken() },
       success: function () {
         console.log('[Voice] WebSocket connecting...')
       },
@@ -303,13 +319,14 @@ Page({
         this._resumeRecordingIfAllowed()
         break
       case 'ai_reply_audio':
-        this._pauseRecordingForAi()
         if (msg.text) {
           this._asrReady = false
           this._listenReadySent = false
-          this._pcmChunks = []
+          this._ttsQueue = []
+          this._ttsTurnEnded = false
           this._ttsAudioFormat = 'pcm'
           this._ttsSampleRate = 24000
+          this._stopAudio()
         }
         if (msg.audioFormat) {
           this._ttsAudioFormat = msg.audioFormat
@@ -318,8 +335,11 @@ Page({
           this._ttsSampleRate = msg.sampleRate
         }
         if (msg.pcmBase64) {
-          var seq = typeof msg.seq === 'number' && msg.seq >= 0 ? msg.seq : this._pcmChunks.length
-          this._pcmChunks[seq] = msg.pcmBase64
+          this._enqueueTtsAudio({
+            pcmBase64: msg.pcmBase64,
+            audioFormat: this._ttsAudioFormat,
+            sampleRate: this._ttsSampleRate
+          })
         }
         if (msg.text) {
           this.setData({ aiText: msg.text, aiSpeaking: true })
@@ -327,7 +347,15 @@ Page({
         break
       case 'ai_turn_end':
         this.setData({ aiSpeaking: false })
-        this._playBufferedAudio()
+        this._ttsTurnEnded = true
+        if (msg.interrupted) {
+          this._ttsQueue = []
+          this._stopAudio()
+          this._resumeRecordingIfAllowed()
+          break
+        }
+        this._asrReady = false
+        this._playNextAudioChunk()
         break
       case 'session_soft_close':
         wx.showToast({ title: '通话即将结束', icon: 'none' })
@@ -359,10 +387,10 @@ Page({
       this.recorderManager = wx.getRecorderManager()
       this.recorderManager.onFrameRecorded(function (res) {
         if (!self._asrReady) return
-        if (self.data.aiSpeaking || self._isPlayingAiAudio || self.data.isMuted) return
+        if (self.data.isMuted) return
         if (res.frameBuffer && self.socketTask) {
           var base64 = wx.arrayBufferToBase64(res.frameBuffer)
-          self._sendWs({ type: 'audio_chunk', pcmBase64: base64 })
+          self._sendWs({ type: 'audio_chunk', seq: self._audioSeq++, pcmBase64: base64 })
         }
       })
       this.recorderManager.onError(function (err) {
@@ -377,7 +405,7 @@ Page({
       sampleRate: 16000,
       numberOfChannels: 1,
       encodeBitRate: 48000,
-      frameSize: 1.28
+      frameSize: 6.4
     })
   },
 
@@ -388,13 +416,9 @@ Page({
     }
   },
 
-  _pauseRecordingForAi() {
-    this._stopRecording()
-  },
-
   _resumeRecordingIfAllowed() {
     if (!this._asrReady) return
-    if (!this.data.isCalling || this.data.isMuted || this.data.aiSpeaking || this._isPlayingAiAudio) return
+    if (!this.data.isCalling || this.data.isMuted) return
     this._startRecording()
   },
 
@@ -417,32 +441,43 @@ Page({
       } catch (e) {}
       this.innerAudioContext = null
     }
+    if (this._currentTtsTempPath) {
+      this._cleanupTempAudio(this._currentTtsTempPath)
+      this._currentTtsTempPath = ''
+    }
   },
 
-  _playBufferedAudio() {
-    if (this._pcmChunks.length === 0) {
-      this._notifyReadyToListen()
+  _enqueueTtsAudio(item) {
+    if (!item || !item.pcmBase64) return
+    this._ttsQueue.push(item)
+    this._playNextAudioChunk()
+  },
+
+  _playNextAudioChunk() {
+    if (this._isPlayingAiAudio) return
+
+    var item = this._ttsQueue.shift()
+    if (!item) {
+      if (this._ttsTurnEnded) {
+        this._notifyReadyToListen()
+      }
       return
     }
 
-    var chunks = this._compactTtsChunks(this._pcmChunks)
-    this._pcmChunks = []
-    if (!chunks) {
-      this._notifyReadyToListen()
-      return
-    }
+    this._playTtsAudioChunk(item)
+  },
 
-    var audioBuffer = this._concatBase64PcmChunks(chunks)
-
-    var audioFormat = this._ttsAudioFormat || 'pcm'
-    var sampleRate = this._ttsSampleRate || 24000
+  _playTtsAudioChunk(item) {
+    var audioBuffer = wx.base64ToArrayBuffer(item.pcmBase64)
+    var audioFormat = item.audioFormat || this._ttsAudioFormat || 'pcm'
+    var sampleRate = item.sampleRate || this._ttsSampleRate || 24000
     var playableBuffer = audioBuffer
     var fileExt = 'wav'
 
     if (audioFormat === 'pcm') {
       if (!this._isPcm16Safe(audioBuffer)) {
         console.error('[Voice] Unsafe PCM payload rejected')
-        this._notifyReadyToListen()
+        this._playNextAudioChunk()
         return
       }
       playableBuffer = this._pcmToWav(this._limitPcm16(audioBuffer, 0.82), sampleRate, 1, 16)
@@ -454,7 +489,7 @@ Page({
       fileExt = 'ogg'
     } else {
       console.error('[Voice] Unsupported TTS audio format:', audioFormat)
-      this._notifyReadyToListen()
+      this._playNextAudioChunk()
       return
     }
 
@@ -464,13 +499,12 @@ Page({
       fs.writeFileSync(tempPath, playableBuffer)
     } catch (e) {
       console.error('[Voice] Write TTS audio failed:', e)
-      this._notifyReadyToListen()
+      this._playNextAudioChunk()
       return
     }
 
-    this._stopAudio()
     this._isPlayingAiAudio = true
-    this._stopRecording()
+    this._currentTtsTempPath = tempPath
     var self = this
     this.innerAudioContext = wx.createInnerAudioContext()
     this.innerAudioContext.src = tempPath
@@ -478,14 +512,20 @@ Page({
     this.innerAudioContext.autoplay = true
     this.innerAudioContext.onEnded(function () {
       self._cleanupTempAudio(tempPath)
+      if (self._currentTtsTempPath !== tempPath) return
+      self._currentTtsTempPath = ''
+      self.innerAudioContext = null
       self._isPlayingAiAudio = false
-      self._notifyReadyToListen()
+      self._playNextAudioChunk()
     })
     this.innerAudioContext.onError(function (err) {
       console.error('[Voice] Audio play error:', err)
       self._cleanupTempAudio(tempPath)
+      if (self._currentTtsTempPath !== tempPath) return
+      self._currentTtsTempPath = ''
+      self.innerAudioContext = null
       self._isPlayingAiAudio = false
-      self._notifyReadyToListen()
+      self._playNextAudioChunk()
     })
   },
 
@@ -493,35 +533,6 @@ Page({
     try {
       wx.getFileSystemManager().unlink({ filePath: path })
     } catch (e) {}
-  },
-
-  _compactTtsChunks(chunks) {
-    var ordered = []
-    for (var i = 0; i < chunks.length; i++) {
-      if (!chunks[i]) {
-        console.error('[Voice] Missing TTS audio chunk:', i)
-        return null
-      }
-      ordered.push(chunks[i])
-    }
-    return ordered
-  },
-
-  _concatBase64PcmChunks(chunks) {
-    var totalLength = 0
-    var buffers = chunks.map(function (chunk) {
-      var buffer = wx.base64ToArrayBuffer(chunk)
-      totalLength += buffer.byteLength
-      return new Uint8Array(buffer)
-    })
-
-    var merged = new Uint8Array(totalLength)
-    var offset = 0
-    buffers.forEach(function (buffer) {
-      merged.set(buffer, offset)
-      offset += buffer.byteLength
-    })
-    return merged.buffer
   },
 
   _limitPcm16(pcmBuffer, peakRatio) {
@@ -615,12 +626,41 @@ Page({
     var self = this
     if (this._mockInterval) return
     console.log('[Voice] Falling back to mock mode')
-    this._mockInterval = setInterval(function () {
+
+    this._asrReady = false
+    this._listenReadySent = false
+    this._ttsQueue = []
+    this._ttsTurnEnded = false
+    this._stopRecording()
+    this._stopAudio()
+    this._closeSocket()
+
+    var replyIndex = 0
+    var speak = function () {
       if (!self.data.isCalling) {
         clearInterval(self._mockInterval)
         self._mockInterval = null
+        if (self._mockSpeakTimer) {
+          clearTimeout(self._mockSpeakTimer)
+          self._mockSpeakTimer = null
+        }
         return
       }
-    }, 5000)
+
+      var text = MOCK_REPLIES[replyIndex % MOCK_REPLIES.length]
+      replyIndex++
+      self.setData({ aiText: text, aiSpeaking: true })
+
+      if (self._mockSpeakTimer) clearTimeout(self._mockSpeakTimer)
+      self._mockSpeakTimer = setTimeout(function () {
+        if (self.data.isCalling) {
+          self.setData({ aiSpeaking: false })
+        }
+        self._mockSpeakTimer = null
+      }, 1000)
+    }
+
+    speak()
+    this._mockInterval = setInterval(speak, 5000)
   }
 })
