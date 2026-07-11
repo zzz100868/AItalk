@@ -5,6 +5,8 @@
 **数据表**：`users`
 **上游文档**：[技术方案设计 §5](../architecture/技术方案设计.md) · [ADR-0002 真人认证选型](../decisions/0002-真人认证选型.md)
 
+**当前实现校准（2026-07）**：后端已有 `POST /api/auth/wx-login` 和 JWT 签发，但 `AuthService` 仍用 `mock_openid_${code}` 创建用户，尚未调用微信 `jscode2session`。生产上线前必须补真实 openid/unionid 获取和实名状态口径。
+
 ## 当前前端状态
 
 - **微信登录**：当前无实际登录流程，app.js 启动时直接从 `wx.getStorageSync('userProfile')` 读取本地缓存的 mockData 默认用户

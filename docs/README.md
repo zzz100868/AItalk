@@ -7,10 +7,16 @@
 ```
 docs/
 ├── README.md              # 本文件，全局索引
+├── DEVELOPMENT.md         # 开发环境搭建、启动命令、API 路由速查
+├── TESTING.md             # 后端验证基线、手动验收与测试缺口
+├── DEV_PROGRESS.md        # 分阶段开发路线表及进度
+├── CODE_AUDIT.md          # 代码通读审计记录、已知问题与修复入口
+├── 上线申请清单.md          # 小程序上线申请事项、费用、时间线
 ├── product/               # 产品概念、需求、原始资料
 ├── architecture/          # 技术架构、模块方案、系统设计
 ├── api/                   # 后端接口文档（按模块拆文件）
-└── decisions/             # ADR 架构决策记录（NNNN-标题.md）
+├── decisions/             # ADR 架构决策记录（NNNN-标题.md）
+└── Doubao/                # 火山引擎（豆包）API 参考文档
 ```
 
 ## 当前文档
@@ -21,6 +27,7 @@ docs/
 - [66题维度映射](product/66题维度映射.md) — 66 题拆成 10 个人格维度、题目归并、自然聊天话术、采样策略
 
 ### architecture/
+- [后端架构与交接](architecture/后端架构.md) — 当前后端/语音网关实现、模块边界、风险和接手顺序
 - [技术方案设计 v0.2](architecture/技术方案设计.md) — 总体架构、域模型、关键模块、API 清单、风险与排期
 - [对话编排设计](architecture/对话编排设计.md) — 会话状态机、双 LLM 架构、维度采样优先级、安全边界
 - [匹配算法设计](architecture/匹配算法设计.md) — 打分公式、配对算法、文案生成、冷启动策略、反馈闭环
@@ -43,7 +50,15 @@ docs/
 - [ADR-0004 数据库选型](decisions/0004-数据库选型.md) — PostgreSQL + pgvector 一库承载
 - [ADR-0005 后端技术栈](decisions/0005-后端技术栈.md) — NestJS + TypeScript + Prisma + Bull
 
-### 运维 & 上线
+### Doubao/
+- [大模型流式语音识别API](Doubao/大模型流式语音识别API.md) — 火山引擎 ASR WebSocket 协议参考
+- [语音合成大模型API](Doubao/语音合成大模型API.md) — 火山引擎 TTS WebSocket 协议参考
+
+### 开发 & 运维
+- [开发指南](DEVELOPMENT.md) — 前后端开发环境搭建、启动命令、API 路由速查表
+- [测试与验收](TESTING.md) — 后端主服务、语音网关、数据库迁移、支付/通知的验证基线
+- [开发进度路线表](DEV_PROGRESS.md) — Phase 1–7 分阶段开发计划及当前进度
+- [代码通读审计记录](CODE_AUDIT.md) — 2026-06-11 代码通读发现的问题、风险和建议修复入口
 - [上线申请清单](上线申请清单.md) — 小程序上线需要申请的全部事项（含流程、费用、时间预估）
 
 ## 维护约定

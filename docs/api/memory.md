@@ -5,6 +5,8 @@
 **数据表**：`memory_chat_messages`、`memory_insights`、`profile_documents`、`long_term_memories`
 **上游文档**：[技术方案设计 §4.3](../architecture/技术方案设计.md) · [对话编排设计](../architecture/对话编排设计.md) · [前后端字段对齐表 §3](../architecture/前后端字段对齐表.md)
 
+**当前实现校准（2026-07）**：后端已实现 chat、insights、archive HTTP API；当前 Prisma schema 没有 `long_term_memories` 表，画像主要由 `profile_documents.data` JSON 承载。MemoryService 与语音网关 DialogueService 存在对话编排/画像抽取逻辑重复，后续应收敛。
+
 ## 当前前端状态
 
 - **chat 子 tab**：用户输入 → 从 `mockData.MEMORY_REPLIES`（8 条固定回复）随机取一条 → 逐字打字效果。消息列表 `messages[]` 存内存，不持久化。AI 角色 = "Stitch AI"

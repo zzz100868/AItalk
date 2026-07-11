@@ -5,6 +5,8 @@
 **数据表**：`orders`、`entitlements`
 **上游文档**：[技术方案设计 §3.6](../architecture/技术方案设计.md)
 
+**当前实现校准（2026-07）**：后端已实现 `POST /api/pay/create-order` 和 `POST /api/pay/wx-callback`。无微信商户号时返回 mock order；真实支付需要微信商户配置、公网回调和验签。支付成功后的订单、权益、匹配解锁和通知写入后续应收敛到事务或幂等流程。
+
 ## 当前前端状态
 
 - **唯一入口**：match 页 `showPayModal` → "解锁 TA 的微信" 弹窗 → `confirmPay()` 仅显示 toast "支付功能开发中"

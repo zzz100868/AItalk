@@ -5,6 +5,8 @@
 **数据表**：`users`、`user_photos`、`user_settings`
 **上游文档**：[前后端字段对齐表 §4–8](../architecture/前后端字段对齐表.md)
 
+**当前实现校准（2026-07）**：后端已实现 `/api/me`、`/api/me/photos` 和 `/api/users/:author/home`。其中 `author` 当前按 user id 查询，参数命名和前端跳转语义需要定稿；照片墙建议以后端为权威数据源。
+
 ## 当前前端状态
 
 - **用户资料**：`stores/userStore.js` 读写 `wx.Storage('userProfile')`，字段仅 avatar / nickName / bio

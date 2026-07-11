@@ -5,6 +5,8 @@
 **数据表**：`voice_sessions`、`dialogue_turns`
 **上游文档**：[技术方案设计 §4.1](../architecture/技术方案设计.md) · [对话编排设计](../architecture/对话编排设计.md) · [前后端字段对齐表 §1](../architecture/前后端字段对齐表.md)
 
+**当前实现校准（2026-07）**：语音 WebSocket 已由 `server/voice-gateway/` 独立进程实现。当前实际事件集合以 `server/voice-gateway/types.ts` 为准；尚无 NestJS `VoiceModule` 提供 HTTP 会话历史接口。真实 ASR/TTS 需要火山配置后单独验收。
+
 ## 当前前端状态
 
 - **语音通话**：纯本地 mock。`startCall()` 启动本地计时器，`endCall()` 停止计时并跳转记忆库 archive 子 tab。无 WebSocket 连接、无 ASR/TTS 调用
