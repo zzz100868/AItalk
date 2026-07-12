@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { SessionState, ClientMessage, ServerMessage } from './types';
+import { SessionState, ClientMessage, ServerMessage, SessionEndReason } from './types';
 import { AsrService } from './asr.service';
 import { TtsService } from './tts.service';
 import { DialogueService } from './dialogue.service';
@@ -24,6 +24,7 @@ export class VoiceSession {
   private asrReady = false;
   private closeAfterTts = false;
   private latestAsrText = '';
+  private latestAsrConfidence: number | undefined;
   private speechDetected = false;
   private speechEndTimer: NodeJS.Timeout | null = null;
   private finalizingUserSpeech = false;
@@ -62,7 +63,7 @@ export class VoiceSession {
         this.handleListenReady();
         break;
       case 'end':
-        await this.handleEnd();
+        await this.handleEnd('user_ended');
         break;
       default:
         this.send({ type: 'error', code: 'UNKNOWN_TYPE', message: `Unknown message type` });
@@ -79,7 +80,7 @@ export class VoiceSession {
 
     if (this.state !== SessionState.ENDED) {
       const duration = this.startTime ? Math.floor((Date.now() - this.startTime) / 1000) : 0;
-      await this.dialogue.endSession(duration);
+      await this.dialogue.endSession(duration, 'abandoned');
       this.state = SessionState.ENDED;
     }
   }
@@ -200,6 +201,7 @@ export class VoiceSession {
   private resetAsrTurn(): void {
     this.clearSpeechEndTimer();
     this.latestAsrText = '';
+    this.latestAsrConfidence = undefined;
     this.speechDetected = false;
     this.finalizingUserSpeech = false;
   }
@@ -216,7 +218,7 @@ export class VoiceSession {
     this.asr.stop();
   }
 
-  private async finalizeUserSpeech(textOverride?: string): Promise<void> {
+  private async finalizeUserSpeech(textOverride?: string, confidenceOverride?: number): Promise<void> {
     if (this.finalizingUserSpeech || this.state === SessionState.ENDED || this.state === SessionState.CLOSING) return;
 
     this.clearSpeechEndTimer();
@@ -232,12 +234,15 @@ export class VoiceSession {
     this.send({ type: 'asr_final', text });
     this.state = SessionState.THINKING;
 
-    const reply = await this.dialogue.generateReply(text);
+    const elapsedSec = Math.floor((Date.now() - this.startTime) / 1000);
+    const enterClosing = !this.dialogue.isAwaitingClosing() && this.shouldSoftClose();
+    const asrConfidence = confidenceOverride ?? this.latestAsrConfidence;
+    const reply = await this.dialogue.generateReply(text, { elapsedSec, enterClosing, asrConfidence });
 
-    if (this.shouldSoftClose()) {
-      this.closeAfterTts = true;
+    if (enterClosing) {
       this.notifySoftClose('通话时间快到了，我们来收尾吧');
     }
+    if (this.dialogue.isClosingComplete()) this.closeAfterTts = true;
 
     this.state = SessionState.TTS_STREAMING;
     this.send({ type: 'ai_reply_audio', seq: 0, pcmBase64: '', text: reply });
@@ -255,7 +260,7 @@ export class VoiceSession {
     console.log(`[Session] Extended to ${Math.floor(newMax / 1000)}s`);
   }
 
-  private async handleEnd(): Promise<void> {
+  private async handleEnd(reason: SessionEndReason): Promise<void> {
     if (this.state === SessionState.ENDED) return;
 
     this.state = SessionState.CLOSING;
@@ -267,12 +272,13 @@ export class VoiceSession {
     this.clearTimers();
 
     const duration = Math.floor((Date.now() - this.startTime) / 1000);
-    await this.dialogue.endSession(duration);
+    await this.dialogue.endSession(duration, reason);
 
     this.send({
       type: 'session_end',
       duration,
       summary: `通话时长 ${Math.floor(duration / 60)} 分钟`,
+      endReason: reason,
     });
     this.state = SessionState.ENDED;
   }
@@ -293,13 +299,14 @@ export class VoiceSession {
       this.send({ type: 'asr_ready' });
     });
 
-    this.asr.on('partial', (text: string) => {
+    this.asr.on('partial', (text: string, confidence?: number) => {
       this.latestAsrText = text;
+      if (confidence !== undefined) this.latestAsrConfidence = confidence;
       this.send({ type: 'asr_partial', text });
     });
 
-    this.asr.on('final', async (text: string) => {
-      await this.finalizeUserSpeech(text);
+    this.asr.on('final', async (text: string, confidence?: number) => {
+      await this.finalizeUserSpeech(text, confidence);
     });
 
     this.asr.on('error', (err: Error) => {
@@ -325,7 +332,7 @@ export class VoiceSession {
 
       if (this.closeAfterTts || this.state === SessionState.CLOSING) {
         this.closeAfterTts = false;
-        this.handleEnd();
+        this.handleEnd('completed');
         return;
       }
 
@@ -341,7 +348,7 @@ export class VoiceSession {
       this.send({ type: 'ai_turn_end' });
       if (this.closeAfterTts || this.state === SessionState.CLOSING) {
         this.closeAfterTts = false;
-        this.handleEnd();
+        this.handleEnd('completed');
         return;
       }
 
@@ -358,7 +365,7 @@ export class VoiceSession {
 
     // Hard close at max duration
     this.durationTimer = setTimeout(() => {
-      this.handleEnd();
+      this.handleEnd('timeout_ended');
     }, remaining);
 
     // Soft close warning at 13 min mark

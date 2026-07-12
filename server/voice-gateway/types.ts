@@ -69,6 +69,7 @@ export interface SessionEndMessage {
   type: 'session_end';
   duration: number;
   summary: string;
+  endReason: SessionEndReason;
 }
 
 export interface ErrorMessage {
@@ -109,9 +110,4 @@ export interface DialogueTurnData {
   text: string;
 }
 
-export interface OrchestrationDirective {
-  mode: 'free_chat' | 'gentle_probe' | 'comfort';
-  probe_hint?: string;
-  probe_dimension?: string;
-  emotion_label?: string;
-}
+export type SessionEndReason = 'completed' | 'user_ended' | 'abandoned' | 'timeout_ended';

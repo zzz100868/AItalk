@@ -289,7 +289,10 @@ export class AsrService extends EventEmitter {
       const text = json?.result?.text || '';
       if (text) {
         const isFinal = flags === 0b0010 || flags === 0b0011 || (sequence !== null && sequence < 0);
-        this.emit(isFinal ? 'final' : 'partial', text);
+        const confidence = typeof json?.result?.confidence === 'number'
+          ? json.result.confidence
+          : undefined;
+        this.emit(isFinal ? 'final' : 'partial', text, confidence);
       }
     } catch (e) {
       console.error('[ASR] Failed to parse response:', e);
@@ -309,7 +312,7 @@ export class AsrService extends EventEmitter {
     this.mockTimer = setTimeout(() => {
       if (!this.active) return;
       const text = MOCK_TEXTS[Math.floor(Math.random() * MOCK_TEXTS.length)];
-      this.emit('final', text);
+      this.emit('final', text, 1);
     }, 1500);
   }
 }

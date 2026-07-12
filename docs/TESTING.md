@@ -14,6 +14,7 @@
 |---|---|---|
 | `npm run build` | 编译检查 | NestJS 主服务 TypeScript 编译 |
 | `npm run build:voice` | 编译检查 | `server/voice-gateway/` TypeScript 编译 |
+| `npm run test:voice` | 单元测试 | probe_card、阶段选卡、选项映射、追问、跳过、纠正与 coverage 规则 |
 | `npx prisma generate` | Prisma | 生成 Prisma Client |
 | `npx prisma migrate dev` | DB | 本地开发库建表/迁移 |
 | `npm run start:dev` | 本地服务 | HTTP API，默认 `http://localhost:3000/api` |
@@ -30,6 +31,7 @@
 cd server
 npm run build
 npm run build:voice
+npm run test:voice
 ```
 
 涉及 Prisma schema 或 migrations 时追加：
@@ -95,6 +97,10 @@ Invoke-RestMethod http://localhost:3000/api/me -Headers $headers
 - ASR：发送 PCM chunk 后应收到 `asr_partial` / `asr_final`。
 - TTS：AI 回复应以 `ai_reply_audio` chunk 下发，最后发送 `ai_turn_end`。
 - Barge-in：AI 播放时用户说话，应发送 interrupted `ai_turn_end` 并进入用户语音识别。
+- 编排：正常 AI 回合应为“轻确认 + 一个选择题”，不能退回随机陪聊陈述。
+- Coverage：回答后 `voice_coverage_states` 和 `voice_evidence` 应立即更新，证据包含 card/version/option/source question 字段。
+- 续采：中途挂断后重连应创建新 session，并优先补未覆盖维度。
+- 纠正：说“你听错了，我刚才说的是……”应 supersede 上一条证据，且不消耗当前问题。
 - 超时：ASR/TTS URL 不可达时，10 秒左右应有错误，不应挂死会话。
 
 ## 5. 支付与通知验收
@@ -126,7 +132,7 @@ Invoke-RestMethod http://localhost:3000/api/me -Headers $headers
 
 ## 7. 已知测试缺口
 
-- 无单元测试框架。
+- 自动化单元测试目前只覆盖语音编排纯逻辑，尚未覆盖数据库和 WebSocket 集成。
 - 无端到端测试脚本。
 - 无 CI 配置可复现后端验证链。
 - 语音真实链路依赖火山 ASR/TTS 配置和微信开发者工具/真机验证。

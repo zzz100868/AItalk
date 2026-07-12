@@ -36,7 +36,7 @@ export const CONFIG = {
   // Session limits
   minDurationSec: 5 * 60,
   maxDurationSec: 15 * 60,
-  softCloseSec: 13 * 60,
+  softCloseSec: 13 * 60 + 45,
   extendDurationSec: 5 * 60,
   absoluteMaxSec: 20 * 60,
 };

@@ -17,9 +17,9 @@ model User {
   avatar            String   @default("")
   gender            String?
   city              String?
-  birthYear         Int?     @map("birth_year")
-  orientation       String?
-  bio               String   @default("")
+  birthYear          Int?     @map("birth_year")
+  orientation        String?
+  bio                String   @default("")
   realNameVerified  Boolean  @default(false) @map("real_name_verified")
   verifyProvider    String?  @map("verify_provider")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -31,6 +31,8 @@ model User {
   insights      MemoryInsight[]
   profileDoc    ProfileDocument?
   notifications Notification[]
+  voiceCoverage VoiceCoverageState?
+  voiceEvidence VoiceEvidence[]
 
   matchResultsAsA MatchResult[] @relation("MatchUserA")
   matchResultsAsB MatchResult[] @relation("MatchUserB")
@@ -107,15 +109,19 @@ model ProfileDocument {
 // ============ 语音域 (预留) ============
 
 model VoiceSession {
-  id          String    @id @default(cuid())
-  userId      String    @map("user_id")
-  startedAt   DateTime  @default(now()) @map("started_at")
-  endedAt     DateTime? @map("ended_at")
-  durationSec Int?      @map("duration_sec")
-  status      String    @default("ongoing") // "ongoing" | "ended" | "timeout"
-  roundNo     Int       @default(1) @map("round_no")
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  startedAt        DateTime  @default(now()) @map("started_at")
+  endedAt          DateTime? @map("ended_at")
+  durationSec      Int?      @map("duration_sec")
+  status           String    @default("ongoing") // "ongoing" | "ended" | "timeout"
+  roundNo          Int       @default(1) @map("round_no")
+  endReason        String?   @map("end_reason") // completed | user_ended | abandoned | timeout_ended
+  coverageSnapshot Json?     @map("coverage_snapshot")
+  probeCardVersion Int       @default(1) @map("probe_card_version")
 
-  turns DialogueTurn[]
+  turns    DialogueTurn[]
+  evidence VoiceEvidence[]
 
   @@map("voice_sessions")
 }
@@ -130,9 +136,50 @@ model DialogueTurn {
   asrConfidence Float?   @map("asr_confidence")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  session VoiceSession @relation(fields: [sessionId], references: [id])
+  session  VoiceSession    @relation(fields: [sessionId], references: [id])
+  evidence VoiceEvidence[]
 
   @@map("dialogue_turns")
+}
+
+model VoiceCoverageState {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  data      Json
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("voice_coverage_states")
+}
+
+model VoiceEvidence {
+  id                   String   @id @default(cuid())
+  userId               String   @map("user_id")
+  sessionId            String   @map("session_id")
+  turnId               String?  @map("turn_id")
+  dimension            String
+  label                String
+  text                 String
+  confidenceDelta      Float    @map("confidence_delta")
+  cardId               String   @map("card_id")
+  cardVersion          Int      @map("card_version")
+  optionId             String?  @map("option_id")
+  optionMappingVersion Int      @map("option_mapping_version")
+  sourceQuestionIds    Json     @map("source_question_ids")
+  targetDimensions     Json     @map("target_dimensions")
+  status               String   @default("active") // active | superseded
+  supersedesEvidenceId String?  @map("supersedes_evidence_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  user    User          @relation(fields: [userId], references: [id])
+  session VoiceSession  @relation(fields: [sessionId], references: [id])
+  turn    DialogueTurn? @relation(fields: [turnId], references: [id])
+
+  @@index([userId, dimension, createdAt])
+  @@index([sessionId, createdAt])
+  @@map("voice_evidence")
 }
 
 // ============ 匹配域 ============

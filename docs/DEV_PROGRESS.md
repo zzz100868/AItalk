@@ -130,7 +130,7 @@
 
 **做什么**：实现 WebSocket 语音网关，对接豆包 ASR 流式识别 + seed-tts-2.0 语音合成，接入对话编排状态机（66 题隐式采样）
 
-**状态**：`done`（audit-fix 6/6 已完成）
+**状态**：`done`（audit-fix 6/6 + coverage orchestration 1/1 已完成）
 
 **推荐模型**：
 
@@ -149,11 +149,11 @@
 - ⚠️ ASR 协议实现：帧封装/解析基本正确，但缺少负包（end-of-stream）、无 final 事件区分
 - ⚠️ TTS 协议实现：Event 流程正确，但每次合成新建连接未复用、无连接超时守护
 - ✅ 对话编排状态机：OPENING → LISTENING → ASR_STREAMING → THINKING → TTS_STREAMING → LISTENING → CLOSING → ENDED
-- ✅ 维度采样：复用 Phase 2 的 PROBE_HINTS + orchestration directive（free_chat / gentle_probe / comfort）
-- ❌ 打断机制（barge-in）：代码未实现 — 前端 AI 说话时停止录音，后端拒绝 TTS_STREAMING 状态的音频帧，无打断路径
-- ✅ 时长控制：5 分钟最低、13 分钟 soft close、15 分钟强制收尾、extend +5min
-- ⚠️ 通话结束后异步画像抽取：存在 Prisma 断连竞态
-- ⚠️ 前端 index 页面 WebSocket 连接 + 录音 + 音频帧发送：音频全缓冲后播放，无流式
+- ✅ 维度采样：30 张版本化 `probe_card` + 用户级 coverage checklist，D1-D10 在 15 分钟路线内主动推进
+- ✅ 打断机制（barge-in）：TTS 期间保留 ASR 监听，检测到用户语音后取消 TTS 并切回识别
+- ✅ 时长控制：13 分 45 秒进入总结确认、15 分钟强制结束、extend +5min
+- ✅ 画像证据：每个用户回答即时写入可追溯证据并更新 `profile_documents`，不再依赖结束后的异步批处理
+- ✅ 前端 index 页面 WebSocket 连接 + 录音 + 音频帧发送：TTS chunk 流式播放
 
 **实现细节**：
 
@@ -174,9 +174,9 @@
 - **降级策略**：
   - ASR 未配置（APPID 为空）→ mock VAD + 随机文本
   - TTS 未配置（VOICE_TYPE 为空）→ 跳过音频，300ms 后 emit done
-  - LLM 未配置 → MOCK_REPLIES 随机回复
-- **数据持久化**：voice_sessions + dialogue_turns 写入 PostgreSQL
-- **画像抽取**：每 5 轮语音对话后 + 通话结束时异步触发（LLM JSON extraction）
+  - LLM 未配置 → 规则引擎选卡并使用 `probe_card` 标准话术
+- **数据持久化**：voice_sessions + dialogue_turns + voice_coverage_states + voice_evidence 写入 PostgreSQL
+- **画像抽取**：固定选项映射即时生成弱证据，LLM 只做候选选卡和回答强度增强
 
 **测试结果**：
 
@@ -415,7 +415,7 @@ cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
 1. `index.js` `_handleWsMessage` 中 `ai_reply_audio` 收到非空 `pcmBase64` 时立即追加到播放队列，边收边播（不再等 `ai_turn_end`）
   - 实现方案：维护一个播放队列，当前无音频在播时取队列头部写入临时文件并播放，`onEnded` 后取下一段
 2. `_fallbackToMock()` 实现真正的 mock 通话循环：
-  - 每 5 秒从 MOCK_REPLIES 中随机取一条，设置 `aiText` + `aiSpeaking`
+  - 每 5 秒从预写选择题序列中取下一条，设置 `aiText` + `aiSpeaking`
   - 1 秒后清除 `aiSpeaking`，模拟一轮对话
 3. `index.js` Token 不再同时通过 URL 和 Header 发送 — 只保留 query param `?token=`（微信小程序 `connectSocket` 不支持自定义 header），删除 header 中的 Authorization
 
@@ -454,6 +454,55 @@ cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
 
 ---
 
+#### Task 3-7：15 分钟 coverage checklist + probe_card 编排
+
+**行为**：
+
+1. 使用 30 张版本化选择题卡片覆盖 D1-D10，正常回合不再进入 `free_chat` 或随机 mock 陈述。
+2. 规则引擎按通话阶段、维度权重、置信度缺口、跳过和卡片新鲜度生成候选；LLM 只能从候选 ID 中选题。
+3. 固定选项映射即时写入证据，保存 card/version/option/source question；回答过短只追问一次。
+4. 用户跳过后同通不再追问相关维度；语音纠正覆盖旧证据但不推进当前 checklist。
+5. 用户级 coverage 跨会话保存；新通话创建新 session，并继续补未覆盖维度。
+6. 13 分 45 秒进入 3-5 条暂定总结确认；结束原因区分 `completed`、`user_ended`、`abandoned`、`timeout_ended`。
+
+**涉及文件**：
+
+- `server/voice-gateway/probe-cards.ts`
+- `server/voice-gateway/coverage-engine.ts`
+- `server/voice-gateway/dialogue.service.ts`
+- `server/voice-gateway/session.ts`
+- `server/voice-gateway/asr.service.ts`
+- `pages/index/index.js`
+- `server/prisma/schema.prisma`
+- `server/prisma/migrations/20260712090000_add_voice_profiling_orchestration/migration.sql`
+- `docs/product/语音画像采集设计.md`
+- `docs/architecture/对话编排设计.md`
+
+**验证命令**：
+
+```bash
+cd server
+npx prisma generate
+npm run test:voice
+npm run build
+npm run build:voice
+```
+
+**状态**：`done`
+
+**测试结果**（2026-07-12）：
+
+- ✅ `npx prisma generate` 成功，新增 coverage/evidence 模型可生成 Prisma Client
+- ✅ `npm run test:voice` 通过 8/8：题库规模与全维度覆盖、D10 主动阶段、固定映射、显式答案优先、低 ASR 置信度上限、一次追问、跳过、纠正不推进
+- ✅ `npm run build` 成功
+- ✅ `npm run build:voice` 成功
+- ✅ `node --check pages/index/index.js` 成功
+- ✅ `git diff --check` 无空白错误
+- ⏳ `npx prisma migrate dev` 需要可用 PostgreSQL 后执行
+- ⏳ 真实 LLM/ASR/TTS + 微信开发者工具完成 15 分钟整通验收
+
+---
+
 ### 审计修复进度概览
 
 
@@ -465,13 +514,14 @@ cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
 | 3-4  | TTS 连接超时 + 连接复用              | P1   | `done` |
 | 3-5  | Barge-in 打断机制实现              | P1   | `done` |
 | 3-6  | 前端流式播放 + Mock 降级修复           | P1   | `done` |
+| 3-7  | coverage checklist + probe_card 编排 | P0   | `done` |
 
 
 **next_prompt**：
 
 ```
-Phase 3 审计修复已全部完成（Task 3-1 到 3-6 均为 done）。
-下一步先用微信开发者工具 + 真实 ASR/TTS 配置验证完整语音链路；通过后执行 Phase 7。
+Phase 3 审计修复和画像编排已全部完成（Task 3-1 到 3-7 均为 done）。
+下一步先执行数据库迁移，再用微信开发者工具 + 真实 LLM/ASR/TTS 配置验证完整 15 分钟语音链路；通过后执行 Phase 7。
 ```
 
 ---

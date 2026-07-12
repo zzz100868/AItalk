@@ -4,12 +4,16 @@ var api = require('../../utils/api.js')
 var connectPage = require('../../stores/connect.js').connectPage
 var appStore = require('../../stores/appStore.js')
 
-var MOCK_REPLIES = [
-  '我在呢。刚才网络有点不稳定，我们先用模拟通话继续聊。',
-  '嗯，我听着。你可以继续说说今天最想被理解的那件事。',
-  '这听起来挺重要的。你愿意多讲一点当时的感受吗？',
-  '我会先记下这些线索，等连接恢复后再继续完整通话。',
-  '不用着急，我们慢慢聊。你现在最想从哪里开始？'
+var MOCK_PROBE_REPLIES = [
+  '网络不稳定，我们先用选择题模拟继续。你的作息更接近哪种？A早睡早起；B晚睡晚起；C工作日规律、周末随意；D每天不固定。',
+  '压力大时，哪种方式最能让你缓过来？A自己安静；B找人倾诉；C运动或做事；D睡一觉。',
+  '空出一个周末，你最想怎么过？A在家休息；B逛街看展；C户外出行；D约朋友聚会。',
+  '有不同意见时，你通常怎么表达？A当场直说；B想清楚再说；C先暗示；D看场合决定。',
+  '关系里哪种情况最让你难受？A冷处理；B频繁争吵；C被控制；D慢慢失去自己。',
+  '长期生活后，钱怎样管理最安心？A共同管理；B各管各的；C共同账户加个人账户；D由更擅长的人管理。',
+  '一段关系里，哪条底线最重要？A诚实；B尊重；C忠诚；D边界。',
+  '公共话题里，你最容易关注哪类？A就业住房；B性别教育；C环境健康；D科技隐私。',
+  '未来几年选生活城市时，你最优先考虑什么？A工作收入；B家人伴侣；C成本舒适度；D发展空间。'
 ]
 
 Page({
@@ -647,7 +651,7 @@ Page({
         return
       }
 
-      var text = MOCK_REPLIES[replyIndex % MOCK_REPLIES.length]
+      var text = MOCK_PROBE_REPLIES[replyIndex % MOCK_PROBE_REPLIES.length]
       replyIndex++
       self.setData({ aiText: text, aiSpeaking: true })
 

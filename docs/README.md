@@ -25,11 +25,12 @@ docs/
 - [产品概念文档](product/产品概念文档.md) — 产品定位、MVP 边界、核心玩法、66 题隐式融入机制
 - [66题.xlsx](product/66题.xlsx) — 人格测试题原始题库
 - [66题维度映射](product/66题维度映射.md) — 66 题拆成 10 个人格维度、题目归并、自然聊天话术、采样策略
+- [语音画像采集设计](product/语音画像采集设计.md) — 15 分钟目标、probe_card 规范、coverage checklist、证据置信度、中断续采与降级策略
 
 ### architecture/
 - [后端架构与交接](architecture/后端架构.md) — 当前后端/语音网关实现、模块边界、风险和接手顺序
 - [技术方案设计 v0.2](architecture/技术方案设计.md) — 总体架构、域模型、关键模块、API 清单、风险与排期
-- [对话编排设计](architecture/对话编排设计.md) — 会话状态机、双 LLM 架构、维度采样优先级、安全边界
+- [对话编排设计](architecture/对话编排设计.md) — probe_card 驱动的会话状态机、coverage 引擎、证据追溯、跨会话续采与失败降级
 - [匹配算法设计](architecture/匹配算法设计.md) — 打分公式、配对算法、文案生成、冷启动策略、反馈闭环
 - [前后端字段对齐表](architecture/前后端字段对齐表.md) — 前端所有页面 data 字段 → 后端 API 响应的完整映射
 

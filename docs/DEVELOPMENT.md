@@ -46,6 +46,7 @@ npm run start:dev           # 开发模式，热重载，http://localhost:3000
 | `npm run start:voice` | 语音网关独立进程（ws://localhost:3001） |
 | `npm run build` | 编译到 dist/ |
 | `npm run build:voice` | 编译语音网关到 dist-voice/ |
+| `npm run test:voice` | 运行 probe_card 和 coverage 编排单元测试 |
 | `npm run smoke:tts` | TTS 配置存在时验证语音合成链路 |
 | `npx prisma generate` | 生成 Prisma Client |
 | `npx prisma studio` | 可视化数据库浏览器 |
@@ -107,6 +108,7 @@ npm run start:dev           # 开发模式，热重载，http://localhost:3000
 cd server
 npm run build
 npm run build:voice
+npm run test:voice
 ```
 
 涉及 Prisma schema 或 migration 时追加：
