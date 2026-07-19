@@ -7,6 +7,7 @@
     "build": "nest build",
     "build:voice": "tsc -p voice-gateway/tsconfig.json",
     "test:voice": "npm run build:voice && node --test dist-voice/coverage-engine.test.js dist-voice/session.test.js",
+    "test:voice:persistence": "npm run build:voice && node --test dist-voice/dialogue.persistence.test.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",

@@ -40,6 +40,21 @@ interface WrittenEvidence {
   draft: EvidenceDraft;
 }
 
+interface PlannedRound {
+  reply: string;
+  drafts: EvidenceDraft[];
+  isCorrection?: boolean;
+}
+
+interface DialogueStateSnapshot {
+  turnCount: number;
+  turns: DialogueTurnData[];
+  coverage: CoverageState;
+  awaitingClosingConfirmation: boolean;
+  closingComplete: boolean;
+  sessionEvidenceLabels: string[];
+}
+
 const DIMENSION_LABELS: Record<DimensionId, string> = {
   marriage_orientation: '婚恋取向',
   family_model: '家庭模式',
@@ -83,6 +98,7 @@ export class DialogueService {
   private awaitingClosingConfirmation = false;
   private closingComplete = false;
   private sessionEvidenceLabels: string[] = [];
+  private endPromise: Promise<void> | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
@@ -98,21 +114,38 @@ export class DialogueService {
     this.coverage = createCoverageState(savedCoverage?.data as Partial<CoverageState> | undefined);
     this.ensureActiveCard(0);
 
-    const session = await this.prisma.voiceSession.create({
-      data: {
-        userId: this.userId,
-        status: 'ongoing',
-        roundNo: previousSessions + 1,
-        coverageSnapshot: this.toJson(this.coverage),
-        probeCardVersion: PROBE_CARD_CATALOG_VERSION,
-      },
-    });
-    this.sessionId = session.id;
-
     const opening = this.prepareOpeningLine();
-    this.turns.push({ role: 'ai', text: opening });
-    await this.saveTurn('ai', opening);
-    await this.persistCoverage();
+    const session = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.voiceSession.create({
+        data: {
+          userId: this.userId,
+          status: 'ongoing',
+          roundNo: previousSessions + 1,
+          coverageSnapshot: this.toJson(this.coverage),
+          probeCardVersion: PROBE_CARD_CATALOG_VERSION,
+        },
+      });
+      await tx.dialogueTurn.create({
+        data: {
+          sessionId: created.id,
+          idx: 0,
+          role: 'ai',
+          text: opening,
+        },
+      });
+      await tx.voiceCoverageState.upsert({
+        where: { userId: this.userId },
+        create: { userId: this.userId, data: this.toJson(this.coverage), version: 1 },
+        update: {
+          data: this.toJson(this.coverage),
+          version: { increment: 1 },
+        },
+      });
+      return created;
+    });
+
+    this.sessionId = session.id;
+    this.turns = [{ role: 'ai', text: opening }];
     return session.id;
   }
 
@@ -122,29 +155,48 @@ export class DialogueService {
   }
 
   async generateReply(userText: string, context: GenerateReplyContext = {}): Promise<string> {
+    if (!this.sessionId) throw new Error('Dialogue session is not initialized');
+
+    const snapshot = this.snapshotState();
+    const userTurnIdx = this.turns.length;
     this.turns.push({ role: 'user', text: userText });
     this.turnCount += 1;
-    const userTurnId = await this.saveTurn('user', userText, context.asrConfidence);
 
+    try {
+      const plan = await this.planReply(userText, context);
+      await this.persistRound(
+        userTurnIdx,
+        userText,
+        context.asrConfidence,
+        plan,
+      );
+      this.turns.push({ role: 'ai', text: plan.reply });
+      return plan.reply;
+    } catch (error) {
+      this.restoreState(snapshot);
+      throw error;
+    }
+  }
+
+  private async planReply(userText: string, context: GenerateReplyContext): Promise<PlannedRound> {
     if (CRITICAL_SAFETY_PATTERNS.some((pattern) => pattern.test(userText))) {
       this.awaitingClosingConfirmation = false;
       this.closingComplete = false;
-      await this.persistCoverage();
-      return this.finishAiReply('我先不继续问选项。请马上联系身边可信任的人或当地紧急服务陪着你，你现在有马上伤害自己的打算吗？');
+      return {
+        reply: '我先不继续问选项。请马上联系身边可信任的人或当地紧急服务陪着你，你现在有马上伤害自己的打算吗？',
+        drafts: [],
+      };
     }
 
     if (this.awaitingClosingConfirmation) {
-      const reply = await this.handleClosingConfirmation(userText, userTurnId);
-      return this.finishAiReply(reply);
+      return this.planClosingConfirmation(userText);
     }
 
     const elapsedSec = context.elapsedSec ?? this.turnCount * 45;
     const activeCard = getActiveCard(this.coverage);
     if (!activeCard) {
       const nextCard = this.ensureActiveCard(elapsedSec);
-      const reply = `我们从一个容易选的开始。${formatProbeCard(nextCard)}`;
-      await this.persistCoverage();
-      return this.finishAiReply(reply);
+      return { reply: `我们从一个容易选的开始。${formatProbeCard(nextCard)}`, drafts: [] };
     }
 
     const previousCard = this.getPreviousAnsweredCard();
@@ -167,13 +219,11 @@ export class DialogueService {
         }] : [];
       }
       this.coverage = applyCorrectionToCoverage(this.coverage, previousCard, drafts);
-      const written = await this.writeEvidence(drafts, userTurnId, true);
-      if (written.length > 0) {
-        this.coverage.lastEvidenceId = written[written.length - 1].id;
-        await this.mergeProfileEvidence(written);
-      }
-      await this.persistCoverage();
-      return this.finishAiReply(`好，我按你的修正来记，当前这题还没算回答。${formatProbeCard(activeCard)}`);
+      return {
+        reply: `好，我按你的修正来记，当前这题还没算回答。${formatProbeCard(activeCard)}`,
+        drafts,
+        isCorrection: true,
+      };
     }
 
     const initialCandidates = selectCandidateCards(this.coverage, elapsedSec, 3);
@@ -195,61 +245,53 @@ export class DialogueService {
       this.sessionId || 'mock-session',
     );
 
-    const written = await this.writeEvidence(drafts, userTurnId, analysis.isCorrection);
-    if (written.length > 0) {
-      this.coverage.lastEvidenceId = written[written.length - 1].id;
+    if (drafts.length > 0) {
       this.sessionEvidenceLabels.push(...drafts.map((draft) => draft.label));
-      await this.mergeProfileEvidence(written);
     }
 
     if (analysis.needsFollowUp) {
-      await this.persistCoverage();
-      return this.finishAiReply(`我再把选项说清楚一点。${formatProbeCard(activeCard)}`);
+      return {
+        reply: `我再把选项说清楚一点。${formatProbeCard(activeCard)}`,
+        drafts,
+        isCorrection: analysis.isCorrection,
+      };
     }
 
     if (context.enterClosing) {
       this.awaitingClosingConfirmation = true;
       const summary = await this.buildClosingSummary();
-      await this.persistCoverage();
-      return this.finishAiReply(summary);
+      return { reply: summary, drafts, isCorrection: analysis.isCorrection };
     }
 
     const candidates = selectCandidateCards(this.coverage, elapsedSec, 3);
     if (candidates.length === 0) {
       this.awaitingClosingConfirmation = true;
       const summary = await this.buildClosingSummary();
-      await this.persistCoverage();
-      return this.finishAiReply(summary);
+      return { reply: summary, drafts, isCorrection: analysis.isCorrection };
     }
     const chosenCard = this.chooseNextCard(candidates, decision?.nextCardId);
     this.coverage = activateCard(this.coverage, chosenCard);
-    await this.persistCoverage();
 
     const reply = this.isValidCardReply(decision?.reply, chosenCard)
       ? decision!.reply!
       : this.buildFallbackReply(chosenCard, analysis);
-    return this.finishAiReply(reply);
+    return { reply, drafts, isCorrection: analysis.isCorrection };
   }
 
-  async endSession(durationSec: number, reason: SessionEndReason): Promise<void> {
-    if (this.ended) return;
-    this.ended = true;
-    await this.persistCoverage();
-    if (!this.sessionId) return;
+  endSession(durationSec: number, reason: SessionEndReason): Promise<void> {
+    if (this.ended) return Promise.resolve();
+    if (this.endPromise) return this.endPromise;
 
-    const status = reason === 'timeout_ended' ? 'timeout' : 'ended';
-    await this.prisma.voiceSession.updateMany({
-      where: { id: this.sessionId, status: 'ongoing' },
-      data: {
-        status,
-        endReason: reason,
-        endedAt: new Date(),
-        durationSec,
-        coverageSnapshot: this.toJson(this.coverage),
-      },
-    }).catch((error: Error) => {
-      console.error(`[Dialogue] Failed to end session: ${error.message}`);
-    });
+    const attempt = this.finishSessionEnd(durationSec, reason)
+      .then(() => {
+        this.ended = true;
+      })
+      .catch((error) => {
+        this.endPromise = null;
+        throw error;
+      });
+    this.endPromise = attempt;
+    return attempt;
   }
 
   getTurnCount(): number {
@@ -384,124 +426,191 @@ ${candidateText}
     return `${prefix}${formatProbeCard(card)}`;
   }
 
+  private async persistRound(
+    userTurnIdx: number,
+    userText: string,
+    asrConfidence: number | undefined,
+    plan: PlannedRound,
+  ): Promise<void> {
+    const sessionId = this.sessionId;
+    if (!sessionId) throw new Error('Dialogue session is not initialized');
+
+    await this.prisma.$transaction(async (tx) => {
+      const userTurn = await tx.dialogueTurn.create({
+        data: {
+          sessionId,
+          idx: userTurnIdx,
+          role: 'user',
+          text: userText,
+          asrConfidence,
+        },
+      });
+      const written = await this.writeEvidence(
+        tx,
+        plan.drafts,
+        userTurn.id,
+        plan.isCorrection === true,
+      );
+      if (written.length > 0) {
+        this.coverage.lastEvidenceId = written[written.length - 1].id;
+        await this.mergeProfileEvidence(tx, written);
+      }
+      await this.persistCoverage(tx);
+      await tx.dialogueTurn.create({
+        data: {
+          sessionId,
+          idx: userTurnIdx + 1,
+          role: 'ai',
+          text: plan.reply,
+        },
+      });
+    });
+  }
+
   private async writeEvidence(
+    tx: Prisma.TransactionClient,
     drafts: EvidenceDraft[],
-    turnId: string | null,
+    turnId: string,
     isCorrection: boolean,
   ): Promise<WrittenEvidence[]> {
     if (!this.sessionId || drafts.length === 0) return [];
-    const supersedesEvidenceId = isCorrection ? this.coverage.lastEvidenceId : undefined;
 
-    try {
-      if (supersedesEvidenceId) {
-        await this.prisma.voiceEvidence.updateMany({
-          where: { id: supersedesEvidenceId, userId: this.userId, status: 'active' },
-          data: { status: 'superseded' },
-        });
+    const supersededByDimension = new Map<DimensionId, string>();
+    if (isCorrection) {
+      const dimensions = [...new Set(drafts.map((draft) => draft.dimension))];
+      const activeEvidence = await tx.voiceEvidence.findMany({
+        where: {
+          userId: this.userId,
+          dimension: { in: dimensions },
+          status: 'active',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      for (const evidence of activeEvidence) {
+        const dimension = evidence.dimension as DimensionId;
+        if (!supersededByDimension.has(dimension)) {
+          supersededByDimension.set(dimension, evidence.id);
+        }
       }
-
-      const written: WrittenEvidence[] = [];
-      for (const draft of drafts) {
-        const row = await this.prisma.voiceEvidence.create({
-          data: {
-            userId: this.userId,
-            sessionId: this.sessionId,
-            turnId,
-            dimension: draft.dimension,
-            label: draft.label,
-            text: draft.text,
-            confidenceDelta: draft.confidenceDelta,
-            cardId: draft.cardId,
-            cardVersion: draft.cardVersion,
-            optionId: draft.optionId,
-            optionMappingVersion: draft.optionMappingVersion,
-            sourceQuestionIds: this.toJson(draft.sourceQuestionIds),
-            targetDimensions: this.toJson(draft.targetDimensions),
-            status: 'active',
-            supersedesEvidenceId,
-          },
-        });
-        written.push({ id: row.id, draft });
-      }
-      return written;
-    } catch (error: any) {
-      console.error(`[Dialogue] Failed to persist evidence: ${error.message}`);
-      return [];
+      const supersededIds = [...supersededByDimension.values()];
+      await tx.voiceEvidence.updateMany({
+        where: { id: { in: supersededIds }, userId: this.userId, status: 'active' },
+        data: { status: 'superseded' },
+      });
     }
-  }
 
-  private async mergeProfileEvidence(written: WrittenEvidence[]): Promise<void> {
-    if (written.length === 0) return;
-    try {
-      const existing = await this.prisma.profileDocument.findUnique({ where: { userId: this.userId } });
-      const data: any = existing?.data || { dimensions: {}, aboutMe: '', personalities: [], traits: [] };
-      if (!data.dimensions) data.dimensions = {};
-
-      for (const { id, draft } of written) {
-        if (!data.dimensions[draft.dimension]) {
-          data.dimensions[draft.dimension] = {
-            label: draft.label,
-            score: 0,
-            confidence: 0,
-            evidence: [],
-          };
-        }
-        const dimension = data.dimensions[draft.dimension];
-        if (draft.isCorrection && Array.isArray(dimension.evidence)) {
-          const previous = [...dimension.evidence].reverse().find((item: any) => item.status !== 'superseded');
-          if (previous) previous.status = 'superseded';
-        }
-        dimension.evidence.push({
-          id,
-          text: draft.text,
+    const written: WrittenEvidence[] = [];
+    for (const draft of drafts) {
+      const supersedesEvidenceId = supersededByDimension.get(draft.dimension);
+      const row = await tx.voiceEvidence.create({
+        data: {
+          userId: this.userId,
+          sessionId: this.sessionId,
+          turnId,
+          dimension: draft.dimension,
           label: draft.label,
-          confidence_delta: draft.confidenceDelta,
+          text: draft.text,
+          confidenceDelta: draft.confidenceDelta,
           cardId: draft.cardId,
           cardVersion: draft.cardVersion,
           optionId: draft.optionId,
           optionMappingVersion: draft.optionMappingVersion,
-          sourceQuestionIds: draft.sourceQuestionIds,
-          targetDimensions: draft.targetDimensions,
+          sourceQuestionIds: this.toJson(draft.sourceQuestionIds),
+          targetDimensions: this.toJson(draft.targetDimensions),
           status: 'active',
-          timestamp: new Date().toISOString(),
-        });
-        dimension.confidence = Math.min(1, Number(dimension.confidence || 0) + draft.confidenceDelta);
-        dimension.label = draft.label;
-      }
-
-      data.meta = data.meta || {};
-      data.meta.voiceCoverage = Object.fromEntries(
-        DIMENSION_IDS.map((dimension) => [dimension, this.coverage.dimensions[dimension].status]),
-      );
-      await this.prisma.profileDocument.upsert({
-        where: { userId: this.userId },
-        create: { userId: this.userId, data, version: 1 },
-        update: { data, version: existing ? existing.version + 1 : 1 },
+          supersedesEvidenceId,
+        },
       });
-    } catch (error: any) {
-      console.error(`[Dialogue] Failed to merge profile evidence: ${error.message}`);
+      written.push({ id: row.id, draft });
+    }
+    return written;
+  }
+
+  private async mergeProfileEvidence(
+    tx: Prisma.TransactionClient,
+    written: WrittenEvidence[],
+  ): Promise<void> {
+    if (written.length === 0) return;
+    const existing = await tx.profileDocument.findUnique({ where: { userId: this.userId } });
+    const data: any = existing?.data || { dimensions: {}, aboutMe: '', personalities: [], traits: [] };
+    if (!data.dimensions) data.dimensions = {};
+
+    for (const { id, draft } of written) {
+      if (!data.dimensions[draft.dimension]) {
+        data.dimensions[draft.dimension] = {
+          label: draft.label,
+          score: 0,
+          confidence: 0,
+          evidence: [],
+        };
+      }
+      const dimension = data.dimensions[draft.dimension];
+      if (draft.isCorrection && Array.isArray(dimension.evidence)) {
+        const previous = [...dimension.evidence].reverse().find((item: any) => item.status !== 'superseded');
+        if (previous) previous.status = 'superseded';
+      }
+      dimension.evidence.push({
+        id,
+        text: draft.text,
+        label: draft.label,
+        confidence_delta: draft.confidenceDelta,
+        cardId: draft.cardId,
+        cardVersion: draft.cardVersion,
+        optionId: draft.optionId,
+        optionMappingVersion: draft.optionMappingVersion,
+        sourceQuestionIds: draft.sourceQuestionIds,
+        targetDimensions: draft.targetDimensions,
+        status: 'active',
+        timestamp: new Date().toISOString(),
+      });
+      dimension.confidence = Math.min(1, Number(dimension.confidence || 0) + draft.confidenceDelta);
+      dimension.label = draft.label;
+    }
+
+    data.meta = data.meta || {};
+    data.meta.voiceCoverage = Object.fromEntries(
+      DIMENSION_IDS.map((dimension) => [dimension, this.coverage.dimensions[dimension].status]),
+    );
+    await tx.profileDocument.upsert({
+      where: { userId: this.userId },
+      create: { userId: this.userId, data, version: 1 },
+      update: { data, version: existing ? existing.version + 1 : 1 },
+    });
+  }
+
+  private async persistCoverage(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.voiceCoverageState.upsert({
+      where: { userId: this.userId },
+      create: { userId: this.userId, data: this.toJson(this.coverage), version: 1 },
+      update: {
+        data: this.toJson(this.coverage),
+        version: { increment: 1 },
+      },
+    });
+    if (this.sessionId) {
+      await tx.voiceSession.update({
+        where: { id: this.sessionId },
+        data: { coverageSnapshot: this.toJson(this.coverage) },
+      });
     }
   }
 
-  private async persistCoverage(): Promise<void> {
-    try {
-      await this.prisma.voiceCoverageState.upsert({
-        where: { userId: this.userId },
-        create: { userId: this.userId, data: this.toJson(this.coverage), version: 1 },
-        update: {
-          data: this.toJson(this.coverage),
-          version: { increment: 1 },
+  private async finishSessionEnd(durationSec: number, reason: SessionEndReason): Promise<void> {
+    if (!this.sessionId) return;
+    const status = reason === 'timeout_ended' ? 'timeout' : 'ended';
+    await this.prisma.$transaction(async (tx) => {
+      await this.persistCoverage(tx);
+      await tx.voiceSession.updateMany({
+        where: { id: this.sessionId!, status: 'ongoing' },
+        data: {
+          status,
+          endReason: reason,
+          endedAt: new Date(),
+          durationSec,
+          coverageSnapshot: this.toJson(this.coverage),
         },
       });
-      if (this.sessionId) {
-        await this.prisma.voiceSession.update({
-          where: { id: this.sessionId },
-          data: { coverageSnapshot: this.toJson(this.coverage) },
-        });
-      }
-    } catch (error: any) {
-      console.error(`[Dialogue] Failed to persist coverage: ${error.message}`);
-    }
+    });
   }
 
   private async buildClosingSummary(): Promise<string> {
@@ -524,20 +633,23 @@ ${candidateText}
     return `我先把目前的理解暂时记成这几项：${summary}。有没有哪一点不准确？`;
   }
 
-  private async handleClosingConfirmation(userText: string, turnId: string | null): Promise<string> {
+  private async planClosingConfirmation(userText: string): Promise<PlannedRound> {
     const isCorrection = [/不是/u, /不准确/u, /改成/u, /应该是/u, /你听错/u].some((pattern) => pattern.test(userText));
-    if (isCorrection) await this.recordClosingCorrection(userText, turnId);
+    const drafts = isCorrection ? await this.planClosingCorrection(userText) : [];
     this.awaitingClosingConfirmation = false;
     this.closingComplete = true;
-    await this.persistCoverage();
-    return isCorrection
-      ? '好，我把你的修正作为高优先级记录了，这次先到这里。'
-      : '好，这次的内容已经记下了，我们下次接着聊。';
+    return {
+      reply: isCorrection
+        ? '好，我把你的修正作为高优先级记录了，这次先到这里。'
+        : '好，这次的内容已经记下了，我们下次接着聊。',
+      drafts,
+      isCorrection,
+    };
   }
 
-  private async recordClosingCorrection(userText: string, turnId: string | null): Promise<void> {
+  private async planClosingCorrection(userText: string): Promise<EvidenceDraft[]> {
     const dimension = await this.extractCorrectionDimension(userText) || this.latestProbedDimension();
-    if (!dimension) return;
+    if (!dimension) return [];
     const draft: EvidenceDraft = {
       dimension,
       label: `用户修正${DIMENSION_LABELS[dimension]}理解`,
@@ -559,11 +671,7 @@ ${candidateText}
       lastProbedAt: new Date().toISOString(),
       lastCardId: draft.cardId,
     };
-    const written = await this.writeEvidence([draft], turnId, true);
-    if (written.length > 0) {
-      this.coverage.lastEvidenceId = written[0].id;
-      await this.mergeProfileEvidence(written);
-    }
+    return [draft];
   }
 
   private async extractCorrectionDimension(userText: string): Promise<DimensionId | undefined> {
@@ -613,29 +721,24 @@ ${candidateText}
     return previousCardId ? PROBE_CARD_BY_ID.get(previousCardId) : undefined;
   }
 
-  private async saveTurn(role: 'user' | 'ai', text: string, asrConfidence?: number): Promise<string | null> {
-    if (!this.sessionId) return null;
-    try {
-      const row = await this.prisma.dialogueTurn.create({
-        data: {
-          sessionId: this.sessionId,
-          idx: this.turns.length - 1,
-          role,
-          text,
-          asrConfidence: role === 'user' ? asrConfidence : undefined,
-        },
-      });
-      return row.id;
-    } catch (error: any) {
-      console.error(`[Dialogue] Failed to save ${role} turn: ${error.message}`);
-      return null;
-    }
+  private snapshotState(): DialogueStateSnapshot {
+    return {
+      turnCount: this.turnCount,
+      turns: this.turns.map((turn) => ({ ...turn })),
+      coverage: JSON.parse(JSON.stringify(this.coverage)) as CoverageState,
+      awaitingClosingConfirmation: this.awaitingClosingConfirmation,
+      closingComplete: this.closingComplete,
+      sessionEvidenceLabels: [...this.sessionEvidenceLabels],
+    };
   }
 
-  private async finishAiReply(reply: string): Promise<string> {
-    this.turns.push({ role: 'ai', text: reply });
-    await this.saveTurn('ai', reply);
-    return reply;
+  private restoreState(snapshot: DialogueStateSnapshot): void {
+    this.turnCount = snapshot.turnCount;
+    this.turns = snapshot.turns;
+    this.coverage = snapshot.coverage;
+    this.awaitingClosingConfirmation = snapshot.awaitingClosingConfirmation;
+    this.closingComplete = snapshot.closingComplete;
+    this.sessionEvidenceLabels = snapshot.sessionEvidenceLabels;
   }
 
   private toJson(value: unknown): Prisma.InputJsonValue {
