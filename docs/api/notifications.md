@@ -1,54 +1,30 @@
 # Notifications 模块
 
-**模块职责**：通知列表、已读管理、清空
-**对应前端页面**：pages/notifications
+**实现**：`server/src/notifications/`
+**前端页面**：`pkg-social/notifications`、`custom-tab-bar`
 **数据表**：`notifications`
-**上游文档**：[技术方案设计 §3.5](../architecture/技术方案设计.md) · [前后端字段对齐表 §9](../architecture/前后端字段对齐表.md)
+**字段契约**：[前后端字段对齐表](../architecture/前后端字段对齐表.md)
 
-**当前实现校准（2026-07）**：后端已实现通知列表、全部已读、清空、订阅授权意图接口。匹配完成和支付解锁会写通知；微信订阅消息推送是 best-effort，不应阻塞匹配或支付主流程。
+## 当前状态
 
-## 当前前端状态
+站内通知列表、未读数、全部已读和清空已实现，前端页面和 tab badge 已调用这些接口。接口失败或空列表时，通知页仍可能展示两条本地 `follow` mock 通知；当前后端真实事件主要是 `match` 类型。
 
-- **数据来源**：全部 mock 硬编码，2 条 `follow` 类型通知（"陈默 关注了你"、"周晚 关注了你"）
-- **操作**：进入页面自动标记已读、下拉刷新（mock 延迟）、清空全部
-- **筛选**：`activeFilter` 支持按 type 过滤，当前只有 `follow` 类型
-- **点击行为**：`follow` 类型点击跳转 `userHome?author=xxx`
-- **无后端调用**：无 HTTP 请求
+匹配轮次会写入站内通知，支付解锁成功也会写入站内通知。微信订阅消息发送代码存在，但授权意图没有持久化，前端模板 ID 默认空，真实推送尚未验收。
 
-## 当前通知类型分析
+## 当前接口
 
-| 类型 | 当前状态 | MVP 建议 |
-|---|---|---|
-| `follow` | mock 数据中仅有的类型 | **Deprecated** — 关注/粉丝功能已从前端移除，无事件来源 |
-| `match` | 不存在 | **P0** — 每周匹配结果揭晓通知 |
-| `system` | 不存在 | **P1** — 系统公告、安全提醒等 |
+### GET /api/notifications
 
-## 未来后端目标
-
-- 通知由后端事件驱动写入（匹配完成、系统公告等）
-- `follow` 类型待广场/社交功能恢复后再启用
-- MVP 优先实现 `match` + `system` 类型
-
----
-
-## API 列表
-
-### GET /api/notifications — P1
-
-通知列表。
-
-**参数**：`cursor`, `limit`（默认 20），`type`（可选，`match | system`）
-
-**响应**：
+参数：`cursor`、`limit`（默认 20）、`type`。
 
 ```json
 {
   "data": [
     {
-      "id": 1,
+      "id": "cuid",
       "type": "match",
-      "author": "系统",
-      "avatar": "string — URL",
+      "author": "赛博聊机",
+      "avatar": "",
       "content": "你的本周缘分已揭晓",
       "time": "2小时前",
       "read": false
@@ -60,54 +36,28 @@
 }
 ```
 
-**前端字段映射**：
+### PUT /api/notifications/read-all
 
-| 前端 | 后端 |
-|---|---|
-| `notifications[].id` | `id` |
-| `notifications[].type` | `type` |
-| `notifications[].author` | `author`（通知来源名称） |
-| `notifications[].avatar` | `avatar` |
-| `notifications[].content` | `content` |
-| `notifications[].time` | `time`（相对时间） |
-| `notifications[].read` | `read` |
+标记当前用户全部未读通知，成功返回 204。
 
-**前端对接**：替代 notifications 页 mock 硬编码数据。
+### DELETE /api/notifications
 
----
+删除当前用户全部通知，成功返回 204。
 
-### PUT /api/notifications/read-all — P1
+### POST /api/notifications/subscribe
 
-标记全部已读。
+请求：
 
-**响应**：`204 No Content`
+```json
+{ "tmplIds": ["template-id"] }
+```
 
-**前端对接**：当前 `onShow` 中 `notifications.map(n => ({...n, read: true}))` 替换为此接口。
+当前响应只是 `{success: true, tmplIds}`，没有写数据库、没有绑定一次性授权次数，也没有校验模板 ID。不能把它视为完整的订阅授权保存接口。
 
----
+## 微信订阅消息待完成
 
-### DELETE /api/notifications — P1
-
-清空所有通知。
-
-**响应**：`204 No Content`
-
-**前端对接**：替代 `clearAll()` 中的本地 `setData({ notifications: [] })`。
-
----
-
-## 错误码
-
-| code | 说明 |
-|---|---|
-| `NOTIFICATION_NOT_FOUND` | 通知不存在 |
-
-## 优先级说明
-
-| 接口 | 优先级 | 理由 |
-|---|---|---|
-| `GET /api/notifications` | P1 | 前端页面完整但全 mock，可暂用本地数据 |
-| `PUT /api/notifications/read-all` | P1 | 同上 |
-| `DELETE /api/notifications` | P1 | 同上 |
-
-**整个模块为 P1**：通知页有完整 UI 但无真实事件源。MVP 阶段匹配结果可先用 toast / 弹窗通知，后续再接入通知系统。
+1. 在前端配置真实模板 ID，并区分开发/体验/正式环境。
+2. 建模用户授权、模板、可消费次数和消费结果。
+3. 只向有可用授权的用户发送，并记录失败原因和重试边界。
+4. 将 `miniprogram_state` 从当前硬编码 `developer` 改为环境配置。
+5. 在真机验证授权与接收。

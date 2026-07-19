@@ -1,90 +1,51 @@
 # Memory 模块
 
-**模块职责**：文字聊天（chat）、记忆洞察（insights）、人格档案（archive）
-**对应前端页面**：pages/memory（3 个子 tab：chat / memory / archive）
-**数据表**：`memory_chat_messages`、`memory_insights`、`profile_documents`、`long_term_memories`
-**上游文档**：[技术方案设计 §4.3](../architecture/技术方案设计.md) · [对话编排设计](../architecture/对话编排设计.md) · [前后端字段对齐表 §3](../architecture/前后端字段对齐表.md)
+**实现**：`server/src/memory/`
+**前端页面**：`pages/memory`
+**数据表**：`memory_chat_messages`、`memory_insights`、`profile_documents`
+**字段契约**：[前后端字段对齐表](../architecture/前后端字段对齐表.md)
 
-**当前实现校准（2026-07）**：后端已实现 chat、insights、archive HTTP API；当前 Prisma schema 没有 `long_term_memories` 表，画像主要由 `profile_documents.data` JSON 承载。MemoryService 与语音网关 DialogueService 存在对话编排/画像抽取逻辑重复，后续应收敛。
+## 当前状态
 
-## 当前前端状态
+- Chat：前端加载后端历史并调用发送接口；失败时 `utils/api.js` 回落到本地回复。后端会先写用户消息，调用 LLM 或随机 fallback，再写 AI 消息。
+- 画像抽取：每个进程内累计 5 条用户消息后异步抽取最近 10 条消息，合并到 `profile_documents.data`，并可能生成 insight。计数保存在内存，进程重启会丢失。
+- Insights：前端读取 API；编辑和删除目前只修改本地 storage，未调用已有后端接口。
+- Archive：前端读取 API，失败时回落 mock；后端没有画像时返回默认档案。
+- 当前 schema 没有 `long_term_memories`，也没有向量检索。
 
-- **chat 子 tab**：用户输入 → 从 `mockData.MEMORY_REPLIES`（8 条固定回复）随机取一条 → 逐字打字效果。消息列表 `messages[]` 存内存，不持久化。AI 角色 = "Stitch AI"
-- **memory 子 tab**：`insights[]` 初始从 `mockData.MEMORY_DATA.insights`（7 条）加载，持久化到 `wx.Storage('memoryInsights')`。支持按 category 过滤、长按编辑/删除
-- **archive 子 tab**：`aboutMe` / `personalities[]` / `traits[]` 全部来自 `mockData.MEMORY_DATA`，不持久化，纯展示
-- **聊天统计**：`chatDays: '12天'`、`chatMood: '平静'`、`chatTopics: 8` 全部硬编码
+## 当前接口
 
-## 未来后端目标
+### GET /api/memory/chat
 
-- chat 接入 LLM（复用双 LLM 架构，跳过 ASR/TTS）
-- insights 由后端对话后异步生成
-- archive 由后端画像引擎生成并持续更新
-
----
-
-## API 列表
-
-### GET /api/memory/chat — P0
-
-获取聊天历史。
-
-**参数**：`cursor`, `limit`（默认 50）
-
-**响应**：
+参数：`cursor`、`limit`，默认 50。
 
 ```json
 {
   "data": [
-    {
-      "id": "string",
-      "sender": "user | ai",
-      "content": "string",
-      "createdAt": "ISO8601"
-    }
+    { "id": "cuid", "sender": "user", "content": "string", "createdAt": "ISO8601" }
   ],
   "hasMore": false,
   "cursor": null,
-  "meta": {
-    "chatDays": "12天",
-    "chatMood": "平静",
-    "chatTopics": 8
-  }
+  "meta": { "chatDays": "1天", "chatMood": "平静", "chatTopics": 0 }
 }
 ```
 
-**前端字段映射**：
+当前实现按 `createdAt` 排序、按 id 比较游标，分页稳定性需要集成测试。
 
-| 前端 | 后端 |
-|---|---|
-| `messages[].id` | `id` |
-| `messages[].sender` | `sender`（`"user"` / `"ai"`） |
-| `messages[].content` | `content` |
-| `chatDays` | `meta.chatDays` |
-| `chatMood` | `meta.chatMood` |
-| `chatTopics` | `meta.chatTopics` |
+### POST /api/memory/chat
 
-**前端对接**：memory 页 `onLoad` 时调用，替代 `mockData.getMemoryData().messages`。
-
----
-
-### POST /api/memory/chat — P0
-
-发送消息 + 获取 AI 回复。
-
-**请求**：
+请求：
 
 ```json
-{
-  "content": "string"
-}
+{ "content": "string" }
 ```
 
-**响应**：
+响应：
 
 ```json
 {
   "reply": {
-    "id": "string",
+    "id": "cuid",
     "sender": "ai",
     "content": "string",
     "createdAt": "ISO8601"
@@ -92,30 +53,18 @@
 }
 ```
 
-**后端行为**：
-1. 用户消息写入 `memory_chat_messages`
-2. 调用双 LLM 架构（LLM #1 抽取 + 规则引擎 + LLM #2 生成）
-3. 共享该用户的 `long_term_memories` 和 `profile_documents`
-4. AI 回复写入 `memory_chat_messages`
+当前没有 DTO 级非空/长度校验、频率限制或流式 HTTP 响应。LLM 未配置或失败时返回服务端预置回复。
 
-**前端对接**：替代 `sendMessage()` 中的 `mockReplies[random]` 逻辑。前端保持逐字打字效果，将 `reply.content` 逐字渲染。
+### GET /api/memory/insights
 
----
-
-### GET /api/memory/insights — P0
-
-获取洞察列表。
-
-**参数**：`category`（可选，`life | emotion | hobby | growth`，不传返回全部）
-
-**响应**：
+可选参数：`category`。
 
 ```json
 {
   "data": [
     {
-      "id": 1,
-      "date": "2024.01.15",
+      "id": "cuid",
+      "date": "2026.07.12",
       "title": "string",
       "content": "string",
       "tag": "生活",
@@ -126,112 +75,20 @@
 }
 ```
 
-**前端字段映射**：
+### PUT /api/memory/insights/:id
 
-| 前端 | 后端 |
-|---|---|
-| `insights[].id` | `id` |
-| `insights[].date` | `date`（后端格式化 `created_at` 为 "YYYY.MM.DD"） |
-| `insights[].title` | `title` |
-| `insights[].content` | `content` |
-| `insights[].tag` | `tag`（中文："生活"/"情绪"/"兴趣"/"成长"） |
-| `insights[].tagColor` | `tagColor`（`secondary`/`tertiary`/`primary`） |
-| `insights[].category` | `category`（`life`/`emotion`/`hobby`/`growth`） |
+接受可选 `title`、`content`，返回完整 insight。不存在或不属于当前用户时返回 `INSIGHT_NOT_FOUND`。
 
-**tagColor 映射规则**：
-- `life` → `secondary`
-- `emotion` → `tertiary`
-- `hobby` → `primary`
-- `growth` → `primary`
+### DELETE /api/memory/insights/:id
 
-**前端对接**：替代 `storage.get('memoryInsights')` 和 `mockData.MEMORY_DATA.insights`。
+成功返回 204。前端当前尚未调用。
 
----
+### GET /api/memory/archive
 
-### PUT /api/memory/insights/:id — P0
+返回 `aboutMe`、`personalities[]`、`traits[]`。来源是 `profile_documents.data`；没有画像时使用服务端默认值。
 
-编辑洞察。
+## 已知边界
 
-**请求**：
-
-```json
-{
-  "title": "string",
-  "content": "string"
-}
-```
-
-**响应**：更新后的完整 insight 对象。
-
-**前端对接**：替代 `saveEdit()` 中的 `storage.set('memoryInsights', ...)`。
-
----
-
-### DELETE /api/memory/insights/:id — P0
-
-删除洞察。
-
-**响应**：`204 No Content`
-
-**前端对接**：替代 `deleteInsight()` 中的 `storage.set('memoryInsights', ...)`。
-
----
-
-### GET /api/memory/archive — P0
-
-获取人格档案。
-
-**响应**：
-
-```json
-{
-  "aboutMe": "你是一个在安静中寻找力量的人...",
-  "personalities": [
-    {
-      "name": "内向而敏感",
-      "desc": "你喜欢独处，对周围的情绪变化很敏锐..."
-    }
-  ],
-  "traits": [
-    {
-      "name": "深度思考者",
-      "color": "warm"
-    }
-  ]
-}
-```
-
-**前端字段映射**：
-
-| 前端 | 后端 |
-|---|---|
-| `aboutMe` | `aboutMe` |
-| `personalities[].name` | `name` |
-| `personalities[].desc` | `desc` |
-| `traits[].name` | `name` |
-| `traits[].color` | `color`（`warm`/`sun`/`night`/`mint`/`bloom`/`sky`） |
-
-**后端来源**：从 `profile_documents`（JSONB）聚合生成，通话结束后由异步 worker 更新。
-
-**前端对接**：替代 `mockData.getMemoryData()` 的 `aboutMe` / `personalities` / `traits`。
-
----
-
-## 错误码
-
-| code | 说明 |
-|---|---|
-| `INSIGHT_NOT_FOUND` | 洞察不存在 |
-| `CHAT_RATE_LIMITED` | 聊天频率超限 |
-| `LLM_ERROR` | LLM 服务异常（chat 接口） |
-
-## 优先级说明
-
-| 接口 | 优先级 | 理由 |
-|---|---|---|
-| `GET /api/memory/chat` | P0 | chat 子 tab 消息列表 |
-| `POST /api/memory/chat` | P0 | chat 子 tab 发消息，替代 mock 回复 |
-| `GET /api/memory/insights` | P0 | memory 子 tab 洞察列表 |
-| `PUT /api/memory/insights/:id` | P0 | 用户编辑洞察 |
-| `DELETE /api/memory/insights/:id` | P0 | 用户删除洞察 |
-| `GET /api/memory/archive` | P0 | archive 子 tab 人格档案 |
+- 文字画像与语音画像使用两套合并逻辑，数据形状可能漂移。
+- 异步抽取用 `setTimeout` 和进程内计数，没有队列、重试或任务持久化。
+- 文档和代码中的 fallback 只保证有回复，不保证画像抽取成功。

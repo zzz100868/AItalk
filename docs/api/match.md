@@ -1,50 +1,34 @@
 # Match 模块
 
-**模块职责**：每周匹配状态查询、触发匹配、解锁微信、匹配反馈
-**对应前端页面**：pages/match（Tab 0）
+**实现**：`server/src/match/`
+**前端页面**：`pages/match`
 **数据表**：`match_rounds`、`match_results`、`match_feedback`
-**上游文档**：[技术方案设计 §4.4](../architecture/技术方案设计.md) · [匹配算法设计](../architecture/匹配算法设计.md) · [前后端字段对齐表 §2](../architecture/前后端字段对齐表.md)
+**字段契约**：[前后端字段对齐表](../architecture/前后端字段对齐表.md)
 
-**当前实现校准（2026-07）**：后端已实现匹配状态、触发匹配、反馈接口、匹配轮次生成和通知写入。完整验收需要至少两个有画像的用户；匹配轮次和通知写入后续应补事务或幂等保护。
+## 当前状态
 
-## 当前前端状态
+后端已实现候选过滤、打分、贪心配对、LLM/规则文案、结果写入和每周 Cron。Cron 调用 `executeMatchRound()` 预生成结果；`POST /api/match/do` 只读取本周已有结果，不会现场运行算法。
 
-- **开放时间**：`getDay() === 2`（每周二），有 `TEST_MODE = true` 开关始终开放
-- **匹配逻辑**：`doMatch()` 从 `mockData.MATCH_CANDIDATES`（6 位硬编码候选人）随机抽 1 位，避免连续匹配同一人
-- **动画流程**：shake(900ms) → glow(1700ms) → reveal(3000ms) → 显示结果
-- **结果字段**：avatar, name, bio, compatibility, tags, icebreakers, matchInsight
-- **付费入口**：`showPayModal` 弹窗 → `confirmPay()` 显示 toast "支付功能开发中"
-- **倒计时**：非开放时段显示到下个周二 00:00 的倒计时
-- **数据源**：全部来自 `mockData.getMatchCandidates()`，无后端调用
+前端优先调用后端，失败时回落到本地 mock 候选人。真实流程尚未使用至少两个有效画像用户完成数据库集成验收。
 
-## 未来后端目标
+## 当前接口
 
-- 替换 mock 随机为真实匹配算法（维度互补 + 兴趣重合 + 阶段适配 + 活跃度）
-- 每周二定时 Job 预计算匹配结果
-- 用户点击"开始匹配"时返回预计算结果
+### GET /api/match/current
 
----
-
-## API 列表
-
-### GET /api/match/current — P0
-
-当前匹配状态。
-
-**响应（开放且有结果）**：
+如果本周已有结果，无论当天是否周二都会返回结果：
 
 ```json
 {
   "isOpen": true,
   "hasResult": true,
   "match": {
-    "id": "string",
-    "avatar": "string — URL",
+    "id": "cuid",
+    "avatar": "string",
     "name": "string",
     "bio": "string",
-    "compatibility": 98,
-    "tags": ["手冲咖啡", "深夜阅读", "安静"],
-    "icebreakers": ["string", "string"],
+    "compatibility": 88,
+    "tags": ["string"],
+    "icebreakers": ["string"],
     "insight": "string",
     "unlocked": false
   },
@@ -52,139 +36,40 @@
 }
 ```
 
-**响应（未开放）**：
+没有结果且不是周二时，返回 `isOpen: false` 和下周二时间；周二无结果时返回开放但无结果。
+
+### POST /api/match/do
+
+有本周结果时返回 `{success: true, match}`；否则返回：
 
 ```json
 {
-  "isOpen": false,
-  "hasResult": false,
+  "success": false,
   "match": null,
-  "nextOpenAt": "ISO8601 — 下个周二 00:00"
+  "message": "本周匹配尚未生成，请等待周二匹配开放"
 }
 ```
 
-**前端字段映射**：
+当前不会返回旧文档中列出的 `MATCH_NOT_OPEN`、`PROFILE_INCOMPLETE` 等异常码。
 
-| 前端 | 后端 |
-|---|---|
-| `isMatchOpen` | `isOpen` |
-| `isMatched` | `hasResult` |
-| `matchAvatar` | `match.avatar` |
-| `matchName` | `match.name` |
-| `matchBio` | `match.bio` |
-| `compatibility` | `match.compatibility` |
-| `tags` | `match.tags` |
-| `icebreakers` | `match.icebreakers` |
-| `matchInsight` | `match.insight` |
-| `countdownText` | 前端根据 `nextOpenAt` 本地计算倒计时 |
-
-**前端对接**：match 页 `onShow` / `checkMatchStatus()` 调用，替代本地 `getDay()` 判断和 mock candidates。
-
----
-
-### POST /api/match/do — P0
-
-触发匹配（仅开放时段可调用）。
-
-**响应**：
-
-```json
-{
-  "success": true,
-  "match": {
-    "id": "string",
-    "avatar": "string",
-    "name": "string",
-    "bio": "string",
-    "compatibility": 98,
-    "tags": ["手冲咖啡", "深夜阅读", "安静"],
-    "icebreakers": ["string", "string"],
-    "insight": "string",
-    "unlocked": false
-  }
-}
-```
-
-**后端行为**：
-1. 检查当前周是否在开放时段
-2. 检查用户本周是否已匹配（每人每周 1 次）
-3. 返回预计算的匹配结果（来自 `match_results` 表）
-
-**错误码**：
-
-| code | 说明 |
-|---|---|
-| `MATCH_NOT_OPEN` | 非开放时段 |
-| `MATCH_ALREADY_DONE` | 本周已匹配 |
-| `MATCH_NO_CANDIDATE` | 无可匹配用户 |
-| `PROFILE_INCOMPLETE` | 画像维度不足，需先完成 AI 语音对话 |
-
-**前端对接**：替代 `doMatch()` 中的 mock 随机抽取逻辑。前端保持动画流程不变。
-
----
-
-### POST /api/match/:id/unlock — P2
-
-解锁匹配对象微信（付费）。
-
-**请求**：
-
-```json
-{
-  "paymentMethod": "wechat"
-}
-```
-
-**响应**：
-
-```json
-{
-  "unlocked": true,
-  "wechatId": "string"
-}
-```
-
-**当前状态**：前端 `confirmPay()` 为 toast 占位，无实际支付流程。依赖 payment 模块。
-
----
-
-### POST /api/match/:id/feedback — P1
-
-匹配反馈。
-
-**请求**：
+### POST /api/match/:id/feedback
 
 ```json
 {
   "sentiment": "positive | negative | skip",
-  "skipReason": "string — 可选",
-  "comments": "string — 可选"
+  "skipReason": "string",
+  "comments": "string"
 }
 ```
 
-**响应**：`204 No Content`
+成功返回 204。负反馈且有 `skipReason` 时，服务会用进程内 `setTimeout` 异步调整画像；当前没有 DTO 枚举校验和持久任务队列，前端也没有反馈入口。
 
-**后端行为**：写入 `match_feedback`，反哺画像（详见[匹配算法设计 · 反馈闭环](../architecture/匹配算法设计.md)）。
+## 定时匹配
 
-**当前状态**：前端无反馈入口 UI，后续可在匹配结果页添加。
+`MatchScheduler` 每周二触发匹配轮次，候选要求近期活跃且有画像。匹配结果和双方站内通知逐条写入，目前不在单一事务中。微信订阅消息随后 best-effort 发送。
 
----
+详细算法见 [匹配算法设计](../architecture/匹配算法设计.md)。
 
-## 当前 mock vs 未来真实匹配
+## 解锁
 
-| 维度 | 当前 mock | 未来真实 |
-|---|---|---|
-| 候选人来源 | `mockData.MATCH_CANDIDATES`（6 人硬编码） | `match_results` 表（每周二定时 Job 预计算） |
-| 匹配算法 | `Math.random()` | 维度互补 40% + 兴趣重合 25% + 阶段适配 25% + 活跃度 10% |
-| 文案生成 | 硬编码 insight/icebreakers | LLM 基于双方画像生成 |
-| 每周限制 | 无限制 | 每人每周 1 次 |
-| 开放时间 | `TEST_MODE = true` 始终开放 | 后端控制，周二开放 |
-
-## 优先级说明
-
-| 接口 | 优先级 | 理由 |
-|---|---|---|
-| `GET /api/match/current` | P0 | match 页核心状态 |
-| `POST /api/match/do` | P0 | 触发匹配 |
-| `POST /api/match/:id/feedback` | P1 | 前端无反馈 UI，但后端画像闭环需要 |
-| `POST /api/match/:id/unlock` | P2 | 依赖支付模块 |
+当前没有 `POST /api/match/:id/unlock`。解锁流程由 `POST /api/pay/create-order` 和微信支付回调完成，见 [Payment](payment.md)。

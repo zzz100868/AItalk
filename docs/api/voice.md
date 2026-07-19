@@ -35,8 +35,8 @@ WS /ws/voice?token=<JWT>
 
 | type | 字段 | 说明 |
 |---|---|---|
-| `start` | `sessionId?`, `deviceInfo` | 发起通话 |
-| `audio_chunk` | `seq: number`, `pcmBase64: string` | 音频帧，40ms 一帧，PCM 16bit 16kHz |
+| `start` | `deviceInfo?` | 发起新通话；当前不接受恢复旧 session id |
+| `audio_chunk` | `seq: number`, `pcmBase64: string` | PCM 16bit 16kHz 单声道；前端当前 recorder `frameSize` 为 6.4KB |
 | `listen_ready` | — | 前端已完成上一轮播放，可以开始监听 |
 | `extend` | — | 用户要求"再聊一会儿"，延长 5 分钟 |
 | `end` | — | 用户主动挂断 |
@@ -83,14 +83,14 @@ idle → listening → asr_streaming → dialogue_thinking → tts_streaming →
 ### 前端对接要点
 
 1. `startCall()` → `wx.connectSocket({ url: wssUrl })` → 发送 `{type: "start"}`
-2. 使用 `wx.getRecorderManager()` 录音，每 40ms 回调发 `audio_chunk`
+2. 使用 `wx.getRecorderManager()` 录制 16kHz 单声道 PCM，并按 recorder frame 回调发送 `audio_chunk`；当前 `frameSize` 配置为 6.4KB
 3. 收到 `ai_reply_audio` → `wx.createInnerAudioContext()` 播放
 4. 收到 `session_end` → 停止录音、关闭连接、设置 `globalData.memoryTargetTab = 'archive'`、跳转记忆库
 5. `endCall()` → 发送 `{type: "end"}` → 等待 `session_end` → 关闭连接
 
 ---
 
-## HTTP API
+## 规划 HTTP API（当前未实现）
 
 ### GET /api/voice/sessions — P1
 
@@ -150,20 +150,21 @@ idle → listening → asr_streaming → dialogue_thinking → tts_streaming →
 
 ---
 
-## 错误码
+## 当前错误码
 
 | code | 说明 |
 |---|---|
-| `SESSION_LIMIT` | 并发通话数超限 |
-| `SESSION_NOT_FOUND` | 会话不存在 |
+| `AUTH_FAILED` | WebSocket JWT 无效 |
+| `INVALID_JSON` | 消息不是合法 JSON |
+| `UNKNOWN_TYPE` | 未知客户端消息类型 |
 | `ASR_ERROR` | ASR 服务异常 |
-| `TTS_ERROR` | TTS 服务异常 |
-| `LLM_ERROR` | LLM 服务异常 |
+
+`SESSION_LIMIT`、`SESSION_NOT_FOUND`、独立 `TTS_ERROR`/`LLM_ERROR` 事件当前没有实现。TTS/LLM 多数失败走降级或服务端日志。
 
 ## 优先级说明
 
 | 接口 | 优先级 | 理由 |
 |---|---|---|
-| `WS /ws/voice` | P0 | 产品核心功能，前端已有完整 UI 和交互流程 |
-| `GET /api/voice/sessions` | P1 | 首页 callDate 展示，可暂用本地时间 |
-| `GET /api/voice/sessions/:id` | P1 | 通话详情回放，前端当前无入口 |
+| `WS /ws/voice` | 进行中 | 代码和纯逻辑测试存在，真实整通待验收 |
+| `GET /api/voice/sessions` | 未实现 | 首页 callDate 当前使用本地时间 |
+| `GET /api/voice/sessions/:id` | 未实现 | 前端当前无入口 |

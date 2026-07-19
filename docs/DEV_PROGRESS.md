@@ -1,1049 +1,237 @@
-# 赛博聊机 · 开发进度路线表
+# 赛博聊机 · 当前开发进度
 
-**上游文档**：[技术方案设计](architecture/技术方案设计.md) · [开发指南](DEVELOPMENT.md)
-**当前审计**：[代码通读审计记录](CODE_AUDIT.md) · 2026-06-11 代码通读发现的问题与修复入口
+**更新时间**：2026-07-12
+**事实基线**：`backend` 分支，提交 `ab42e83`；本次文档修改前工作树干净并与 `origin/backend` 同步
+**状态口径**：`已完成` 表示代码存在且有仓库内验证；`进行中` 表示主要代码已存在但缺少数据库、外部服务或端到端证据；`待开发` 表示当前代码未实现。
 
-## 使用规则
+本文件是唯一进度记录。设计目标、历史 ADR 和 mock fallback 不能作为完成证据。
 
-1. **每次只执行一个 Phase。**
-2. **执行 Phase 前，先阅读本文件。**
-3. **执行完成后，必须更新该 Phase 的状态、测试结果、需要我手动做的事、next_prompt。**
-4. **如果没有完成，也必须写清楚 blocked 原因。**
-5. **不要擅自扩展到下一个 Phase。**
+## 1. 当前总览
 
----
+| 能力 | 状态 | 依据 |
+|---|---|---|
+| 小程序页面与 API 调用层 | 进行中 | 核心页面已调用后端并保留 fallback；照片、洞察写操作等仍以本地状态为主 |
+| NestJS HTTP 主服务 | 已完成（代码基线） | `npm run build` 通过，模块和路由已注册 |
+| PostgreSQL/Prisma 模型 | 进行中 | schema 校验通过、迁移文件存在；本次未对数据库执行最新迁移 |
+| Memory 文字聊天与画像 | 进行中 | LLM/fallback、历史、画像抽取代码存在；缺数据库集成与真实 LLM 验收 |
+| 实时语音与 coverage 编排 | 进行中（`V-001 active`） | 网关编译通过、coverage 单测 8/8；按本文 Voice 收尾任务表推进 |
+| 每周匹配 | 进行中 | 匹配引擎、Cron、结果和通知写入存在；缺真实候选池集成验收 |
+| 通知中心 | 进行中 | 列表/已读/清空和前端 badge 已实现；订阅授权未持久化、未真机推送 |
+| 微信支付 | 进行中 | 下单和回调代码、前端 `wx.requestPayment` 已实现；未完成真实商户链路验收 |
+| 生产部署 | 待开发 | 无 Docker、CI/CD、反向代理、监控、限流和部署脚本 |
 
-## Phase 1 — 后端骨架 + 前端对接
+## 2. 已完成
 
-**做什么**：搭建 NestJS 后端 MVP 骨架，数据库建表，前端各页面对接 API（带 mock 回落）
+- 小程序主包、设置分包、社交分包、自定义 tab bar 和基础状态管理已落库。
+- 前端已有统一 `utils/api.js`，覆盖登录、资料、记忆、匹配、通知、支付和语音地址。
+- NestJS 已包含 Health、Auth、Profile、Memory、Match、Notifications、Pay、LLM、Prisma 模块。
+- Prisma 已定义用户、记忆、画像、语音、匹配、支付和通知模型，并包含三组迁移。
+- 语音网关已实现 JWT 鉴权、ASR/TTS adapter、barge-in、probe_card、coverage、证据和跨会话状态代码。
+- 匹配引擎、每周定时任务、文案 fallback、反馈写入和匹配通知代码已实现。
+- 支付 V3 请求、回调验签/解密、权益写入和前端支付调用代码已实现。
+- 本次验证：主服务编译通过、语音测试 8/8、Prisma schema 校验通过、23 个前端 JS 文件语法检查通过。
+- 文档入口已统一为 `docs/README.md`，旧 `data/docs/` 已删除。
 
-**状态**：`done`
+## 3. 进行中
 
-**推荐模型**：
+- **真实身份链路**：前端已调用 `wx.login`，后端仍把 code 转为 `mock_openid_${code}`；openid/unionid 和实名状态未接微信接口。
+- **数据库落地**：最新语音 coverage/evidence 迁移文件已提交，但本次没有对目标数据库执行或回归。
+- **语音验收**：纯逻辑已测，真实 ASR/TTS/LLM、15 分钟收尾、断线续采、barge-in 和持久化未做整通验收。
+- **前后端数据权威**：资料基本信息已接 API；照片墙仍本地保存，洞察编辑/删除仍只改本地 storage，用户主页 `author` 与 user id 语义未统一。
+- **匹配验收**：需要至少两个具备有效画像和活跃数据的用户验证候选过滤、配对、轮次和通知。
+- **支付/通知验收**：需要商户号、平台证书、回调域名、模板 ID 和真机；订阅授权接口当前未持久化。
 
+## 4. Voice 收尾任务表
 
-| 环节  | 模型                               |
-| --- | -------------------------------- |
-| 设计  | Opus（整体架构、数据模型）                  |
-| 编码  | Sonnet（NestJS CRUD 脚手架、前端 API 层） |
-| 测试  | Haiku（curl 验证接口）                 |
+### 4.1 状态与门控
 
+本表在正式接入 Harness 前承担 Voice 模块的人工状态机职责。允许状态：
 
-**完成标准**：
+- `not_started`：尚未开始。
+- `active`：当前唯一允许实施的任务；全表同时最多一个。
+- `blocked`：有明确阻塞原因，不能伪装成完成。
+- `passing`：所有验证命令退出码为 0，且已登记验收证据。
 
-- server/ 目录：NestJS + Prisma + PostgreSQL
-- Prisma schema 定义全部核心表
-- `npx prisma migrate dev` 建表成功
-- 20 个 API 路由全部注册（GET /health 可访问）
-- Auth: wx-login mock 登录 → 返回 JWT
-- Profile: GET/PUT /me, photos CRUD, user home
-- Memory: chat history, send message (mock AI reply), insights CRUD, archive
-- Match: current status, do match (mock candidates), feedback
-- Notifications: list, read-all, clear
-- 前端 utils/api.js 封装
-- app.js 启动时 wx.login → 后端换 token
-- profile/editProfile/userHome 页面对接 API
-- memory 页面对接 API（chat/insights/archive）
-- match 页面对接 API
+状态转换规则：
 
-**测试结果**：
+1. `not_started` 或 `blocked` 进入 `active` 前，必须确认没有其他 `active` 项，并满足依赖。
+2. `active` 只能在全部验证命令成功后进入 `passing`。
+3. 验证失败时保持 `active`；无法继续时改为 `blocked` 并记录原因。
+4. 当前尚不存在的测试文件或 npm script 是对应任务必须交付的一部分；在入口补齐并成功执行前，任务不得进入 `passing`。
+5. 现有 `npm run test:voice` 的 8/8 只覆盖 coverage 纯逻辑，是共同基线，不替代下列任务的专项证据。
 
-- `curl /api/health` → `{"status":"ok"}`
-- `POST /api/auth/wx-login` → 返回 JWT + user 对象
-- 所有带 Auth 的接口返回正确结构
-- 无数据库时服务降级为 mock-only 模式可启动
+验收证据在接入 Harness 前直接登记在本节，格式为：`日期 · git commit · 命令/退出码 · 结果摘要`。接入后改为 `.harness/evidence/<task-id>/<timestamp>/result.json`。
 
-**需要你手动做的**：
+除非任务另有说明，以下每个 PowerShell 验证块都从仓库根目录独立执行，不依赖前一个代码块留下的工作目录或环境状态。
 
-- Docker Desktop 启动 PostgreSQL 容器（已完成）
-- 微信开发者工具中验证前端页面 → API 调用是否走通
+### 4.2 任务总表
 
-**next_prompt**：执行 Phase 2
+| ID | 任务 | 依赖 | 状态 | 验收证据 |
+|---|---|---|---|---|
+| V-001 | 会话生命周期与状态机可靠性 | 无 | `active` | 待生成 |
+| V-002 | 回合、证据、coverage 与画像持久化一致性 | V-001 | `not_started` | 待生成 |
+| V-003 | WebSocket 协议与小程序端收尾 | V-001、V-002 | `not_started` | 待生成 |
+| V-004 | ASR/TTS/LLM adapter 契约与故障测试 | V-003 | `not_started` | 待生成 |
+| V-005 | 本地 PostgreSQL + mock provider 全链路集成 | V-004 | `not_started` | 待生成 |
+| V-006 | 真实火山服务 15 分钟整通验收 | V-005 | `not_started` | 待生成 |
 
----
+当前 `active` 数量：**1**（V-001）。
 
-## Phase 2 — Memory Chat 接入 LLM + 画像写入
+### 4.3 V-001 会话生命周期与状态机可靠性
 
-**做什么**：将 memory chat 的 mock 回复替换为火山引擎豆包 LLM 真实对话；对话后异步抽取画像；archive 页展示真实画像数据
+**可观察行为**：重复 `start/end/close/error` 不会创建重复会话或发送重复 `session_end`；会话结束后迟到的 ASR/LLM/TTS 回调不再改变状态；soft close、硬超时、extend 和主动挂断结果确定。
 
-**状态**：`done`
-
-**推荐模型**：
-
-
-| 环节  | 模型                               |
-| --- | -------------------------------- |
-| 设计  | Opus（LLM prompt 设计、画像抽取逻辑、上下文管理） |
-| 编码  | Opus（API 调用封装、Service 实现、异步抽取）   |
-| 测试  | Haiku（验证 LLM 返回格式、画像字段写入）        |
-
-
-**完成标准**：
-
-- 火山引擎 SDK 集成（豆包 pro API 调用封装）→ `server/src/llm/llm.service.ts`
-- POST /api/memory/chat 调用 LLM 替代 mock 回复
-- LLM 上下文：拼接用户画像 + 最近 20 条消息 + system prompt + 编排指令
-- 对话后异步画像抽取（profile_documents 写入）→ `server/src/memory/profile-extractor.service.ts`
-- GET /api/memory/archive 从 profile_documents 读取真实数据（已有，Phase 1 实现）
-- memory insights 由后端对话异步生成（setTimeout Worker，每 5 轮触发）
-- .env 新增 VOLC_* 配置项
-
-**实现细节**：
-
-- **简化双 LLM**：生成用豆包 pro（chat），抽取用豆包 pro（JSON mode），异步分离
-- **编排指令**：free_chat / gentle_probe / comfort 三种模式，根据画像覆盖度和情绪自动切换
-- **降级策略**：LLM 不可用时自动回退 MOCK_REPLIES（与 Phase 1 行为一致）
-- **异步抽取**：每 5 轮用户消息后 setTimeout 1s 触发，不阻塞响应
-
-**测试结果**：
-
-- TypeScript 编译零错误
-- `npm run build` 成功
-- LLM 未配置时降级为 mock 回复（不崩溃）
-- 待填入 API Key 后验证真实 LLM 返回（已完成）
-
-**需要你手动做的**：
-
-- 注册火山引擎账号 → [https://console.volcengine.com/ark](https://console.volcengine.com/ark)
-- 创建推理接入点（模型选豆包 pro-32k 或 pro-128k）
-- 获取 API Key（访问密钥管理）
-- 在 `server/.env` 填入：
-  ```
-  VOLC_API_KEY=your_api_key_here
-  VOLC_LLM_MODEL=ep-xxxxxxxx  (接入点 ID)
-  ```
-
-**next_prompt**：
-
-```
-执行 Phase 3。先阅读 docs/DEV_PROGRESS.md。
-目标：实现 WebSocket 语音网关 + ASR + TTS + 对话编排。
-这是最复杂的模块，全程用 Opus。
-先设计 WebSocket 协议和状态机（参考 docs/architecture/技术方案设计.md §4.1 和 docs/architecture/对话编排设计.md）。
-然后实现语音网关独立进程。
-完成后更新 DEV_PROGRESS.md。
-```
-
----
-
-## Phase 3 — 实时语音通话（ASR + TTS + 对话编排）
-
-**做什么**：实现 WebSocket 语音网关，对接豆包 ASR 流式识别 + seed-tts-2.0 语音合成，接入对话编排状态机（66 题隐式采样）
-
-**状态**：`done`（audit-fix 6/6 + coverage orchestration 1/1 已完成）
-
-**推荐模型**：
-
-
-| 环节  | 模型                                             |
-| --- | ---------------------------------------------- |
-| 设计  | **Opus**（WebSocket 协议、状态机设计、VAD/打断逻辑、66 题采样策略） |
-| 编码  | Opus + Sonnet（语音网关核心用 Opus，周边工具代码用 Sonnet）     |
-| 测试  | Sonnet（集成测试脚本、延迟测量）                            |
-
-
-**完成标准**：
-
-- ✅ 独立 WebSocket 语音网关进程 (`server/voice-gateway/`)
-- ✅ 协议实现：audio_chunk ↔ asr_partial ↔ ai_reply_audio ↔ ai_turn_end
-- ⚠️ ASR 协议实现：帧封装/解析基本正确，但缺少负包（end-of-stream）、无 final 事件区分
-- ⚠️ TTS 协议实现：Event 流程正确，但每次合成新建连接未复用、无连接超时守护
-- ✅ 对话编排状态机：OPENING → LISTENING → ASR_STREAMING → THINKING → TTS_STREAMING → LISTENING → CLOSING → ENDED
-- ✅ 维度采样：30 张版本化 `probe_card` + 用户级 coverage checklist，D1-D10 在 15 分钟路线内主动推进
-- ✅ 打断机制（barge-in）：TTS 期间保留 ASR 监听，检测到用户语音后取消 TTS 并切回识别
-- ✅ 时长控制：13 分 45 秒进入总结确认、15 分钟强制结束、extend +5min
-- ✅ 画像证据：每个用户回答即时写入可追溯证据并更新 `profile_documents`，不再依赖结束后的异步批处理
-- ✅ 前端 index 页面 WebSocket 连接 + 录音 + 音频帧发送：TTS chunk 流式播放
-
-**实现细节**：
-
-- **独立进程**：`npm run start:voice` 启动，监听 3001 端口
-- **JWT 验证**：query param `?token=` 或 Authorization header
-- **小雅人设**：语音用小雅角色（区别于文字聊天的 Stitch）
-- **ASR 二进制协议**：
-  - WebSocket 连接携带 `X-Api-App-Key` / `X-Api-Access-Key` / `X-Api-Resource-Id` 鉴权头
-  - 首帧：Full client request（JSON config: audio.format=pcm, rate=16000, model_name=bigmodel）
-  - 后续帧：Audio-only request（原始 PCM 数据）
-  - 响应解析：Header(4B) + Sequence(4B) + PayloadSize(4B) + JSON Payload → `result.text`
-- **TTS Event 协议**：
-  - WebSocket 连接携带鉴权头
-  - 建连帧：StartConnection(1) → ConnectionStarted(50)
-  - 会话帧：StartSession(100, 含 text+speaker+audio_params) → SessionStarted(150) → FinishSession(102)
-  - 音频帧：TTSResponse(352) 事件携带 PCM base64 音频数据
-  - 结束帧：SessionFinished(152) → FinishConnection(2) → ConnectionFinished(52) → done
-- **降级策略**：
-  - ASR 未配置（APPID 为空）→ mock VAD + 随机文本
-  - TTS 未配置（VOICE_TYPE 为空）→ 跳过音频，300ms 后 emit done
-  - LLM 未配置 → 规则引擎选卡并使用 `probe_card` 标准话术
-- **数据持久化**：voice_sessions + dialogue_turns + voice_coverage_states + voice_evidence 写入 PostgreSQL
-- **画像抽取**：固定选项映射即时生成弱证据，LLM 只做候选选卡和回答强度增强
-
-**测试结果**：
-
-- ✅ TypeScript 编译零错误（主服务 `npm run build` + 语音网关 `tsc -p voice-gateway/tsconfig.json`）
-- ✅ 语音网关启动正常，监听 ws://localhost:3001/ws/voice
-- ✅ Mock 模式下 ASR/TTS 降级正常
-- ⏳ 待开通 ASR/TTS 后验证真实语音流
-- ⏳ 待微信开发者工具验证前端 WebSocket 连接
-
-**需要你手动做的**：
-
-- 火山引擎控制台开通 Doubao-流式语音识别 + Doubao-语音合成-2.0
-- 在 `server/.env` 填入：
-  ```
-  VOLC_ASR_APPID=your_appid
-  VOLC_ASR_TOKEN=your_token
-  VOLC_ASR_CLUSTER=your_cluster
-  VOLC_TTS_APPID=your_appid
-  VOLC_TTS_TOKEN=your_token
-  VOLC_TTS_CLUSTER=your_cluster
-  VOLC_TTS_VOICE_TYPE=your_voice_type
-  ```
-- 微信开发者工具测试 `wx.connectSocket` 连接到 `ws://localhost:3001/ws/voice`
-- 确认录音权限 + PCM 格式输出
-
-### 审计修复任务（2026-06-11）
-
-审计范围：`server/voice-gateway/` 全部文件 + `pages/index/index.js` + `utils/api.js`
-审计结论：框架搭建完整，但 ASR/TTS 协议、打断机制、前端播放存在阻塞性问题，不可直接上真实语音流。
-
----
-
-#### Task 3-1：ASR 协议合规修复
-
-**严重程度**：P0（协议违规，真实 ASR 无法正常工作）
-
-**行为**：
-
-1. `asr.service.ts` `stop()` 关闭连接前发送负包（flags=`0b0010`），通知服务端音频已结束
-2. `handleResponse()` 区分 partial 和 final 结果（根据 sequence 或 flags），分别 emit `'partial'` / `'final'`
-3. `sendFullClientRequest()` 的帧 flags 从 `0b0000` 改为 `0b0001`（表示 header 后 4 字节为 sequence number）
-4. 前端 `_startRecording` 的 `frameSize` 从 1.28KB 调整为 6.4KB（≈200ms @16kHz/16bit/mono），匹配豆包推荐包大小
-
-**涉及文件**：
-
-- `server/voice-gateway/asr.service.ts`（负包发送 + final 检测 + flags 修正）
-- `pages/index/index.js`（frameSize 调整）
+**必须交付**：`server/voice-gateway/session.test.ts`，覆盖正常回合、重复消息、并发结束、迟到回调、ASR/TTS 错误和计时器边界。
 
 **验证命令**：
 
-```bash
-cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
-# 手动验证：配置 ASR 密钥后，wscat 连接语音网关，发送音频，观察是否收到 asr_final 消息
-# 抓包验证：关闭 ASR 连接前最后一帧的 flags 应为 0b0010
-```
-
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `asr.service.ts` 帧封装已支持可选 4 字节 sequence 字段
-- ✅ `stop()` 在关闭真实 ASR WebSocket 前发送 flags=`0b0010` 的最后一包负包
-- ✅ `sendFullClientRequest()` 已将 flags 从 `0b0000` 改为 `0b0001`，并携带正 sequence
-- ✅ `handleResponse()` 已按 response flags / sequence 区分 `partial` 与 `final`，final 会 emit `'final'`
-- ✅ `pages/index/index.js` `_startRecording()` 的 `frameSize` 已从 `1.28` 调整为 `6.4`
-- ✅ `npx tsc -p voice-gateway/tsconfig.json --noEmit` 零错误
-- ✅ `rg -n "buildAsrFrame\(0b0001, 0b0001|buildAsrFrame\(0b0010, 0b0010|emit\(isFinal \? 'final' : 'partial'|frameSize: 6\.4" server\voice-gateway pages\index\index.js` 确认关键改动存在
-
----
-
-#### Task 3-2：状态机 Bug 修复 + 死代码清理
-
-**严重程度**：P0（乱码显示 + 代码可维护性）
-
-**行为**：
-
-1. `session.ts:195` 将乱码字符串 `'閫氳瘽鏃堕棿蹇埌浜嗭紝鎴戜滑鏉ユ敹灏惧惂'` 替换为 `'通话时间快到了，我们来收尾吧'`
-2. `session.ts:252-273` 删除 `return;` 之后的不可达代码块
-3. `session.ts:195` 中 `finalizeUserSpeech` 内的 `session_soft_close` 消息与 `startTimers()` 中的重复发送逻辑合并（避免同一条 soft_close 发两次）
-4. `index.js:165-166` 删除重复的 `this._pcmChunks = []`
-5. `index.js:365` 补上 `seq` 字段：`{ type: 'audio_chunk', seq: self._audioSeq++, pcmBase64: base64 }`
-
-**涉及文件**：
-
-- `server/voice-gateway/session.ts`
-- `pages/index/index.js`
-
-**验证命令**：
-
-```bash
-cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
-# 手动验证：通话超过 13 分钟，前端收到的 session_soft_close 消息应显示正确中文
-grep -r '閫氳瘽' server/voice-gateway/  # 应无结果
-grep -n 'return;' server/voice-gateway/session.ts  # 确认无紧跟不可达代码的 return
-```
-
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `server/voice-gateway/session.ts` soft close 乱码已替换为正确中文
-- ✅ `session_soft_close` 通过 `notifySoftClose()` 合并发送路径，避免 timer 与对话收尾重复发送
-- ✅ `server/voice-gateway/session.ts` ASR `final` 回调中的 `return;` 后不可达代码已删除
-- ✅ `pages/index/index.js` 已删除重复的 `this._pcmChunks = []`
-- ✅ `pages/index/index.js` 已初始化 `_audioSeq`，并在 `audio_chunk` 消息中发送 `seq`
-- ✅ `npx tsc -p voice-gateway/tsconfig.json --noEmit` 零错误
-- ✅ `Select-String -Path server\voice-gateway\*.ts -Pattern "閫氙|閫氱|蹇|鏉|惂"` 无结果
-- ✅ `asr.on('final')` 回调中 `await this.finalizeUserSpeech(text);` 后不再有不可达代码
-
----
-
-#### Task 3-3：PrismaClient 单例化
-
-**严重程度**：P0（并发通话耗尽数据库连接池）
-
-**行为**：
-
-1. 新建 `server/voice-gateway/prisma.ts`，导出全局唯一的 `PrismaClient` 实例
-2. `dialogue.service.ts` 从 `import { prisma } from './prisma'` 获取实例，删除 `new PrismaClient()`
-3. 删除 `endSession()` 中的 `this.prisma.$disconnect()`（进程级生命周期管理，非会话级）
-4. 画像抽取 `triggerProfileExtraction` 中的 `setTimeout` 改为 `setImmediate` + 独立 try/catch，避免与已断开的 client 竞态
-
-**涉及文件**：
-
-- `server/voice-gateway/prisma.ts`（新建）
-- `server/voice-gateway/dialogue.service.ts`
-
-**验证命令**：
-
-```bash
-cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
-# 手动验证：启动语音网关，10 个并发 WebSocket 连接 → pg_stat_activity 连接数应 ≤ 默认连接池大小（5）而非 50
-grep -r 'new PrismaClient' server/voice-gateway/  # 应只出现在 prisma.ts 中
-```
-
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `server/voice-gateway/prisma.ts` 已新增进程级 PrismaClient 单例
-- ✅ `dialogue.service.ts` 已改为 `import { prisma } from './prisma'`，不再为每个会话 `new PrismaClient()`
-- ✅ `endSession()` 已删除 `this.prisma.$disconnect()`，避免单个会话结束时断开共享连接池
-- ✅ `triggerProfileExtraction()` 已从 `setTimeout` 改为 `setImmediate`，并由独立 `runProfileExtraction()` 方法承载 try/catch
-- ✅ `npx tsc -p voice-gateway/tsconfig.json --noEmit` 零错误
-- ✅ `rg -n "new PrismaClient|\$disconnect|setTimeout|setImmediate|runProfileExtraction" server\voice-gateway` 确认 `new PrismaClient` 只出现在 `prisma.ts`，语音网关无 `$disconnect`
-
----
-
-#### Task 3-4：TTS 连接超时守护 + 连接复用
-
-**严重程度**：P1（延迟 + 挂死风险）
-
-**行为**：
-
-1. `tts.service.ts` `connectAndSynthesize` 增加 10 秒连接超时：超时后 emit `'error'`，调用 `finish()`
-2. `asr.service.ts` `connectReal` 增加 10 秒连接超时：超时后 emit `'error'`
-3. （可选优化）TTS 连接复用：保持 WebSocket 连接，多次合成复用同一连接，仅在 session 结束时关闭。根据豆包文档：收到 `SessionFinished` 后可直接发新的 `StartSession`，无需断开重连
-
-**涉及文件**：
-
-- `server/voice-gateway/tts.service.ts`
-- `server/voice-gateway/asr.service.ts`
-
-**验证命令**：
-
-```bash
-cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
-# 手动验证：将 ASR/TTS 的 WebSocket URL 改为不可达地址 → 10 秒后应 emit error，session 应转入 WAITING_TO_LISTEN 或降级
-# 连接复用验证：多轮对话中观察 TTS 日志，应只出现一次 "[TTS] Connected"
-```
-
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `asr.service.ts` `connectReal()` 已增加 10 秒连接超时，超时后 emit `'error'` 并关闭 ASR socket
-- ✅ `tts.service.ts` 已增加 10 秒连接超时，超时后 emit `'error'` 并调用 `finish()`
-- ✅ `tts.service.ts` 已拆分 `ensureConnected()` / `startSession()`，连接 `CONNECTION_STARTED` 后可复用同一 WebSocket 发起多次 `StartSession`
-- ✅ `tts.service.ts` `SESSION_FINISHED` 后调用 `completeSession()` 完成本次合成，不再正常路径发送 `FINISH_CONNECTION`
-- ✅ TTS 连接异常关闭时会 emit `'error'` 并完成当前等待中的合成 promise，避免会话挂死
-- ✅ `npx tsc -p voice-gateway/tsconfig.json --noEmit` 零错误
-- ✅ `rg -n "connection timeout|CONNECT_TIMEOUT_MS|startConnectTimer|completeConnect|completeSession|FINISH_CONNECTION|SESSION_FINISHED" server\voice-gateway\tts.service.ts server\voice-gateway\asr.service.ts` 确认超时与复用路径存在，且无正常 `buildFrame(TtsEvent.FINISH_CONNECTION)` 发送路径
-
----
-
-#### Task 3-5：Barge-in 打断机制实现
-
-**严重程度**：P1（核心交互缺失，DEV_PROGRESS 原标记 ✅ 实际未实现）
-
-**行为**：
-
-1. 后端 `session.ts` `handleAudioChunk` 在 `TTS_STREAMING` 状态下也接受音频帧，触发打断：
-  - 检测到语音帧（`isSpeechFrame`）→ 调用 `this.tts.cancel()` 停止 TTS
-  - 发送 `ai_turn_end` 通知前端 AI 停止说话
-  - 状态转为 `ASR_STREAMING`，继续接收用户语音
-2. 前端 `index.js` `onFrameRecorded` 回调删除 `self.data.aiSpeaking` 阻断条件，在 AI 说话期间仍然发送音频帧
-3. 前端收到 `ai_turn_end` 时停止当前音频播放（`_stopAudio()`）
-
-**涉及文件**：
-
-- `server/voice-gateway/session.ts`（状态机 + handleAudioChunk）
-- `pages/index/index.js`（录音 + 播放中断）
-
-**验证命令**：
-
-```bash
-cd server && npx tsc -p voice-gateway/tsconfig.json --noEmit
-# 手动验证（微信开发者工具）：
-# 1. 发起通话，等 AI 开始说话
-# 2. 在 AI 说话过程中对着麦克风说话
-# 3. 预期：AI 声音立刻停止，ASR 开始识别用户语音
-# 4. 控制台应出现 "[Session] Barge-in triggered" 日志
-```
-
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `session.ts` `handleAudioChunk()` 已允许 `TTS_STREAMING` 状态接收音频帧并做本地 VAD 检测
-- ✅ 检测到语音帧时调用 `handleBargeIn()`：取消 TTS、发送 `ai_turn_end`、状态转入 `ASR_STREAMING`
-- ✅ `ai_turn_end` 已扩展 `interrupted?: boolean`，打断路径发送 `{ interrupted: true }`
-- ✅ TTS 播放期间后端会启动 barge-in 专用 ASR 监听，正常 TTS done/error 时会停止该监听
-- ✅ `pages/index/index.js` 音频帧回调已移除 `aiSpeaking` / `_isPlayingAiAudio` 阻断，AI 说话期间仍可发送音频帧
-- ✅ 前端收到 interrupted `ai_turn_end` 时调用 `_stopAudio()` 并清空旧 TTS 缓冲，避免打断后继续播放旧音频
-- ✅ `npx tsc -p voice-gateway/tsconfig.json --noEmit` 零错误
-- ✅ `rg -n "Barge-in triggered|interrupted|TTS_STREAMING|startBargeInListening|stopBargeInListening|handleBargeIn" server\voice-gateway pages\index\index.js` 确认关键路径存在
-
----
-
-#### Task 3-6：前端音频流式播放 + Mock 降级修复
-
-**严重程度**：P1（用户体验 + 降级不可用）
-
-**行为**：
-
-1. `index.js` `_handleWsMessage` 中 `ai_reply_audio` 收到非空 `pcmBase64` 时立即追加到播放队列，边收边播（不再等 `ai_turn_end`）
-  - 实现方案：维护一个播放队列，当前无音频在播时取队列头部写入临时文件并播放，`onEnded` 后取下一段
-2. `_fallbackToMock()` 实现真正的 mock 通话循环：
-  - 每 5 秒从预写选择题序列中取下一条，设置 `aiText` + `aiSpeaking`
-  - 1 秒后清除 `aiSpeaking`，模拟一轮对话
-3. `index.js` Token 不再同时通过 URL 和 Header 发送 — 只保留 query param `?token=`（微信小程序 `connectSocket` 不支持自定义 header），删除 header 中的 Authorization
-
-**涉及文件**：
-
-- `pages/index/index.js`
-
-**验证命令**：
-
-```bash
-# 流式播放验证（微信开发者工具）：
-# 1. 配置真实 TTS，发起通话
-# 2. AI 回复 3 句话，观察第一句话是否在收到第一个 TTS chunk 后立即开始播放
-# 3. 对比修改前（全缓冲）和修改后（流式）的首字延迟
-
-# Mock 降级验证：
-# 1. 不启动后端服务器
-# 2. 在微信开发者工具中点击"开始通话"
-# 3. 应看到 aiText 每 5 秒更新一次 mock 文本，而非空白通话界面
-```
-
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `pages/index/index.js` 已新增 `_ttsQueue` / `_ttsTurnEnded`，`ai_reply_audio` 收到非空 `pcmBase64` 后立即入队并尝试播放
-- ✅ `_playNextAudioChunk()` / `_playTtsAudioChunk()` 已按队列逐段写入临时文件并播放，`onEnded` 后自动播放下一段
-- ✅ `ai_turn_end` 不再触发全量缓冲播放，只标记当前 TTS 轮次结束；队列清空后再发送 `listen_ready`
-- ✅ interrupted `ai_turn_end` 会停止当前音频、清空队列，避免打断后继续播放旧 TTS
-- ✅ `_fallbackToMock()` 已实现 mock 通话循环：立即显示一条 mock 回复，并每 5 秒更新一次，1 秒后清除 `aiSpeaking`
-- ✅ `wx.connectSocket` 已删除 `Authorization` header，仅通过 `api.getVoiceWsUrl()` 生成的 `?token=` 传递 token
-- ✅ 已删除旧的 `_playBufferedAudio` / `_compactTtsChunks` / `_concatBase64PcmChunks` 全缓冲播放路径
-- ✅ `node --check pages/index/index.js` 零错误
-- ✅ `npx tsc -p voice-gateway/tsconfig.json --noEmit` 零错误
-- ✅ `rg -n "Authorization|header:\s*\{|_playBufferedAudio|_pcmChunks|_compactTtsChunks|_concatBase64PcmChunks" pages\index\index.js` 无结果
-
----
-
-#### Task 3-7：15 分钟 coverage checklist + probe_card 编排
-
-**行为**：
-
-1. 使用 30 张版本化选择题卡片覆盖 D1-D10，正常回合不再进入 `free_chat` 或随机 mock 陈述。
-2. 规则引擎按通话阶段、维度权重、置信度缺口、跳过和卡片新鲜度生成候选；LLM 只能从候选 ID 中选题。
-3. 固定选项映射即时写入证据，保存 card/version/option/source question；回答过短只追问一次。
-4. 用户跳过后同通不再追问相关维度；语音纠正覆盖旧证据但不推进当前 checklist。
-5. 用户级 coverage 跨会话保存；新通话创建新 session，并继续补未覆盖维度。
-6. 13 分 45 秒进入 3-5 条暂定总结确认；结束原因区分 `completed`、`user_ended`、`abandoned`、`timeout_ended`。
-
-**涉及文件**：
-
-- `server/voice-gateway/probe-cards.ts`
-- `server/voice-gateway/coverage-engine.ts`
-- `server/voice-gateway/dialogue.service.ts`
-- `server/voice-gateway/session.ts`
-- `server/voice-gateway/asr.service.ts`
-- `pages/index/index.js`
-- `server/prisma/schema.prisma`
-- `server/prisma/migrations/20260712090000_add_voice_profiling_orchestration/migration.sql`
-- `docs/product/语音画像采集设计.md`
-- `docs/architecture/对话编排设计.md`
-
-**验证命令**：
-
-```bash
+```powershell
 cd server
-npx prisma generate
-npm run test:voice
-npm run build
 npm run build:voice
+node --test dist-voice/session.test.js
 ```
 
-**状态**：`done`
+**验收证据**：待生成。当前状态为 `active`，未通过前不得启动 V-002。
 
-**测试结果**（2026-07-12）：
+### 4.4 V-002 持久化一致性
 
-- ✅ `npx prisma generate` 成功，新增 coverage/evidence 模型可生成 Prisma Client
-- ✅ `npm run test:voice` 通过 8/8：题库规模与全维度覆盖、D10 主动阶段、固定映射、显式答案优先、低 ASR 置信度上限、一次追问、跳过、纠正不推进
-- ✅ `npm run build` 成功
-- ✅ `npm run build:voice` 成功
-- ✅ `node --check pages/index/index.js` 成功
-- ✅ `git diff --check` 无空白错误
-- ⏳ `npx prisma migrate dev` 需要可用 PostgreSQL 后执行
-- ⏳ 真实 LLM/ASR/TTS + 微信开发者工具完成 15 分钟整通验收
+**可观察行为**：每个有效用户回合的 turn、evidence、coverage snapshot 和 profile 合并保持一致；写入失败不会留下“coverage 已推进但证据缺失”；所有结束原因幂等落库。
 
----
-
-### 审计修复进度概览
-
-
-| Task | 内容                           | 严重程度 | 状态     |
-| ---- | ---------------------------- | ---- | ------ |
-| 3-1  | ASR 协议合规修复（负包 + final + 包大小） | P0   | `done` |
-| 3-2  | 状态机 Bug 修复 + 死代码清理           | P0   | `done` |
-| 3-3  | PrismaClient 单例化             | P0   | `done` |
-| 3-4  | TTS 连接超时 + 连接复用              | P1   | `done` |
-| 3-5  | Barge-in 打断机制实现              | P1   | `done` |
-| 3-6  | 前端流式播放 + Mock 降级修复           | P1   | `done` |
-| 3-7  | coverage checklist + probe_card 编排 | P0   | `done` |
-
-
-**next_prompt**：
-
-```
-Phase 3 审计修复和画像编排已全部完成（Task 3-1 到 3-7 均为 done）。
-下一步先执行数据库迁移，再用微信开发者工具 + 真实 LLM/ASR/TTS 配置验证完整 15 分钟语音链路；通过后执行 Phase 7。
-```
-
----
-
-## Phase 4 — 真实匹配算法 + 每周定时 Job
-
-**做什么**：实现匹配打分公式、配对算法、LLM 文案生成、每周二定时触发
-
-**状态**：`done`
-
-**推荐模型**：
-
-
-| 环节  | 模型                                     |
-| --- | -------------------------------------- |
-| 设计  | **Opus**（匹配公式权重、Gale-Shapley 算法、冷启动策略） |
-| 编码  | Sonnet（打分函数、定时 Job、候选人过滤）              |
-| 测试  | Haiku（验证分数计算、配对结果、文案格式）                |
-
-
-**完成标准**：
-
-- ✅ 用户池过滤逻辑（7天活跃 + 维度置信度门槛 + ProfileDocument 存在）
-- ✅ 硬条件过滤（性别×性取向兼容矩阵、同城、年龄差≤5、4周去重）
-- ✅ 打分公式：complementary_score(0.40) + interest_overlap(0.25) + stage_fit(0.25) + activity_bonus(0.10)
-- ✅ 配对算法：MVP 贪心（按分数降序配对）
-- ✅ LLM 文案生成：匹配理由 + 破冰话题 + insight（`LlmService.chatWithJson`）
-- ✅ `@nestjs/schedule` Cron Job：每周二 00:00 触发（`@Cron('0 0 * * 2')`）
-- ✅ 冷启动策略（用户 < 50 时：放宽年龄差至8、忽略同城、置信度门槛降至0.2、保底配对）
-- ✅ POST /api/match/do 返回本周预计算的真实结果
-- ✅ 匹配反馈闭环：feedback 写入 → 异步画像维度 confidence 微调
-
-**实现细节**：
-
-- **文件结构**：`match.types.ts`（类型）+ `matching.engine.ts`（纯函数引擎）+ `match.scheduler.ts`（Cron）+ 重写 `match.service.ts`
-- **打分引擎**：纯函数，无 DI 依赖。10维度按 similar/complementary/mixed 模式计算，归一化后加权
-- **维度配置**：D1-D10 各维度权重+模式在 `DIMENSION_CONFIGS` 常量中定义
-- **兴趣重合**：D8 evidence 标签做 Jaccard 相似度
-- **活跃度**：voice_sessions(7d) × 0.5 + chat_messages(7d) × 0.5，归一化到 [0,1]
-- **LLM 降级**：LLM 不可用时使用模板文案（"你们在 N 个维度上有共鸣"）
-- **反馈闭环**：负面反馈 + 原因 → 映射到具体维度 → confidence - 0.05
-
-**测试结果**：
-
-- ✅ TypeScript 编译零错误（`npm run build` + `tsc --noEmit`）
-- ✅ ScheduleModule 注册成功
-- ⏳ 待创建测试用户验证完整匹配流程
-- ⏳ 待 LLM API Key 配置后验证文案生成
-
-**需要你手动做的**：
-
-- 创建测试用户画像数据（至少 10 个用户 + ProfileDocument）
-- 验证 LLM 文案生成（需要 VOLC_API_KEY 已配置 — 已完成）
-- 手动触发 `executeMatchRound()` 验证完整流程
-
-**next_prompt**：
-
-```
-执行 Phase 5。先阅读 docs/DEV_PROGRESS.md。
-目标：接入微信支付和微信实名认证。
-设计阶段用 Opus（安全验签、权益模型）。
-编码阶段用 Sonnet。
-完成后更新 DEV_PROGRESS.md。
-```
-
----
-
-## Phase 5 — 前端对接后端 API（对齐接口）
-
-**做什么**：将前端各页面从纯 mock 数据切换为调用后端 API，失败时回落到本地 mock
-
-**状态**：`done`
-
-**推荐模型**：
-
-
-| 环节  | 模型                       |
-| --- | ------------------------ |
-| 设计  | Opus（接口对齐策略、fallback 设计） |
-| 编码  | Opus（api.js 重写、各页面对接）    |
-
-
-**完成标准**：
-
-- ✅ `utils/api.js` 包含所有业务 API 方法（login / sendChatMessage / doMatch / getArchive 等）
-- ✅ `app.js` 启动时 `wx.login()` → `POST /api/auth/wx-login` → 存 token + 同步 userStore
-- ✅ `pages/match/match.js` 调用 `GET /api/match/current` + `POST /api/match/do`
-- ✅ `pages/memory/memory.js` 修复语法错误 + 添加 `loadArchive()` + `sendChatMessage` 对接
-- ✅ `pkg-settings/editProfile/editProfile.js` 保存时同步 `PUT /api/me`
-- ✅ `pkg-social/userHome/userHome.js` 非自己用户调用 `GET /api/users/:author/home`
-- ✅ `pkg-social/notifications/notifications.js` 调用通知 API
-- ✅ 所有 API 调用失败时回落到 mock 数据，无后端时前端仍可用
-- ✅ 删除过时的 `utils/api.ts`
-
-**实现细节**：
-
-- **统一 Fallback 策略**：每个 API 方法 `.catch()` 返回 mock 数据
-- **Token 管理**：`api.login()` 获取后存储，所有后续请求自动携带 Authorization header
-- **userStore 同步**：登录成功后将服务端用户信息写入本地 Store
-- **无侵入**：不改 UI、不改 mockData.js、不改后端
-
-**测试结果**：
-
-- ✅ 无后端时所有页面正常使用（mock fallback）
-- ⏳ 待启动后端验证 API 联调
-
-**需要你手动做的**：
-
-- 启动后端 `cd server && npm run start:dev`
-- 微信开发者工具中验证各页面网络请求
-- 确认 match/memory/profile 页面数据正确展示
-
-**next_prompt**：
-
-```
-执行 Phase 6。先阅读 docs/DEV_PROGRESS.md。
-目标：接入微信支付和微信实名认证。
-设计阶段用 Opus（安全验签、权益模型）。
-编码阶段用 Sonnet。
-完成后更新 DEV_PROGRESS.md。
-```
-
----
-
-## Phase 6 — 微信支付 + 通知推送
-
-**做什么**：接入微信支付统一下单、权益解锁；实现事件驱动通知 + 微信订阅消息推送 + 未读 badge
-
-**状态**：`done`（6/6 全部完成）
-
-**推荐模型**：
-
-
-| 环节  | 模型                          |
-| --- | --------------------------- |
-| 设计  | Opus（支付安全、回调验签、权益模型）        |
-| 编码  | Sonnet（微信支付 SDK、通知 Service） |
-| 测试  | Haiku（沙箱支付、推送验证）            |
-
-
-**当前代码现状**（2026-06-11 审计）：
-
-
-| 模块                   | 现状                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| Prisma schema        | `notifications` 表已建（type/authorName/authorAvatar/content/read）；无 `orders`、`entitlements` 表 |
-| NotificationsService | CRUD 已实现（list/markAllRead/clearAll），但无写入入口 — 没有任何业务模块调用 `notification.create()`            |
-| MatchService         | 匹配完成后不写通知；`MatchResult` 有 `unlockedByA/B` 字段但无对应的支付/解锁接口                                   |
-| 前端 match 页           | `confirmPay()` 仅 toast "支付功能开发中"；支付弹窗 UI 已完整                                               |
-| 前端 notifications 页   | API 对接已完成（Phase 5），但后端无通知数据 → 实际空列表                                                        |
-| 订阅消息                 | 未涉及                                                                                        |
-
-
-**完成标准**：
-
-- orders + entitlements 表建表迁移
-- POST /api/pay/create-order → 调用微信统一下单 → 返回 wxPayParams
-- POST /api/pay/wx-callback → 验签 → 更新订单 → 写入 entitlements → 更新 unlocked 状态
-- 前端 confirmPay() 调用 wx.requestPayment
-- 匹配完成时自动写入 match 类型通知
-- 微信订阅消息推送（周二匹配结果揭晓）
-- 未读计数 badge（tab bar）
-
-**需要你手动做的**：
-
-- 微信支付商户号申请 + API 密钥配置
-- 支付回调地址配置（需要公网域名）
-- 微信小程序后台配置订阅消息模板
-- 真机测试支付和推送
-
----
-
-### Task 6-1：数据模型 — orders + entitlements 建表
-
-**行为**：
-
-1. `schema.prisma` 新增 `Order` 模型：`id`, `userId`, `sku`（`unlock_wechat`）, `targetMatchId`, `amount`（分）, `status`（`pending` / `paid` / `failed` / `refunded`）, `wxOutTradeNo`（微信商户订单号）, `wxTransactionId`（微信支付单号）, `paidAt`, `createdAt`
-2. `schema.prisma` 新增 `Entitlement` 模型：`id`, `userId`, `type`（`unlock_wechat`）, `matchResultId`, `orderId`, `createdAt`
-3. `MatchResult` 增加 `Order[]` 反向关系（一个匹配结果可关联多个订单）
-4. 运行 `npx prisma migrate dev --name add-orders-entitlements` 建表
-5. 运行 `npx prisma generate` 更新 Client
-
-**涉及文件**：
-
-- `server/prisma/schema.prisma`
+**必须交付**：`server/voice-gateway/dialogue.persistence.test.ts`，使用可清理的测试数据库覆盖成功、回滚、重复结束、纠正 supersede 和断线结束。
 
 **验证命令**：
 
-```bash
-cd server && npx prisma migrate dev --name add-orders-entitlements
-npx prisma generate
-npx tsc --noEmit
-# 验证：npx prisma studio → 应看到 Order 和 Entitlement 表
+```powershell
+cd server
+npm run build:voice
+node --test dist-voice/dialogue.persistence.test.js
 ```
 
-**状态**：`done`
+**验收证据**：待生成。
 
-**测试结果**（2026-06-11）：
+### 4.5 V-003 WebSocket 协议与小程序端收尾
 
-- ✅ `npx prisma migrate dev --name add-orders-entitlements` 成功，migration 文件 `20260611030653_add_orders_entitlements/migration.sql` 已创建
-- ✅ `npx prisma generate` 成功，Prisma Client 已更新
-- ✅ `npx tsc --noEmit` 零错误
-- ✅ `npx prisma studio` 可查看 Order 和 Entitlement 表
+**可观察行为**：客户端与服务端对 `start/listen_ready/audio_chunk/end` 及全部服务端事件解释一致；收到 `session_end` 不会再次发送 `end`；错误、断线、fallback、TTS 队列排空和 barge-in 都能稳定收尾。
 
----
-
-#### Task 6-2：支付后端 — PayModule + 微信下单 + 回调验签
-
-**行为**：
-
-1. 新建 `server/src/pay/` 目录：`pay.module.ts`, `pay.controller.ts`, `pay.service.ts`
-2. `PayService.createOrder(userId, sku, targetMatchId)`：
-  - 校验 matchResult 存在且属于该用户
-  - 校验未重复支付（同用户同 matchResult 无 paid 订单）
-  - 生成 `out_trade_no`（`CB` + timestamp + random）
-  - 调用微信支付 V3 JSAPI 统一下单（`POST https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi`）
-  - 返回 `orderId` + `wxPayParams`（timeStamp/nonceStr/package/signType/paySign）
-  - 微信支付未配置时返回 mock 数据（`{ orderId: 'mock-xxx', wxPayParams: null }`）
-3. `PayController` 路由：
-  - `POST /api/pay/create-order`（需 Auth）
-  - `POST /api/pay/wx-callback`（无 Auth，微信服务器调用）
-4. `PayService.handleCallback(body, headers)`：
-  - 验证微信签名（`Wechatpay-Signature` + `Wechatpay-Nonce` + `Wechatpay-Timestamp`）
-  - 解密 `resource.ciphertext`（AES-256-GCM）
-  - 更新 `Order.status = 'paid'` + `paidAt`
-  - 写入 `Entitlement`
-  - 更新 `MatchResult.unlockedByA/B = true`
-  - 写入 match 类型通知（"你已解锁 XX 的微信"）
-5. `AppModule` 注册 `PayModule`
-6. `.env.example` 新增 `WX_MCH_ID`, `WX_MCH_API_KEY_V3`, `WX_MCH_SERIAL_NO`, `WX_MCH_PRIVATE_KEY_PATH`, `WX_PAY_NOTIFY_URL`
-
-**涉及文件**：
-
-- `server/src/pay/pay.module.ts`（新建）
-- `server/src/pay/pay.service.ts`（新建）
-- `server/src/pay/pay.controller.ts`（新建）
-- `server/src/app.module.ts`（注册 PayModule）
-- `server/.env.example`（新增支付配置项）
+**必须交付**：`server/voice-gateway/ws-protocol.test.ts`，并完成 `pages/index/index.js` 对协议错误与结束路径的处理。
 
 **验证命令**：
 
-```bash
-cd server && npx tsc --noEmit && npm run build
-# Mock 模式验证（无微信商户号）：
-curl -X POST http://localhost:3000/api/pay/create-order \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"sku":"unlock_wechat","targetMatchId":"<match_id>"}'
-# 预期：返回 { orderId: "mock-xxx", wxPayParams: null }
-
-# 编译检查：
-grep -r 'PayModule' server/src/app.module.ts  # 应已注册
+```powershell
+node --check pages/index/index.js
+cd server
+npm run build:voice
+node --test dist-voice/ws-protocol.test.js
 ```
 
-**状态**：`done`
+**验收证据**：待生成。
 
-**测试结果**（2026-06-11）：
+### 4.6 V-004 Provider adapter 契约与故障测试
 
-- ✅ `PayModule` 已创建：`pay.service.ts` + `pay.controller.ts` + `pay.module.ts`
-- ✅ `POST /api/pay/create-order` — 校验 matchResult 存在性、重复支付检测、mock 模式回落
-- ✅ `POST /api/pay/wx-callback` — 签名验证、AES-256-GCM 解密、订单更新、权益写入、解锁、通知
-- ✅ `AppModule` 已注册 `PayModule`
-- ✅ `.env.example` 已新增 `WX_MCH_ID` 等支付配置项
-- ✅ `npx tsc --noEmit` 零错误
-- ✅ `npm run build` 成功
-- ✅ Mock 模式 curl 验证：create-order 正确返回 `MATCH_NOT_FOUND`；wx-callback 正确返回 `{"code":"SUCCESS"}`
-- ⏳ 真实验证需配置微信商户号后测试完整支付链路
+**可观察行为**：ASR/TTS/LLM 在成功、鉴权失败、超时、异常帧、断线和取消时都产生确定结果；任何 provider 故障都不会让会话永久停留在 `THINKING` 或 `TTS_STREAMING`。
 
----
-
-#### Task 6-3：前端支付对接 — confirmPay 调用 wx.requestPayment
-
-**行为**：
-
-1. `utils/api.js` 新增 `createOrder(sku, targetMatchId)` 方法，调用 `POST /api/pay/create-order`
-2. `pages/match/match.js` `confirmPay()` 改为：
-  - 调用 `api.createOrder('unlock_wechat', this.data.matchResult.id)`
-  - 如果返回 `wxPayParams`：调用 `wx.requestPayment(wxPayParams)` → 成功后 `setData({ matchResult.unlocked: true })` + toast "解锁成功"
-  - 如果返回 `wxPayParams: null`（mock 模式）：toast "支付功能配置中" 并直接解锁（开发期间便于测试）
-  - 失败：toast 错误信息
-3. 匹配结果页展示解锁状态：已解锁时显示对方微信号（后端 `GET /api/match/current` 已返回 `unlocked` 字段）
-
-**涉及文件**：
-
-- `utils/api.js`
-- `pages/match/match.js`
+**必须交付**：`asr.service.test.ts`、`tts.service.test.ts`、`dialogue.service.test.ts`，测试使用本地 fake WebSocket/HTTP provider，不依赖真实火山凭据。
 
 **验证命令**：
 
-```bash
-# 微信开发者工具验证：
-# 1. 登录 → 执行匹配 → 进入匹配结果页
-# 2. 点击"开始聊天"→ 弹出支付弹窗 → 点击"立即解锁"
-# 3. Mock 模式下应 toast "支付功能配置中" 并解锁
-# 4. 再次进入页面，unlocked 状态应持久
+```powershell
+cd server
+npm run build:voice
+node --test dist-voice/asr.service.test.js dist-voice/tts.service.test.js dist-voice/dialogue.service.test.js
 ```
 
-**状态**：`done`
+**验收证据**：待生成。
 
-**测试结果**（2026-06-11）：
+### 4.7 V-005 本地数据库全链路集成
 
-- ✅ `utils/api.js` 新增 `createOrder(sku, targetMatchId)` 方法
-- ✅ `pages/match/match.js` `confirmPay()` 完整改写：mock 模式 → toast "支付功能配置中" + 解锁；真实模式 → `wx.requestPayment`
-- ✅ `data` 新增 `matchId` + `unlocked` 字段，`checkMatchStatus` / `doMatch` / `resetMatch` 均已同步
-- ✅ `showPayModal()` 已解锁时跳过支付弹窗
-- ✅ 后端 `npx tsc --noEmit` 零错误
-- ⏳ 微信开发者工具验证完整支付流程（需配置微信商户号后真机测试）
+**可观察行为**：使用测试 PostgreSQL 和 mock provider，从 JWT WebSocket 连接开始完成开场、回答、证据写入、收尾、断线续采和结束原因校验；测试可重复运行并清理数据。
 
----
+**前置条件**：`VOICE_TEST_DATABASE_URL` 必须指向允许清空数据的专用测试库，严禁指向开发共享库或生产库。
 
-#### Task 6-4：事件驱动通知 — 匹配完成自动写入通知
-
-**行为**：
-
-1. `NotificationsService` 新增 `create(userId, type, content, authorName?, authorAvatar?)` 方法
-2. `MatchService` 或 `MatchScheduler`：匹配轮次完成后（`executeMatchRound`），遍历所有 `MatchResult`，为双方各写入一条 `match` 类型通知：
-  - `content`: "你的本周缘分已揭晓，快来看看吧！"
-  - `authorName`: "赛博聊机"
-  - `authorAvatar`: 系统头像 URL
-3. `PayService.handleCallback` 支付成功后写入通知：
-  - `content`: "你已解锁 XX 的联系方式"
-  - `type`: "match"
-4. 前端 notifications 页已在 Phase 5 对接 API，无需改动 — 后端有数据后自动展示
-
-**涉及文件**：
-
-- `server/src/notifications/notifications.service.ts`（新增 create 方法）
-- `server/src/match/match.scheduler.ts` 或 `match.service.ts`（调用通知写入）
-- `server/src/pay/pay.service.ts`（支付成功通知）
+**必须交付**：`server/voice-gateway/voice.integration.test.ts`，测试启动真实 gateway 进程或等价 server fixture。
 
 **验证命令**：
 
-```bash
-cd server && npx tsc --noEmit && npm run build
-# 验证：手动触发 executeMatchRound() → 查询 notifications 表
-# psql: SELECT * FROM notifications WHERE type = 'match' ORDER BY created_at DESC LIMIT 5;
-# 或：curl http://localhost:3000/api/notifications -H "Authorization: Bearer <token>"
-# 预期：返回 match 类型通知
+```powershell
+cd server
+$env:DATABASE_URL = $env:VOICE_TEST_DATABASE_URL
+npx prisma migrate deploy
+npm run build:voice
+node --test dist-voice/voice.integration.test.js
 ```
 
-**状态**：`done`
+**验收证据**：待生成。
 
-**测试结果**（2026-06-11）：
+### 4.8 V-006 真实火山服务整通验收
 
-- ✅ `NotificationsService.create()` 方法已实现，支持 userId/type/content/authorName/authorAvatar 参数
-- ✅ `NotificationsModule` 已导出 `NotificationsService`
-- ✅ `MatchModule` 已导入 `NotificationsModule`
-- ✅ `MatchService.executeMatchRound()` 在每个 MatchResult 创建后为双方用户写入 match 通知
-- ✅ `npx tsc --noEmit` 零错误
-- ✅ `npm run build` 成功
-- ⏳ 待手动触发 `executeMatchRound()` 验证通知写入（# 需要至少 2 个有画像的用户）
-- 📌 PayService 通知（第 3 点）将在 Task 6-2 实现时同步添加
+**可观察行为**：在本地运行环境中使用真实 ASR/TTS/LLM 完成 15 分钟通话，覆盖正常回答、跳过、纠正、barge-in、soft close、硬超时和中断续采；数据库记录与前端播放结果一致。
 
----
+**前置条件**：有效的火山测试凭据、V-005 通过、微信开发者工具或真机可连接本地网关。
 
-#### Task 6-5：未读计数 badge — tab bar 红点
-
-**行为**：
-
-1. 后端 `GET /api/notifications` 已返回 `unreadCount`（Phase 1 实现），无需改动
-2. 前端 `custom-tab-bar/index.js`：在 `onShow` 或定时轮询中调用 `api.getNotifications({ limit: 1 })` 获取 `unreadCount`
-3. `unreadCount > 0` 时在 tab bar "记忆库" 或专门的通知入口显示红点 badge（`wx.setTabBarBadge` 或自定义组件 badge）
-4. 进入 notifications 页 → `markAllRead` → 清除 badge
-
-**涉及文件**：
-
-- `custom-tab-bar/index.js`（badge 显示）
-- `utils/api.js`（如需新增 unread count 快捷方法）
-- `pkg-settings/notifications/notifications.js` 或 `pages/` 下通知入口（已读后清 badge）
+**必须交付**：新增 `npm run smoke:voice`，以自动化客户端输出事件时序、延迟、结束原因和数据库校验摘要；真机播放结果作为补充人工证据。
 
 **验证命令**：
 
-```bash
-# 微信开发者工具验证：
-# 1. 后端写入一条未读通知（psql INSERT 或触发匹配）
-# 2. 进入小程序 → tab bar 应显示红点/数字 badge
-# 3. 进入通知页 → badge 应消失
-# 4. 刷新页面 → badge 不再出现（已标记已读）
+```powershell
+cd server
+npm run smoke:tts
+npm run smoke:voice
 ```
 
-**状态**：`done`
+**验收证据**：待生成。没有真实凭据或仅 mock 通过时，不得进入 `passing`。
 
-**测试结果**（2026-06-11）：
+### 4.9 Harness 后续接入
 
-- ✅ `custom-tab-bar/index.js` — `ready()` 启动 10s 轮询 `_fetchUnread()`，`detached()` 清理 timer
-- ✅ `_fetchUnread()` — 调用 `api.getNotifications({ limit: 1 })` 获取 `unreadCount`，写入 `app.globalData.unreadCount`
-- ✅ `custom-tab-bar/index.wxml` — 记忆库 tab（index=1）上显示 badge，unreadCount > 99 时显示 "99+"
-- ✅ `custom-tab-bar/index.wxss` — badge 红色圆角胶囊样式（暖红 `#c45a5a`，阴影，绝对定位在图标右上角）
-- ✅ `pkg-social/notifications/notifications.js` — `onShow` 中 markAllRead 后设置 `app.globalData.unreadCount = 0`
-- ✅ 后端 `npx tsc --noEmit` 零错误
-- ⏳ 微信开发者工具验证 badge 显示和消失
+Voice 收尾表稳定后再执行 Harness L1 接入，不在当前文档任务中提前创建。接入时：
 
----
+1. 将 V-001 至 V-006 迁移到 `docs/FEATURES.json`，保持同一 ID、依赖语义、验证命令和当前状态。
+2. 配置 `.harness/config.json` 的 `wip_limit: 1` 和 `completion_requires_verification: true`。
+3. 使用 `scripts/harness/task.py` 完成状态转换，禁止手改 `passing`。
+4. 将命令输出保存到 `.harness/evidence/`，会话交接写入 `.harness/session/`。
+5. 只有迁移完成且 `doctor.py` 检查通过后，本节才降级为摘要并链接 `FEATURES.json`。
 
-#### Task 6-6：微信订阅消息推送 — 匹配结果通知
+## 5. 待开发
 
-**行为**：
+- 微信 `jscode2session`、真实用户身份和实名认证状态方案。
+- 照片上传/对象存储，以及前端照片墙改为后端权威数据源。
+- 洞察编辑/删除的前端失败处理和后端同步闭环。
+- 订阅消息授权记录、消费状态和重试策略。
+- HTTP/数据库/WebSocket 集成测试、小程序端到端测试和 CI。
+- 支付、匹配、通知多表写入的事务与幂等治理。
+- 生产环境配置校验、限流、安全响应头、日志、监控、告警、备份和回滚。
+- Docker/进程守护、HTTPS/WSS、域名白名单和部署自动化。
+- 规划中的语音会话历史 HTTP API、设置/账号安全 API；这些接口当前未实现。
 
-1. 小程序端：匹配页 `doMatch()` 执行前调用 `wx.requestSubscribeMessage({ tmplIds: [MATCH_RESULT_TMPL_ID] })`，请求一次性订阅授权
-2. 授权成功后将 `tmplId` + `openid` 存入后端（新接口 `POST /api/notifications/subscribe` 或复用 user profile 字段）
-3. 后端 `MatchScheduler`：匹配完成后对已授权用户调用微信 `subscribeMessage.send` 接口：
-  - `touser`: openid
-  - `template_id`: 匹配结果模板 ID
-  - `data`: `{ thing1: { value: "你的本周缘分已揭晓" }, time2: { value: "2026-06-10 00:00" } }`
-4. 需要微信小程序后台配置订阅消息模板（手动操作）
-5. 推送失败静默忽略（不影响匹配流程）
+## 6. 已知问题
 
-**涉及文件**：
+| 优先级 | 问题 | 影响 |
+|---|---|---|
+| P0 | Auth 使用 mock openid，JWT 允许回落到 `dev-secret` | 无法用于生产身份和安全边界 |
+| P0 | 未执行最新数据库迁移和真实语音整通 | 核心语音能力尚无可运行证据 |
+| P0 | 真实支付回调链路无验收，跨表写入不在事务中 | 可能出现订单、权益、解锁状态不一致 |
+| P1 | `POST /notifications/subscribe` 不保存授权 | 推送实现无法证明用户授权可消费 |
+| P1 | 前端 API host 写死在 `utils/api.js` | 模拟器、真机和生产环境切换容易出错 |
+| P1 | 照片墙和洞察写操作仍以本地状态为主 | 后端与前端数据可能漂移 |
+| P1 | 根 TypeScript 检查失败且根依赖未安装 | 前端 TS 文件没有稳定质量门禁 |
+| P1 | 无 HTTP/DB/WS 集成测试和 CI | 编译通过仍可能存在运行时回归 |
+| P2 | LLM 请求无明确 timeout/retry，DTO 校验有限 | 外部故障和非法输入处理不稳定 |
+| P2 | 部分 fallback 吞掉写失败或模拟解锁成功 | 调试时可能误判真实功能状态 |
 
-- `pages/match/match.js`（requestSubscribeMessage）
-- `server/src/notifications/notifications.service.ts`（subscribe 存储 + send 调用）
-- `server/src/match/match.scheduler.ts`（匹配完成后触发推送）
+详细证据见 [代码审计](CODE_AUDIT.md)。
 
-**验证命令**：
+## 7. 下一步计划
 
-```bash
-cd server && npx tsc --noEmit && npm run build
-# 订阅授权验证（微信开发者工具）：
-# 1. 点击"开始匹配" → 应弹出订阅消息授权弹窗
-# 2. 同意后控制台应打印 "[Notifications] Subscription saved for user xxx"
+1. **执行当前唯一 active 项 V-001**：先收敛 VoiceSession 生命周期、并发结束和迟到回调。
+2. **按依赖顺序推进 V-002 至 V-005**：完成持久化、协议、provider contract 和本地数据库集成。
+3. **具备火山测试凭据后执行 V-006**：完成 15 分钟真实整通并登记证据。
+4. **Voice 达到 passing 后再恢复其他业务任务**：真实微信登录、照片/洞察契约、匹配、支付和通知验收。
+5. **部署决定继续后置**：域名、Docker、CI、监控、限流和上线工程不阻塞 V-001 至 V-006 的本地开发。
 
-# 推送验证（需真机）：
-# 1. 手动触发 executeMatchRound()
-# 2. 检查手机微信服务通知 → 应收到匹配结果推送
-# 注意：开发者工具不支持推送，必须真机验证
-```
+## 8. 仍需项目负责人确认
 
-**状态**：`done`
-
-**测试结果**（2026-06-11）：
-
-- ✅ `WxSubscribeService` 已创建 — access_token 获取（含缓存）+ `sendMatchNotifications` 推送
-- ✅ `MatchScheduler` 注入 `WxSubscribeService`，匹配完成后自动查询本轮结果 → 发送推送
-- ✅ `POST /api/notifications/subscribe` 端点已添加
-- ✅ 前端 `match.js` `doMatch()` 中调用 `wx.requestSubscribeMessage`，成功后回调 `api.subscribeNotifications()`
-- ✅ `utils/api.js` 新增 `subscribeNotifications(tmplIds)` 方法
-- ✅ `.env.example` 新增 `WX_SUBSCRIBE_TMPL_ID`
-- ✅ `npx tsc --noEmit` 零错误
-- ✅ `npm run build` 成功
-- ⏳ 微信小程序后台配置订阅消息模板 → 填入 `WX_SUBSCRIBE_TMPL_ID` + `MATCH_RESULT_TMPL_ID`
-- ⏳ 真机验证推送通知（开发者工具不支持）
-
----
-
-### 任务进度概览
-
-
-| Task | 内容                                      | 依赖  | 状态     |
-| ---- | --------------------------------------- | --- | ------ |
-| 6-1  | 数据模型 — orders + entitlements 建表         | 无   | `done` |
-| 6-2  | 支付后端 — PayModule + 微信下单 + 回调验签          | 6-1 | `done` |
-| 6-3  | 前端支付对接 — confirmPay + wx.requestPayment | 6-2 | `done` |
-| 6-4  | 事件驱动通知 — 匹配完成自动写入通知                     | 无   | `done` |
-| 6-5  | 未读计数 badge — tab bar 红点                 | 6-4 | `done` |
-| 6-6  | 微信订阅消息推送 — 匹配结果推送到微信                    | 6-4 | `done` |
-
-
-**推荐执行顺序**：6-1 → 6-4（可与 6-1 并行，不依赖新表）→ 6-2 → 6-3 → 6-5 → 6-6
-
-**next_prompt**：
-
-```
-执行 Phase 6。先阅读 docs/DEV_PROGRESS.md 中的 Task 6-1 到 6-6。
-按依赖顺序执行：先做 6-1（建表）和 6-4（通知写入，可并行），再做 6-2、6-3、6-5、6-6。
-每完成一个 Task 更新其状态为 done 并写入测试结果。
-设计阶段用 Opus，编码用 Sonnet。
-```
-
----
-
-## Phase 7 — 生产部署 + 压测 + 上线
-
-**做什么**：服务器部署、域名 HTTPS、小程序审核、性能压测
-
-**状态**：`todo`
-
-**推荐模型**：
-
-
-| 环节  | 模型                                |
-| --- | --------------------------------- |
-| 设计  | Opus（部署架构、监控方案）                   |
-| 编码  | Sonnet（Dockerfile、CI/CD、Nginx 配置） |
-| 测试  | Haiku（压测脚本、监控告警验证）                |
-
-
-**完成标准**：
-
-- Docker Compose 或 K8s 部署方案
-- HTTPS 证书 + 域名配置
-- 微信小程序域名白名单配置
-- API 限流（Redis rate limiter）
-- 语音并发压测（目标：100 同时通话）
-- 错误监控（Sentry 或类似）
-- 小程序审核提交
-
-**需要你手动做的**：
-
-- 购买服务器 / 云服务
-- 域名备案
-- 微信小程序审核提交
-- 生产环境密钥配置
-
-**next_prompt**：
-
-```
-执行 Phase 7。先阅读 docs/DEV_PROGRESS.md。
-目标：生产部署。设计用 Opus，编码用 Sonnet。
-完成后更新 DEV_PROGRESS.md。
-```
-
----
-
-## 进度概览
-
-
-| Phase | 内容                        | 状态                     | 核心模型                |
-| ----- | ------------------------- | ---------------------- | ------------------- |
-| 1     | 后端骨架 + 前端对接               | `done`                 | Sonnet              |
-| 2     | Memory Chat 接入 LLM + 画像写入 | `done`                 | Opus 全程             |
-| 3     | 实时语音通话（ASR + TTS + 对话编排）  | `done` (audit-fix complete) | **Opus 全程**         |
-| 4     | 真实匹配算法 + 定时 Job           | `done`                 | Opus 设计 + Sonnet 编码 |
-| 5     | 前端对接后端 API（对齐接口）          | `done`                 | Opus 全程             |
-| 6     | 微信支付 + 通知推送               | `done`                 | Opus 设计 + Sonnet 编码 |
-| 7     | 生产部署 + 压测 + 上线            | `todo`                 | Opus 设计 + Sonnet 编码 |
+- 微信实名认证的产品与技术口径，不能仅凭当前 mock 登录推断。
+- 解锁价格与 SKU 是否固定为代码中的 `6.99` 元和 `unlock_wechat`。
+- 照片存储供应商、生产域名和部署平台。
+- 匹配开放规则是否严格为每周二、是否允许测试环境绕过。
+- 订阅消息模板字段、正式环境状态和授权消费策略。
+- 前端负责人何时配合完成 userId/author、照片墙、洞察和环境配置契约。

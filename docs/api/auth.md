@@ -1,67 +1,47 @@
 # Auth 模块
 
-**模块职责**：微信登录、Token 管理、实名认证
-**对应前端页面**：app.js（登录）、pages/accountSecurity（认证状态展示）
+**实现**：`server/src/auth/`
+**前端调用**：`app.js`、`utils/api.js`
 **数据表**：`users`
-**上游文档**：[技术方案设计 §5](../architecture/技术方案设计.md) · [ADR-0002 真人认证选型](../decisions/0002-真人认证选型.md)
+**字段契约**：[前后端字段对齐表](../architecture/前后端字段对齐表.md)
 
-**当前实现校准（2026-07）**：后端已有 `POST /api/auth/wx-login` 和 JWT 签发，但 `AuthService` 仍用 `mock_openid_${code}` 创建用户，尚未调用微信 `jscode2session`。生产上线前必须补真实 openid/unionid 获取和实名状态口径。
+## 当前状态
 
-## 当前前端状态
+小程序启动时调用 `wx.login()`，再调用 `POST /api/auth/wx-login` 并保存 JWT。后端目前没有调用微信 `jscode2session`，而是把临时 code 拼成 `mock_openid_${code}`；新用户的 `realNameVerified` 默认是 `false`。
 
-- **微信登录**：当前无实际登录流程，app.js 启动时直接从 `wx.getStorageSync('userProfile')` 读取本地缓存的 mockData 默认用户
-- **实名认证**：采用微信实名认证方案，通过微信登录链路确认实名状态，accountSecurity 页面展示认证状态
+因此当前实现只能用于开发环境的身份闭环，不能证明真实 openid、unionid 或实名认证。
 
-## 未来后端目标
+## POST /api/auth/wx-login
 
-- 微信登录闭环：`wx.login()` 拿 code → 后端换 openid → 返回 JWT
-- 实名认证：微信用户已实名，后端通过微信登录链路确认实名状态 → 写 `users.real_name_verified = true`（见 ADR-0002）
+无需 JWT。
 
----
-
-## API 列表
-
-### POST /api/auth/wx-login — P0
-
-微信小程序登录。
-
-**请求**：
+请求：
 
 ```json
-{
-  "code": "string — wx.login() 返回的临时 code"
-}
+{ "code": "wx.login 返回的临时 code" }
 ```
 
-**响应**：
+响应：
 
 ```json
 {
-  "token": "string — JWT",
+  "token": "JWT",
   "user": {
-    "id": "string — 如 LX_9527",
-    "openid": "string",
-    "nickname": "string",
-    "avatar": "string — URL",
-    "bio": "string",
+    "id": "cuid",
+    "openid": "mock_openid_<code>",
+    "nickname": "新用户",
+    "avatar": "",
+    "bio": "",
     "realNameVerified": false
   }
 }
 ```
 
-**错误码**：
+当前明确错误：`code` 为空时返回 `WX_CODE_INVALID`。文档中的 `WX_API_ERROR` 只有接入真实微信接口后才会成立。
 
-| code | 说明 |
-|---|---|
-| `WX_CODE_INVALID` | code 无效或已过期 |
-| `WX_API_ERROR` | 微信 API 调用失败 |
+## 待开发
 
-**前端对接**：app.js `onLaunch` 调用 `wx.login()` 获取 code，登录成功后将 user 写入 `globalData.userInfo` 和 `wx.setStorageSync('userProfile', ...)`。
-
----
-
-## 优先级说明
-
-| 接口 | 优先级 | 理由 |
-|---|---|---|
-| `wx-login` | P0 | 所有接口的鉴权前置 |
+1. 使用 `WX_APPID`、`WX_SECRET` 调用微信接口换取 openid/session key，并处理错误码与超时。
+2. 明确 unionid、用户合并和 token 刷新策略。
+3. 单独确认实名认证产品口径和可用平台能力，不能直接从当前登录代码推断。
+4. 生产启动时禁止 `JWT_SECRET=dev-secret`。

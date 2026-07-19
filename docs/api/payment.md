@@ -1,81 +1,64 @@
 # Payment 模块
 
-**模块职责**：微信支付、权益解锁
-**对应前端页面**：pages/match（支付弹窗）
+**实现**：`server/src/pay/`
+**前端页面**：`pages/match`
 **数据表**：`orders`、`entitlements`
-**上游文档**：[技术方案设计 §3.6](../architecture/技术方案设计.md)
+**字段契约**：[前后端字段对齐表](../architecture/前后端字段对齐表.md)
 
-**当前实现校准（2026-07）**：后端已实现 `POST /api/pay/create-order` 和 `POST /api/pay/wx-callback`。无微信商户号时返回 mock order；真实支付需要微信商户配置、公网回调和验签。支付成功后的订单、权益、匹配解锁和通知写入后续应收敛到事务或幂等流程。
+## 当前状态
 
-## 当前前端状态
+后端已实现微信支付 V3 JSAPI 下单、回调 header 验签、AES-GCM 资源解密、订单更新、权益创建、匹配解锁和站内通知。前端已调用 `wx.requestPayment`。
 
-- **唯一入口**：match 页 `showPayModal` → "解锁 TA 的微信" 弹窗 → `confirmPay()` 仅显示 toast "支付功能开发中"
-- **无实际支付调用**：未调用 `wx.requestPayment`
-- **无支付参数**：无订单号、金额、SKU
-- **付费模式**：产品文档待讨论（按次 / 按阶段 / 会员制）
+真实链路尚未使用商户号、平台证书和公网回调验收。未配置 `WX_MCH_ID` 时，后端仍创建 pending 订单并返回 `wxPayParams: null`；前端会在本地显示“已解锁”，但数据库没有 paid entitlement。
 
-## 未来后端目标
+## POST /api/pay/create-order
 
-- 创建订单 → 调用微信支付统一下单 → 前端 `wx.requestPayment` → 微信回调确认
-- 支付成功后写入 `entitlements` 表，解锁对应匹配对象微信
+需要 JWT。
 
----
-
-## API 列表
-
-### POST /api/pay/create-order — P2
-
-创建支付订单。
-
-**请求**：
+请求：
 
 ```json
 {
   "sku": "unlock_wechat",
-  "targetMatchId": "string — 要解锁的匹配 ID"
+  "targetMatchId": "match-result-id"
 }
 ```
 
-**响应**：
+真实配置成功响应：
 
 ```json
 {
-  "orderId": "string",
+  "success": true,
+  "orderId": "cuid",
   "wxPayParams": {
     "timeStamp": "string",
     "nonceStr": "string",
-    "package": "string",
+    "package": "prepay_id=...",
     "signType": "RSA",
     "paySign": "string"
   }
 }
 ```
 
-**前端对接**：`confirmPay()` 调用此接口 → 拿 `wxPayParams` → `wx.requestPayment(wxPayParams)`。
+未配置商户号时：
 
----
+```json
+{ "success": true, "orderId": "cuid", "wxPayParams": null }
+```
 
-### POST /api/pay/wx-callback — P2
+当前金额在代码中固定为 699 分。匹配不存在返回 `MATCH_NOT_FOUND`，已有 paid 订单返回 `ALREADY_PAID`。
 
-微信支付结果回调（微信服务器 → 后端，非前端调用）。
+## POST /api/pay/wx-callback
 
-**行为**：验签 → 更新 `orders.status` → 写 `entitlements`。
+无需 JWT，由微信服务器调用。配置商户号后流程为：验签、解密、查订单、更新 paid、创建 entitlement、更新匹配解锁位、写通知。
 
----
+当前风险：
 
-## 错误码
+- 回调多步写入不在 Prisma transaction 中。
+- 除 `entitlements.order_id` 外，订单号和业务幂等约束不足。
+- 回调验签使用 `JSON.stringify(body)`，需要确认生产框架保留的 body 与微信签名原文完全一致。
+- 未配置商户号时回调直接返回 SUCCESS，只适合开发环境。
 
-| code | 说明 |
-|---|---|
-| `ORDER_CREATE_FAILED` | 订单创建失败 |
-| `PAY_ALREADY_DONE` | 已支付 |
-| `MATCH_NOT_FOUND` | 匹配不存在 |
+## 上线前验收
 
-## 优先级说明
-
-| 接口 | 优先级 | 理由 |
-|---|---|---|
-| `POST /api/pay/create-order` | P2 | 前端仅 toast 占位，付费模式待确认 |
-| `POST /api/pay/wx-callback` | P2 | 同上 |
-
-**整个模块为 P2**：付费模式尚未收敛（产品概念文档 §7.2 列出三种方案待讨论），前端无实际支付逻辑。后端需预留 `orders` / `entitlements` 表结构，但实现优先级最低。
+按 [测试与验收](../TESTING.md) 完成真实下单、前端支付、回调验签/解密、重复回调和故障注入，再把该模块标记为生产完成。

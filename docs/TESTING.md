@@ -1,139 +1,108 @@
 # 赛博聊机 · 测试与验收
 
-**状态**：当前验证基线（2026-07）
-**适用范围**：后端主服务、语音网关、数据库迁移、后端/前端联调契约
-**上游文档**：[开发指南](DEVELOPMENT.md) · [后端架构与交接](architecture/后端架构.md)
+**状态**：当前验证基线（2026-07-12）
+**范围**：后端主服务、语音网关、Prisma、前端静态检查和外部集成
+**上游文档**：[开发指南](DEVELOPMENT.md) · [后端架构](architecture/后端架构.md)
 
-当前项目没有完整自动化测试体系。本文先定义可执行的后端验证基线，避免把“代码能启动”“文档写了”误当成“功能已完成”。
+项目当前只有语音编排纯逻辑单元测试，没有 HTTP/数据库/WebSocket 集成测试、端到端测试或 CI。完成状态必须区分“静态检查通过”“本地集成通过”和“真实外部链路通过”。
 
-## 1. 当前可用命令
+## 1. 自动化与静态检查
 
-在 `server/` 下执行：
+在 `server/` 执行：
 
-| 命令 | 类型 | 说明 |
+| 命令 | 覆盖范围 | 当前状态 |
 |---|---|---|
-| `npm run build` | 编译检查 | NestJS 主服务 TypeScript 编译 |
-| `npm run build:voice` | 编译检查 | `server/voice-gateway/` TypeScript 编译 |
-| `npm run test:voice` | 单元测试 | probe_card、阶段选卡、选项映射、追问、跳过、纠正与 coverage 规则 |
-| `npx prisma generate` | Prisma | 生成 Prisma Client |
-| `npx prisma migrate dev` | DB | 本地开发库建表/迁移 |
-| `npm run start:dev` | 本地服务 | HTTP API，默认 `http://localhost:3000/api` |
-| `npm run start:voice` | 本地服务 | WebSocket 语音网关，默认 `ws://localhost:3001/ws/voice` |
-| `npm run smoke:tts` | 外部服务 smoke | TTS 配置存在时验证语音合成链路 |
+| `npm run build` | NestJS 主服务 TypeScript 编译 | 可执行 |
+| `npm run build:voice` | 语音网关 TypeScript 编译 | 可执行 |
+| `npm run test:voice` | probe_card、coverage、映射、追问、跳过、纠正 | 8 个测试 |
+| `npx prisma validate` | Prisma schema 结构 | 可执行 |
+| `npx prisma generate` | Prisma Client 生成 | 可执行 |
+| `node --check <file.js>` | 小程序 JavaScript 语法 | 可执行 |
 
-不要用仓库根目录的 `npm test` 作为完成标准；它当前是占位失败脚本。
+根目录 `npm test` 是固定失败的占位脚本。根 `tsconfig.json` 当前不能通过类型检查，详见 [代码审计](CODE_AUDIT.md)。
 
-## 2. 后端任务完成门槛
+## 2. 本次审计证据
 
-普通后端代码变更至少满足：
+2026-07-12 在 `backend` 分支、`ab42e83` 基线上执行：
+
+- `npm run build`：通过。
+- `npm run test:voice`：通过，8/8。
+- `npx prisma validate`：通过。
+- 对仓库 23 个前端 `.js` 文件执行 `node --check`：通过。
+- 使用后端 TypeScript 编译器检查根 `tsconfig.json`：失败，存在微信全局类型缺失和实际类型错误。
+- 未执行 `prisma migrate dev/deploy`：本次审计没有被授权修改数据库，也没有确认目标数据库。
+- 未执行真实 LLM/ASR/TTS、微信支付或订阅消息验收：需要有效外部凭据、微信开发者工具/真机和公网回调。
+
+## 3. 后端变更最低门槛
 
 ```bash
 cd server
 npm run build
-npm run build:voice
 npm run test:voice
+npx prisma validate
 ```
 
-涉及 Prisma schema 或 migrations 时追加：
+涉及 Prisma schema 或 migration 时追加：
 
 ```bash
-cd server
 npx prisma generate
+# 仅对明确的本地开发库
 npx prisma migrate dev
 ```
 
-涉及 HTTP API 时追加最小手动验收：
+涉及 HTTP API 时，启动主服务后至少验证：
 
 ```bash
 curl http://localhost:3000/api/health
 ```
 
-需要鉴权的接口先通过登录拿 token：
+鉴权接口先调用 `POST /api/auth/wx-login` 获取 token。注意当前登录生成 mock openid，因此只能证明本地鉴权链路，不代表真实微信身份已通过。
 
-```bash
-TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/wx-login \
-  -H "Content-Type: application/json" \
-  -d "{\"code\":\"dev-code\"}" | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).token")
-```
+## 4. 模块验收矩阵
 
-然后访问目标接口：
-
-```bash
-curl http://localhost:3000/api/me -H "Authorization: Bearer $TOKEN"
-```
-
-Windows PowerShell 可改用：
-
-```powershell
-$login = Invoke-RestMethod -Method Post http://localhost:3000/api/auth/wx-login `
-  -ContentType 'application/json' `
-  -Body '{"code":"dev-code"}'
-$headers = @{ Authorization = "Bearer $($login.token)" }
-Invoke-RestMethod http://localhost:3000/api/me -Headers $headers
-```
-
-## 3. 模块验收重点
-
-| 模块 | 后端验收重点 | 备注 |
+| 模块 | 可在仓库内验证 | 仍需集成/外部验证 |
 |---|---|---|
-| Auth | 真实微信 openid/unionid、JWT payload、实名状态口径 | 当前仍是 mock openid |
-| Profile | `/me`、`/me/photos`、`/users/:id/home` 字段与前端一致 | 用户主页参数需要和前端定名 |
-| Memory | chat 写入、LLM fallback、insights update/delete、archive 来源 | 文字和语音画像逻辑需后续收敛 |
-| Match | weekly round、pairing、文案 fallback、feedback 写入 | 需要至少 2 个有画像用户才能完整验收 |
-| Notifications | 列表、未读数、read-all、clear、匹配/支付事件写入 | 订阅消息推送是 best-effort |
-| Payment | create-order、mock 模式、微信回调验签、权益解锁 | 多步写入应补事务或幂等保护 |
-| Voice Gateway | WS 鉴权、start/audio/listen/end 事件、ASR/TTS 错误处理 | 真实 ASR/TTS 需配置火山密钥后验证 |
+| Auth | 编译、JWT guard、空 code 错误 | `jscode2session`、openid/unionid、实名口径 |
+| Profile | Controller/Service 编译 | DB CRUD、照片上传方案、前端数据权威来源 |
+| Memory | LLM fallback 代码路径 | DB 历史分页、画像异步抽取、前端编辑/删除同步 |
+| Match | 匹配引擎和定时任务编译 | 至少两个真实画像用户、重复轮次和通知一致性 |
+| Notifications | CRUD 代码路径 | 订阅授权持久化、模板和真机推送 |
+| Payment | 下单/回调代码编译 | 微信下单、回调原文验签、幂等与事务 |
+| Voice | 8 个 coverage 单测、网关编译 | DB 迁移、15 分钟整通、barge-in、断线续采、真实 ASR/TTS/LLM |
 
-## 4. 语音网关验收
+## 5. 语音真实链路验收
 
-无 ASR/TTS 配置时：
+满足以下条件后才能把语音状态标为“已验收”：
 
-- `npm run start:voice` 能启动。
-- 小程序或 WebSocket 客户端能连接 `/ws/voice?token=<JWT>`。
-- `start` 后收到 `connected` 和 mock AI 回复事件。
+1. 对目标数据库执行最新迁移，确认 `voice_coverage_states` 和 `voice_evidence` 存在。
+2. 使用真实 JWT 连接 `/ws/voice?token=<JWT>`。
+3. 验证 `start`、`listen_ready`、`audio_chunk`、`end` 以及所有服务端事件。
+4. 验证 TTS chunk 播放、用户插话、ASR 结束判断和错误超时。
+5. 完成一通 15 分钟流程，检查 coverage、evidence、session end reason 和画像合并。
+6. 中途断线后重连，确认创建新 session 并续采缺失维度。
 
-有 ASR/TTS 配置时：
+`npm run test:voice` 只覆盖纯规则逻辑，不能替代上述验收。
 
-- ASR：发送 PCM chunk 后应收到 `asr_partial` / `asr_final`。
-- TTS：AI 回复应以 `ai_reply_audio` chunk 下发，最后发送 `ai_turn_end`。
-- Barge-in：AI 播放时用户说话，应发送 interrupted `ai_turn_end` 并进入用户语音识别。
-- 编排：正常 AI 回合应为“轻确认 + 一个选择题”，不能退回随机陪聊陈述。
-- Coverage：回答后 `voice_coverage_states` 和 `voice_evidence` 应立即更新，证据包含 card/version/option/source question 字段。
-- 续采：中途挂断后重连应创建新 session，并优先补未覆盖维度。
-- 纠正：说“你听错了，我刚才说的是……”应 supersede 上一条证据，且不消耗当前问题。
-- 超时：ASR/TTS URL 不可达时，10 秒左右应有错误，不应挂死会话。
+## 6. 支付与通知验收
 
-## 5. 支付与通知验收
+真实支付至少验证：下单参数、`wx.requestPayment`、微信回调签名原文、资源解密、重复回调幂等、订单/权益/匹配解锁/通知的一致性。当前这些写入不在单一事务中。
 
-无微信商户号时：
+订阅消息至少验证：前端模板 ID、授权结果、授权消费策略、后端持久化、access token、正式环境 `miniprogram_state` 和真机接收。当前 `POST /api/notifications/subscribe` 只回显成功，不持久化授权。
 
-- `POST /api/pay/create-order` 应创建本地订单并返回 `wxPayParams: null`。
-- 前端可进入 mock 解锁路径，但这不代表真实支付已通过。
+## 7. 数据库与部署验收
 
-有微信商户号时：
+- `prisma migrate deploy` 在空库和已有库都可重复执行。
+- HTTP 主服务和语音网关使用同一 schema 与 `JWT_SECRET`。
+- 生产环境不使用 `dev-secret`，不提交 `.env`、证书或私钥。
+- HTTPS/WSS、域名白名单、健康检查、日志、告警、备份和回滚均有证据。
+- CI 能从干净环境执行依赖安装、Prisma 生成、构建和测试。
 
-- 下单返回 JSAPI 支付参数。
-- 微信回调验签通过。
-- 订单状态更新为 `paid`。
-- 创建 `Entitlement`。
-- 对应 `MatchResult.unlockedByA/B` 更新。
-- 写入通知。
+## 8. 当前测试缺口
 
-以上多步写入后续应放入事务或幂等流程。
-
-## 6. 文档验收
-
-后端文档变更完成前，检查：
-
-- 新增文档已登记到 `docs/README.md`。
-- API 字段变更已同步到 `docs/api/<module>.md`。
-- 架构边界或风险变更已同步到 `docs/architecture/后端架构.md` 或 ADR。
-- 进度状态变更只写入 `docs/DEV_PROGRESS.md`，不要让 `CODE_AUDIT.md` 变成第二份进度表。
-
-## 7. 已知测试缺口
-
-- 自动化单元测试目前只覆盖语音编排纯逻辑，尚未覆盖数据库和 WebSocket 集成。
-- 无端到端测试脚本。
-- 无 CI 配置可复现后端验证链。
-- 语音真实链路依赖火山 ASR/TTS 配置和微信开发者工具/真机验证。
-- 支付和订阅消息依赖微信商户号、小程序后台模板和公网回调地址。
+- 无 Controller/Service 单元测试。
+- 无 PostgreSQL 集成测试和测试数据工厂。
+- 无 WebSocket 协议集成测试。
+- 无小程序自动化或端到端测试。
+- 无支付、订阅消息和火山服务的可重复 sandbox 测试。
+- 无 CI 配置。
+- 根 TypeScript 工程未达到可检查状态。
