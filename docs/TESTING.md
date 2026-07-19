@@ -4,7 +4,7 @@
 **范围**：后端主服务、语音网关、Prisma、前端静态检查和外部集成
 **上游文档**：[开发指南](DEVELOPMENT.md) · [后端架构](architecture/后端架构.md)
 
-项目当前有语音 coverage 纯逻辑测试和 VoiceSession 进程内生命周期测试，没有 HTTP/数据库/WebSocket 协议集成测试、端到端测试或 CI。完成状态必须区分“静态检查通过”“进程内测试通过”“本地集成通过”和“真实外部链路通过”。
+项目当前有语音 coverage 纯逻辑测试、VoiceSession 进程内生命周期测试和专用 PostgreSQL 持久化测试，没有 HTTP/WebSocket 协议集成测试、端到端测试或 CI。完成状态必须区分“静态检查通过”“进程内测试通过”“本地集成通过”和“真实外部链路通过”。
 
 ## 1. 自动化与静态检查
 
@@ -15,6 +15,7 @@
 | `npm run build` | NestJS 主服务 TypeScript 编译 | 可执行 |
 | `npm run build:voice` | 语音网关 TypeScript 编译 | 可执行 |
 | `npm run test:voice` | coverage/probe_card 规则与 VoiceSession 生命周期 | 17 个测试 |
+| `npm run test:voice:persistence` | Voice 回合事务、回滚、纠正和结束持久化 | 5 个 PostgreSQL 测试；要求 `VOICE_TEST_DATABASE_URL` |
 | `npx prisma validate` | Prisma schema 结构 | 可执行 |
 | `npx prisma generate` | Prisma Client 生成 | 可执行 |
 | `node --check <file.js>` | 小程序 JavaScript 语法 | 可执行 |
@@ -28,6 +29,8 @@
 - `npm run build`：通过。
 - `npm run test:voice`：通过，17/17（coverage 8 项、VoiceSession 生命周期 9 项）。
 - `npm run build:voice && node --test dist-voice/session.test.js`：通过，V-001 专项 9/9。
+- `prisma migrate deploy`：在隔离的 `aitalk_voice_test` 数据库通过，三组迁移无待应用项。
+- `npm run test:voice:persistence`：通过，V-002 专项 5/5；未使用项目 `.env` 指向的数据库。
 - `npx prisma validate`：通过。
 - 对仓库 23 个前端 `.js` 文件执行 `node --check`：通过。
 - 使用后端 TypeScript 编译器检查根 `tsconfig.json`：失败，存在微信全局类型缺失和实际类型错误。
@@ -69,7 +72,7 @@ curl http://localhost:3000/api/health
 | Match | 匹配引擎和定时任务编译 | 至少两个真实画像用户、重复轮次和通知一致性 |
 | Notifications | CRUD 代码路径 | 订阅授权持久化、模板和真机推送 |
 | Payment | 下单/回调代码编译 | 微信下单、回调原文验签、幂等与事务 |
-| Voice | 8 个 coverage 单测、9 个会话生命周期单测、网关编译 | 持久化/WS 协议集成、DB 迁移、15 分钟整通、barge-in、断线续采、真实 ASR/TTS/LLM |
+| Voice | coverage 8 项、生命周期 9 项、PostgreSQL 持久化 5 项、网关编译 | WS 协议集成、目标环境迁移、15 分钟整通、真机 barge-in、真实 ASR/TTS/LLM |
 
 ## 5. 语音真实链路验收
 
@@ -83,6 +86,8 @@ curl http://localhost:3000/api/health
 6. 中途断线后重连，确认创建新 session 并续采缺失维度。
 
 `npm run test:voice` 覆盖纯规则逻辑和使用 fake provider/可控时钟的进程内生命周期，不包含真实 WebSocket、数据库或外部 provider，不能替代上述验收。
+
+`npm run test:voice:persistence` 会清理专用库中的 Voice 测试数据。入口要求 `VOICE_TEST_DATABASE_URL`，并拒绝数据库名不含 `test` 的地址；执行前仍应人工确认它不是共享开发库或生产库。
 
 ## 6. 支付与通知验收
 
@@ -101,7 +106,7 @@ curl http://localhost:3000/api/health
 ## 8. 当前测试缺口
 
 - 无 Controller/Service 单元测试。
-- 无 PostgreSQL 集成测试和测试数据工厂。
+- 只有 Voice 模块具备专用 PostgreSQL 集成测试；其他模块仍无数据库测试和统一测试数据工厂。
 - 无 WebSocket 协议集成测试。
 - 无小程序自动化或端到端测试。
 - 无支付、订阅消息和火山服务的可重复 sandbox 测试。

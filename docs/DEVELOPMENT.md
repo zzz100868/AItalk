@@ -132,6 +132,7 @@ NestJS 当前模块：`health`、`auth`、`profile`、`memory`、`match`、`noti
 | `npm run build` | 编译主服务到 `server/dist/` |
 | `npm run build:voice` | 编译语音网关到 `server/dist-voice/` |
 | `npm run test:voice` | 构建并运行 coverage/probe_card 与 VoiceSession 生命周期测试 |
+| `npm run test:voice:persistence` | 使用 `VOICE_TEST_DATABASE_URL` 运行 Voice PostgreSQL 持久化测试 |
 | `npm run smoke:tts` | 使用真实配置执行 TTS smoke test |
 | `npm run prisma:generate` | 生成 Prisma Client |
 | `npm run prisma:migrate` | 对本地开发库执行迁移 |
@@ -160,6 +161,17 @@ npx prisma validate
 ```
 
 涉及数据库、外部服务或前端交互时，必须追加相应集成/真机验收，不能以 mock 路径代替。
+
+Voice 持久化变更使用可清理的专用测试库：
+
+```powershell
+cd server
+$env:DATABASE_URL = $env:VOICE_TEST_DATABASE_URL
+npx prisma migrate deploy
+npm run test:voice:persistence
+```
+
+`VOICE_TEST_DATABASE_URL` 的数据库名必须包含 `test`，并且不得指向共享开发库或生产库。
 
 ## 10. 构建与部署
 
@@ -204,7 +216,7 @@ npm run start:voice:prod
 
 ### 为什么根目录 `npm test` 失败
 
-根脚本是占位命令。当前自动化测试只有 `server` 下的 `npm run test:voice`。根 TypeScript 检查也尚未配置到可通过状态。
+根脚本是占位命令。当前自动化测试入口位于 `server`，包括 `npm run test:voice` 和需要专用数据库的 `npm run test:voice:persistence`。根 TypeScript 检查尚未配置到可通过状态。
 
 ### 为什么支付显示“配置中”但页面变成已解锁
 

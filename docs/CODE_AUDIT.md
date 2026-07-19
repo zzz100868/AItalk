@@ -34,7 +34,7 @@
 ## 3. 架构观察
 
 - NestJS 当前是 `Controller -> Service -> PrismaService`，适合 MVP；支付、匹配等跨表流程已经需要显式事务边界。
-- 语音网关直接访问 Prisma 并维护高复杂度会话状态。coverage/probe_card 已抽成纯逻辑模块，这是当前最有测试基础的部分。
+- 语音网关直接访问 Prisma 并维护高复杂度会话状态。coverage/probe_card 已抽成纯逻辑模块，每轮 turn/evidence/coverage/profile 写入已使用 Prisma 事务并有专用 PostgreSQL 回滚测试。
 - Memory 文字画像与 Voice 语音画像分别合并 `ProfileDocument.data`，规则和数据形状可能继续漂移，应抽取共享画像合并模块。
 - `data/mockData.js` 对前端开发有价值，但不同 API 的 fallback 语义不一致；读取回落、写入失败和模拟成功应分开处理。
 - 目标态文档曾包含 Redis、Bull、pgvector、Docker 和 CI；当前代码没有这些实现，后续文档必须明确标记为规划。
@@ -45,6 +45,7 @@
 |---|---|
 | `server: npm run build` | 通过 |
 | `server: npm run test:voice` | 通过，17/17（coverage 8、VoiceSession 生命周期 9） |
+| `server: npm run test:voice:persistence` | 通过，5/5（隔离 PostgreSQL） |
 | `server: npx prisma validate` | 通过 |
 | 23 个前端 JS 文件 `node --check` | 通过 |
 | 根 TypeScript `tsc --noEmit` | 失败：微信全局类型缺失及多处类型错误 |
@@ -58,5 +59,6 @@
 - `data/docs/` 旧文档树已删除，`docs/README.md` 是唯一入口。
 - Phase 3 旧审计中的 ASR 结束帧、状态机清理、PrismaClient 单例、TTS 超时/复用、barge-in 和前端 chunk 播放已有对应代码。
 - 语音 coverage/probe_card 规则已有 8 个自动化测试；VoiceSession 生命周期、并发结束、迟到回调、错误恢复和计时器边界已有 9 个自动化测试。
+- Voice 回合写入已收敛为短事务，profile 合并失败可回滚 turn/evidence/coverage；纠正按维度 supersede，结束写入使用首个原因并幂等。
 
 这些项目表示对应代码修复已存在，不代表真实 ASR/TTS/LLM 整通已经验收。
