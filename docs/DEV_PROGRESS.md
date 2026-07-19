@@ -1,7 +1,7 @@
 # 赛博聊机 · 当前开发进度
 
-**更新时间**：2026-07-12
-**事实基线**：`backend` 分支，提交 `ab42e83`；本次文档修改前工作树干净并与 `origin/backend` 同步
+**更新时间**：2026-07-19
+**事实基线**：`backend` 分支，V-001 实现提交 `cda751d`
 **状态口径**：`已完成` 表示代码存在且有仓库内验证；`进行中` 表示主要代码已存在但缺少数据库、外部服务或端到端证据；`待开发` 表示当前代码未实现。
 
 本文件是唯一进度记录。设计目标、历史 ADR 和 mock fallback 不能作为完成证据。
@@ -14,7 +14,7 @@
 | NestJS HTTP 主服务 | 已完成（代码基线） | `npm run build` 通过，模块和路由已注册 |
 | PostgreSQL/Prisma 模型 | 进行中 | schema 校验通过、迁移文件存在；本次未对数据库执行最新迁移 |
 | Memory 文字聊天与画像 | 进行中 | LLM/fallback、历史、画像抽取代码存在；缺数据库集成与真实 LLM 验收 |
-| 实时语音与 coverage 编排 | 进行中（`V-001 active`） | 网关编译通过、coverage 单测 8/8；按本文 Voice 收尾任务表推进 |
+| 实时语音与 coverage 编排 | 进行中（`V-001 passing`） | coverage 规则 8/8、会话生命周期 9/9；V-002 尚未启动 |
 | 每周匹配 | 进行中 | 匹配引擎、Cron、结果和通知写入存在；缺真实候选池集成验收 |
 | 通知中心 | 进行中 | 列表/已读/清空和前端 badge 已实现；订阅授权未持久化、未真机推送 |
 | 微信支付 | 进行中 | 下单和回调代码、前端 `wx.requestPayment` 已实现；未完成真实商户链路验收 |
@@ -29,14 +29,14 @@
 - 语音网关已实现 JWT 鉴权、ASR/TTS adapter、barge-in、probe_card、coverage、证据和跨会话状态代码。
 - 匹配引擎、每周定时任务、文案 fallback、反馈写入和匹配通知代码已实现。
 - 支付 V3 请求、回调验签/解密、权益写入和前端支付调用代码已实现。
-- 本次验证：主服务编译通过、语音测试 8/8、Prisma schema 校验通过、23 个前端 JS 文件语法检查通过。
+- 本次验证：主服务编译通过、语音测试 17/17；此前 Prisma schema 校验和 23 个前端 JS 文件语法检查继续作为文档审计基线。
 - 文档入口已统一为 `docs/README.md`，旧 `data/docs/` 已删除。
 
 ## 3. 进行中
 
 - **真实身份链路**：前端已调用 `wx.login`，后端仍把 code 转为 `mock_openid_${code}`；openid/unionid 和实名状态未接微信接口。
 - **数据库落地**：最新语音 coverage/evidence 迁移文件已提交，但本次没有对目标数据库执行或回归。
-- **语音验收**：纯逻辑已测，真实 ASR/TTS/LLM、15 分钟收尾、断线续采、barge-in 和持久化未做整通验收。
+- **语音验收**：coverage 规则和 VoiceSession 生命周期已测；持久化一致性、WebSocket 协议、真实 ASR/TTS/LLM、15 分钟整通、断线续采和 barge-in 仍待后续任务验收。
 - **前后端数据权威**：资料基本信息已接 API；照片墙仍本地保存，洞察编辑/删除仍只改本地 storage，用户主页 `author` 与 user id 语义未统一。
 - **匹配验收**：需要至少两个具备有效画像和活跃数据的用户验证候选过滤、配对、轮次和通知。
 - **支付/通知验收**：需要商户号、平台证书、回调域名、模板 ID 和真机；订阅授权接口当前未持久化。
@@ -58,7 +58,7 @@
 2. `active` 只能在全部验证命令成功后进入 `passing`。
 3. 验证失败时保持 `active`；无法继续时改为 `blocked` 并记录原因。
 4. 当前尚不存在的测试文件或 npm script 是对应任务必须交付的一部分；在入口补齐并成功执行前，任务不得进入 `passing`。
-5. 现有 `npm run test:voice` 的 8/8 只覆盖 coverage 纯逻辑，是共同基线，不替代下列任务的专项证据。
+5. 现有 `npm run test:voice` 共 17 项，包含 coverage 8 项和 V-001 生命周期 9 项；已通过任务的测试不替代后续任务的专项证据。
 
 验收证据在接入 Harness 前直接登记在本节，格式为：`日期 · git commit · 命令/退出码 · 结果摘要`。接入后改为 `.harness/evidence/<task-id>/<timestamp>/result.json`。
 
@@ -68,14 +68,14 @@
 
 | ID | 任务 | 依赖 | 状态 | 验收证据 |
 |---|---|---|---|---|
-| V-001 | 会话生命周期与状态机可靠性 | 无 | `active` | 待生成 |
+| V-001 | 会话生命周期与状态机可靠性 | 无 | `passing` | 2026-07-19，专项测试 9/9；详见 4.3 |
 | V-002 | 回合、证据、coverage 与画像持久化一致性 | V-001 | `not_started` | 待生成 |
 | V-003 | WebSocket 协议与小程序端收尾 | V-001、V-002 | `not_started` | 待生成 |
 | V-004 | ASR/TTS/LLM adapter 契约与故障测试 | V-003 | `not_started` | 待生成 |
 | V-005 | 本地 PostgreSQL + mock provider 全链路集成 | V-004 | `not_started` | 待生成 |
 | V-006 | 真实火山服务 15 分钟整通验收 | V-005 | `not_started` | 待生成 |
 
-当前 `active` 数量：**1**（V-001）。
+当前 `active` 数量：**0**。V-002 依赖已满足，但尚未授权启动。
 
 ### 4.3 V-001 会话生命周期与状态机可靠性
 
@@ -91,7 +91,7 @@ npm run build:voice
 node --test dist-voice/session.test.js
 ```
 
-**验收证据**：待生成。当前状态为 `active`，未通过前不得启动 V-002。
+**验收证据**：2026-07-19 · `cda751d` · `npm run build:voice` / exit 0，`node --test dist-voice/session.test.js` / exit 0 · 9/9 通过；覆盖正常回合、重复启动、并发结束、初始化中断、迟到 ASR/LLM/TTS 回调、ASR/TTS 错误、挂起 TTS 主动结束及 soft-close/extend/hard-timeout 边界。
 
 ### 4.4 V-002 持久化一致性
 
@@ -221,8 +221,8 @@ Voice 收尾表稳定后再执行 Harness L1 接入，不在当前文档任务�
 
 ## 7. 下一步计划
 
-1. **执行当前唯一 active 项 V-001**：先收敛 VoiceSession 生命周期、并发结束和迟到回调。
-2. **按依赖顺序推进 V-002 至 V-005**：完成持久化、协议、provider contract 和本地数据库集成。
+1. **经授权后启动 V-002**：先把 V-002 改为唯一 active 项，再验证回合、证据、coverage 与画像写入的一致性。
+2. **按依赖顺序推进 V-003 至 V-005**：完成协议、provider contract 和本地数据库集成。
 3. **具备火山测试凭据后执行 V-006**：完成 15 分钟真实整通并登记证据。
 4. **Voice 达到 passing 后再恢复其他业务任务**：真实微信登录、照片/洞察契约、匹配、支付和通知验收。
 5. **部署决定继续后置**：域名、Docker、CI、监控、限流和上线工程不阻塞 V-001 至 V-006 的本地开发。

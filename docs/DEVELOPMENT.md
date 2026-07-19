@@ -131,7 +131,7 @@ NestJS 当前模块：`health`、`auth`、`profile`、`memory`、`match`、`noti
 | `npm run start:voice` | 启动语音网关 |
 | `npm run build` | 编译主服务到 `server/dist/` |
 | `npm run build:voice` | 编译语音网关到 `server/dist-voice/` |
-| `npm run test:voice` | 构建并运行 coverage/probe_card 单元测试 |
+| `npm run test:voice` | 构建并运行 coverage/probe_card 与 VoiceSession 生命周期测试 |
 | `npm run smoke:tts` | 使用真实配置执行 TTS smoke test |
 | `npm run prisma:generate` | 生成 Prisma Client |
 | `npm run prisma:migrate` | 对本地开发库执行迁移 |
